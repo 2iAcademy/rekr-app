@@ -11,5 +11,18 @@ export default defineConfig({
 
   build: {
     sourcemap: true
-  }
+  },
+ preview: {
+  port: 8080,
+  strictPort: true,
+ },
+ server: {
+  port: 8080,
+  strictPort: true,
+  host: true,
+  watch: {
+   usePolling: true,
+   interval: 100,
+  },
+ },
 });
