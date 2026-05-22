@@ -24,6 +24,14 @@ function App() {
         <button type="button" className="counter" onClick={() => setCount((count) => count + 1)}>
           Count is {count}
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            throw new Error('Sentry Test Error');
+          }}
+        >
+          Break the world
+        </button>
       </section>
 
       <div className="ticks"></div>

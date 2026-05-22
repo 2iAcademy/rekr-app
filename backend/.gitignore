@@ -2,3 +2,8 @@ node_modules
 .env
 
 /generated/prisma
+
+# Sentry Config File
+.sentryclirc
+
+dist/
