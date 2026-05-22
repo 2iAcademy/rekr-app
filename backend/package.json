@@ -18,7 +18,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "sentry:sourcemaps": "sentry-cli sourcemaps inject --org diego-b0 --project rekr-back dist && sentry-cli sourcemaps upload --org diego-b0 --project rekr-back dist"
+    "sentry:sourcemaps": "sentry-cli sourcemaps inject --org rekr --project node-nestjs dist && sentry-cli sourcemaps upload --org rekr --project node-nestjs dist"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
