@@ -20,6 +20,12 @@ export default defineConfig({
   port: 8080,
   strictPort: true,
   host: true,
+  proxy: {
+   '/api': {
+    target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
+    changeOrigin: true,
+   },
+  },
   watch: {
    usePolling: true,
    interval: 100,

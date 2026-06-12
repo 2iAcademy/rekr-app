@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import reactLogo from './assets/react.svg';
 import viteLogo from './assets/vite.svg';
 import heroImg from './assets/hero.png';
@@ -6,6 +6,27 @@ import './App.css';
 
 function App() {
   const [count, setCount] = useState(0);
+  const [apiMessage, setApiMessage] = useState('Loading API...');
+  const [apiError, setApiError] = useState('');
+
+  useEffect(() => {
+    const apiBaseUrl = import.meta.env.VITE_API_URL ?? '/api';
+
+    fetch(`${apiBaseUrl}`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        return response.text();
+      })
+      .then((message) => {
+        setApiMessage(message);
+      })
+      .catch((error: unknown) => {
+        setApiError(error instanceof Error ? error.message : 'Unknown API error');
+      });
+  }, []);
 
   return (
     <>
@@ -20,6 +41,7 @@ function App() {
           <p>
             Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
           </p>
+          <p>Backend response: <code>{apiError || apiMessage}</code></p>
         </div>
         <button type="button" className="counter" onClick={() => setCount((count) => count + 1)}>
           Count is {count}
