@@ -6,9 +6,15 @@ import { AppService } from './app.service';
 import { APP_FILTER } from '@nestjs/core';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { PrismaModule } from './prisma/prisma.module';
+import { LogsModule } from './logs/logs.module';
 
 @Module({
-  imports: [SentryModule.forRoot(), ConfigModule.forRoot(), PrismaModule],
+  imports: [
+    SentryModule.forRoot(),
+    ConfigModule.forRoot(),
+    PrismaModule,
+    LogsModule,
+  ],
   controllers: [AppController],
   providers: [
     {
