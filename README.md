@@ -6,9 +6,10 @@ Monorepo : `backend/` (NestJS + Prisma + PostgreSQL) + `clientApp/` (React + Vit
 
 | Dossier | Contenu |
 |---------|---------|
-| `backend/` | API NestJS 11 (TypeScript) · ORM **Prisma 7** · PostgreSQL 18 |
+| `backend/` | API NestJS 11 (TypeScript) · ORM **Prisma 7** · PostgreSQL 18 · Kafka producer |
 | `clientApp/` | Front React + Vite |
 | `sonarqube/` | Analyse de code en local |
+| `docker-compose.yml` | Stack locale avec PostgreSQL, Kafka, Kafka UI, backend, sink |
 
 ## Démarrage
 
@@ -32,7 +33,44 @@ cp backend/.env.example backend/.env  # DATABASE_URL + PORT (utilisés par NestJ
 docker compose up -d
 ```
 
-Démarre `postgres` (5432), `backend` (3001) et `frontend` (8080).
+Démarre `postgres` (5432), `kafka` (29092), `kafka-ui` (8085), `backend` (3001), `logs-sink` et `frontend` (8080).
+
+### Kafka / logs
+
+Flux: `backend` (producer) → topic Kafka `logs.raw` → `logs-sink` (consumer) → table Postgres `logs_raw`.
+
+1. Vérifier que les services tournent:
+
+```bash
+docker compose ps
+docker compose logs -f backend logs-sink
+```
+
+2. Produire un message de test (depuis le conteneur backend, fonctionne même si `localhost:3001` n'est pas joignable depuis l'hôte):
+
+```bash
+docker compose exec backend sh -lc "wget -qSO- --post-data='' http://127.0.0.1:3001/api/logs/sample 2>&1"
+```
+
+3. Variante erreur simulée:
+
+```bash
+docker compose exec backend sh -lc "wget -qSO- --header='Content-Type: application/json' --post-data='{\"message\":\"test error\"}' http://127.0.0.1:3001/api/logs/error 2>&1"
+```
+
+4. Vérifier la consommation:
+
+```bash
+docker compose logs -f logs-sink
+```
+
+5. Vérifier côté Kafka UI: http://localhost:8085
+
+6. Vérifier la persistance en base:
+
+```bash
+docker compose exec postgres psql -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c "SELECT event_id, level, message, occurred_at FROM logs_raw ORDER BY created_at DESC LIMIT 10;"
+```
 
 ### 3. Initialiser la base (depuis l'hôte)
 
@@ -43,7 +81,8 @@ npx prisma migrate dev   # crée et applique les migrations
 npx prisma generate      # génère le client Prisma
 ```
 
-L'API répond alors sur **http://localhost:3001/api**.
+L'API répond sur le réseau Docker à `http://backend:3001/api`.
+Depuis l'hôte, l'URL exposée est `http://localhost:3001/api` si le port forwarding Docker est disponible.
 
 ## Base de données — Prisma
 

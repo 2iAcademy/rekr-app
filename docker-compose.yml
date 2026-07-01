@@ -1,4 +1,45 @@
 services:
+  kafka:
+    image: apache/kafka:4.0.0
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:9092,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: rekr
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
   postgres:
     image: postgres:18-alpine
     environment:
@@ -25,6 +66,8 @@ services:
       NODE_ENV: development
       PORT: ${PORT:-3001}
       DATABASE_URL: postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-backend}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: logs.raw
       SENTRY_DSN: ${SENTRY_DSN:-}
     volumes:
       - ./backend:/app
@@ -32,6 +75,28 @@ services:
     ports:
       - "${PORT:-3001}:3001"
     depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    #voir images (dev) pour remplacer le Dockerfile
+
+  logs-sink:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: npm run start:logs-sink
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-backend}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: logs.raw
+      KAFKA_GROUP_ID: rekr-logs-sink
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      kafka:
+        condition: service_healthy
       postgres:
         condition: service_healthy
 
@@ -48,6 +113,8 @@ services:
       - /app/node_modules
     ports:
       - "8080:8080"
+    #voir images (dev) pour remplacer le Dockerfile
 
 volumes:
+  kafka-data:
   pg18_data:
