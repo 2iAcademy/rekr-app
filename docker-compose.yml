@@ -19,6 +19,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: dev
     command: npm run start:dev
     environment:
       NODE_ENV: development
