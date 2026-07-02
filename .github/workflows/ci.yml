@@ -1,35 +1,20 @@
 name: CI
+
 on:
   pull_request:
-    branches:
-      - dev
   push:
     branches:
-      - dev
-      - prod
+      - preprod
+      - main
 
 jobs:
-  build_docker:
+  build:
+    name: Build backend
     runs-on: ubuntu-latest
 
     steps:
-      - name: install checkout
+      - name: Checkout
         uses: actions/checkout@v7
 
-      - name: check version docker
-        run: |
-          docker -v
-          docker compose version
-
-      - name: docker up
-        run: docker compose up -d
-
-      - name: install dependencies
-        run: docker compose exec -T -w /front/front node npm ci
-
-      - name: build app
-        run: docker compose exec -T -w /front/front node npm run build
-
-      - name: stop docker
-        if: always()
-        run: docker compose down
+      - name: Build backend
+        run: docker build --target build -t rekr-backend:ci ./backend
