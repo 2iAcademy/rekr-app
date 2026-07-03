@@ -12,7 +12,7 @@ COPY prisma.config.ts ./
 RUN npx prisma generate
 
 FROM common AS build
-COPY nest-cli.json instrument.ts ./
+COPY nest-cli.json ./
 COPY src ./src
 RUN npx nest build
 
