@@ -1,18 +1,21 @@
+import path from 'path';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import tailwindcss from '@tailwindcss/vite';
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
         name: 'Rekr',
         short_name: 'Rekr',
-        theme_color: '#2563eb',
+        theme_color: '#0EA672',
         lang: 'fr',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
@@ -31,7 +34,9 @@ export default defineConfig({
       project: 'rekr',
     }),
   ],
-
+  resolve: {
+    alias: { '@': path.resolve(__dirname, './src') },
+  },
   build: {
     sourcemap: true,
   },

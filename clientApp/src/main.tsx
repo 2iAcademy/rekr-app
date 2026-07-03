@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { createRoot, type Container } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
+import { Toaster } from '@/components/ui/sonner';
 import * as Sentry from '@sentry/react';
 
 const container = document.getElementById('root');
@@ -19,6 +20,7 @@ const root = createRoot(container as Container, {
 root.render(
   <StrictMode>
     <App />
+    <Toaster />
   </StrictMode>,
 );
 
