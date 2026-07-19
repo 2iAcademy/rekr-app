@@ -3,10 +3,11 @@ import { Check, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { authControllerSignup } from '@/api/generated';
 
 const roleOptions = [
-  { value: 'candidat', title: 'Candidat', subtitle: 'Je cherche un poste' },
-  { value: 'recruteur', title: 'Recruteur', subtitle: 'Je recrute' },
+  { value: 'candidate', title: 'Candidat', subtitle: 'Je cherche un poste' },
+  { value: 'recruiter', title: 'Recruteur', subtitle: 'Je recrute' },
 ] as const;
 
 type Role = (typeof roleOptions)[number]['value'];
@@ -27,19 +28,33 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
 
   const passwordsMatch = password === confirmPassword;
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
     if (!passwordsMatch) {
       setError('Les mots de passe ne correspondent pas.');
       return;
     }
+
     if (!acceptTerms) {
       setError('Tu dois accepter les CGU pour continuer.');
       return;
     }
-    setError(null);
-    onSubmit?.({ role, email, password });
-  }
+
+    try {
+      await authControllerSignup({
+        email,
+        password,
+        userType: role,
+      });
+
+      setError(null);
+
+      onSubmit?.({ role, email, password });
+    } catch {
+      setError('Impossible de créer le compte.');
+    }
+  };
 
   return (
     <main

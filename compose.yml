@@ -10,6 +10,7 @@ services:
         PORT: ${PORT:-3001}
         DATABASE_URL: ${DATABASE_URL:-}
         SENTRY_DSN: ${SENTRY_DSN:-}
+        JWT_SECRET: ${JWT_SECRET:-}
       volumes:
         - ./backend:/app
         - /app/node_modules
@@ -36,9 +37,9 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${POSTGRES_DB:-backend}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
