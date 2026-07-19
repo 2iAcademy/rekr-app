@@ -54,8 +54,46 @@ enum TagCategory {
   contract
   theme
   other
+  language
+  benefit
 
   @@map("tag_category")
+}
+
+enum ContractType {
+  CDI
+  CDD
+  ALTERNANCE
+  STAGE
+  FREELANCE
+  INTERIM
+
+  @@map("contract_type")
+}
+
+enum ExperienceLevel {
+  JUNIOR
+  CONFIRME
+  SENIOR
+  EXPERT
+
+  @@map("experience_level")
+}
+
+enum RemotePolicy {
+  ON_SITE
+  HYBRID
+  FULL_REMOTE
+
+  @@map("remote_policy")
+}
+
+enum Availability {
+  IMMEDIATE
+  WITHIN_DELAY
+  SPECIFIC_DATE
+
+  @@map("availability")
 }
 
 model User {
@@ -80,18 +118,31 @@ model User {
 }
 
 model CandidateProfile {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @unique @map("fk_user")
-  prenom     String   @db.VarChar(100)
-  nom        String   @db.VarChar(100)
-  picture    String?  @db.VarChar(255)
-  bio        String?  @db.Text
-  ville      String?  @db.VarChar(100)
-  codePostal String?  @map("code_postal") @db.VarChar(10)
-  latitude   Decimal? @db.Decimal(10, 7)
-  longitude  Decimal? @db.Decimal(10, 7)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                      Int              @id @default(autoincrement())
+  userId                  Int              @unique @map("fk_user")
+  firstName               String           @map("first_name") @db.VarChar(100)
+  lastName                String           @map("last_name") @db.VarChar(100)
+  picture                 String?          @db.VarChar(255)
+  bio                     String?          @db.Text
+  city                    String?          @db.VarChar(100)
+  postalCode              String?          @map("postal_code") @db.VarChar(10)
+  latitude                Decimal?         @db.Decimal(10, 7)
+  longitude               Decimal?         @db.Decimal(10, 7)
+  desiredJobTitle         String?          @map("desired_job_title") @db.VarChar(255)
+  contractTypes           ContractType[]   @map("contract_types")
+  experienceLevel         ExperienceLevel? @map("experience_level")
+  availability            Availability?
+  availabilityDelayMonths Int?             @map("availability_delay_months")
+  availabilityDate        DateTime?        @map("availability_date") @db.Timestamptz(6)
+  remotePolicy            RemotePolicy?    @map("remote_policy")
+  mobilityRadiusKm        Int?             @map("mobility_radius_km")
+  mobilityNationwide      Boolean?         @map("mobility_nationwide")
+  salaryMin               Int?             @map("salary_min")
+  salaryMax               Int?             @map("salary_max")
+  linkedinUrl             String?          @map("linkedin_url") @db.VarChar(255)
+  cvUrl                   String?          @map("cv_url") @db.VarChar(255)
+  createdAt               DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -102,8 +153,8 @@ model RecruiterProfile {
   id        Int      @id @default(autoincrement())
   userId    Int      @unique @map("fk_user")
   companyId Int      @map("fk_company")
-  prenom    String   @db.VarChar(100)
-  nom       String   @db.VarChar(100)
+  firstName String   @map("first_name") @db.VarChar(100)
+  lastName  String   @map("last_name") @db.VarChar(100)
   avatar    String?  @db.VarChar(255)
   jobTitle  String?  @map("job_title") @db.VarChar(150)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -117,21 +168,23 @@ model RecruiterProfile {
 
 model Company {
   id          Int          @id @default(autoincrement())
-  nom         String       @db.VarChar(255)
+  name        String       @db.VarChar(255)
   logo        String?      @db.VarChar(255)
-  taille      CompanySize?
+  size        CompanySize?
   sectorId    Int?         @map("fk_sector")
   description String?      @db.Text
   siteUrl     String?      @map("site_url") @db.VarChar(255)
-  ville       String?      @db.VarChar(100)
-  codePostal  String?      @map("code_postal") @db.VarChar(10)
+  coverImage  String?      @map("cover_image") @db.VarChar(255)
+  city        String?      @db.VarChar(100)
+  postalCode  String?      @map("postal_code") @db.VarChar(10)
   latitude    Decimal?     @db.Decimal(10, 7)
   longitude   Decimal?     @db.Decimal(10, 7)
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  recruiter RecruiterProfile[]
-  offers    Offer[]
+  recruiter   RecruiterProfile[]
+  offers      Offer[]
+  companyTags CompanyTag[]
 
   sector Sector? @relation(fields: [sectorId], references: [id], onDelete: SetNull)
 
@@ -148,18 +201,23 @@ model Sector {
 }
 
 model Offer {
-  id          Int         @id @default(autoincrement())
-  companyId   Int         @map("fk_company")
-  createdById Int?        @map("fk_user_created")
-  titre       String      @db.VarChar(255)
-  description String?     @db.Text
-  ville       String?     @db.VarChar(100)
-  codePostal  String?     @map("code_postal") @db.VarChar(10)
-  latitude    Decimal?    @db.Decimal(10, 7)
-  longitude   Decimal?    @db.Decimal(10, 7)
-  statut      OfferStatus @default(draft)
-  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                 Int              @id @default(autoincrement())
+  companyId          Int              @map("fk_company")
+  createdById        Int?             @map("fk_user_created")
+  title              String           @db.VarChar(255)
+  description        String?          @db.Text
+  city               String?          @db.VarChar(100)
+  postalCode         String?          @map("postal_code") @db.VarChar(10)
+  latitude           Decimal?         @db.Decimal(10, 7)
+  longitude          Decimal?         @db.Decimal(10, 7)
+  contractType       ContractType?    @map("contract_type")
+  minExperienceLevel ExperienceLevel? @map("min_experience_level")
+  remotePolicy       RemotePolicy?    @map("remote_policy")
+  salaryMin          Int?             @map("salary_min")
+  salaryMax          Int?             @map("salary_max")
+  status             OfferStatus      @default(draft)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user           User?                 @relation(fields: [createdById], references: [id], onDelete: SetNull)
   company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -176,6 +234,7 @@ model Tag {
 
   offerTags     OfferTag[]
   candidateTags CandidateTag[]
+  companyTags   CompanyTag[]
 
   @@map("tag")
 }
@@ -200,6 +259,17 @@ model CandidateTag {
 
   @@id([candidateUserId, tagId])
   @@map("candidate_tag")
+}
+
+model CompanyTag {
+  companyId Int @map("fk_company")
+  tagId     Int @map("fk_tag")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, tagId])
+  @@map("company_tag")
 }
 
 model CandidateLikesOffer {
