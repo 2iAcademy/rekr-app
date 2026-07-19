@@ -1,11 +1,7 @@
-import './App.css';
+import { SplashPage } from '@/features/onboarding/pages/SplashPage';
 
 function App() {
-  return (
-    <>
-        <div>Hello, World!</div>
-    </>
-  );
+  return <SplashPage />;
 }
 
 export default App;
