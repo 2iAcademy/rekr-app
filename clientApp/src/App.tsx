@@ -1,7 +1,8 @@
-import { SplashPage } from '@/features/onboarding/pages/SplashPage';
+import { RouterProvider } from 'react-router';
+import { router } from '@/router';
 
 function App() {
-  return <SplashPage />;
+  return <RouterProvider router={router} />;
 }
 
 export default App;

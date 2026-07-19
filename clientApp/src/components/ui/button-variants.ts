@@ -16,6 +16,7 @@ export const buttonVariants = cva(
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
         brand: "bg-brand-strong-gradient text-white shadow-brand hover:opacity-95",
+        role: "bg-role-gradient text-white shadow-role hover:opacity-95",
         soft: "border-black/5 bg-card text-foreground shadow-sm hover:opacity-95",
       },
       size: {
