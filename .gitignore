@@ -1,6 +1,7 @@
 .DS_Store
 node_modules/
 .env
+docs/
 
 compose.override.yml
 compose.override.yaml
