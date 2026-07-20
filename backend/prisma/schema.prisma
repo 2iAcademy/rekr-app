@@ -106,13 +106,15 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  candidateProfile CandidateProfile?
-  createdOffers    Offer[]
-  likedOffers      CandidateLikesOffer[]
-  likesGiven       RecruiterLikesCandidate[] @relation("RecruiterLikes")
-  likesReceived    RecruiterLikesCandidate[] @relation("CandidateLikedByRecruiter")
-  recruiterProfile RecruiterProfile?
-  candidateTags    CandidateTag[]
+  candidateProfile   CandidateProfile?
+  createdOffers      Offer[]
+  likedOffers        CandidateLikesOffer[]
+  likesGiven         RecruiterLikesCandidate[] @relation("RecruiterLikes")
+  likesReceived      RecruiterLikesCandidate[] @relation("CandidateLikedByRecruiter")
+  recruiterProfile   RecruiterProfile?
+  candidateTags      CandidateTag[]
+  matchesAsCandidate Match[]                   @relation("MatchCandidate")
+  matchesAsRecruiter Match[]                   @relation("MatchRecruiter")
 
   @@map("user")
 }
@@ -223,6 +225,7 @@ model Offer {
   company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   offerTags      OfferTag[]
   candidateLikes CandidateLikesOffer[]
+  matches        Match[]
 
   @@map("offer")
 }
@@ -294,4 +297,19 @@ model RecruiterLikesCandidate {
 
   @@id([recruiterUserId, candidateUserId])
   @@map("recruiter_likes_candidate")
+}
+
+model Match {
+  id              Int      @id @default(autoincrement())
+  candidateUserId Int      @map("fk_user_candidate")
+  offerId         Int      @map("fk_offer")
+  recruiterUserId Int?     @map("fk_user_recruiter")
+  matchedAt       DateTime @default(now()) @map("matched_at") @db.Timestamptz(6)
+
+  candidate User  @relation("MatchCandidate", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  offer     Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  recruiter User? @relation("MatchRecruiter", fields: [recruiterUserId], references: [id], onDelete: SetNull)
+
+  @@unique([candidateUserId, offerId])
+  @@map("match")
 }
