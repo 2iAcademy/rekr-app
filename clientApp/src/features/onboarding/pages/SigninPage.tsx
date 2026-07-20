@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 interface SigninPageProps {
   onBack?: () => void;
   onSignUp?: () => void;
+  onForgotPassword?: () => void;
   onSubmit?: (data: { email: string; password: string }) => void;
 }
 
-export function SigninPage({ onBack, onSignUp, onSubmit }: SigninPageProps) {
+export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: SigninPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -66,6 +67,13 @@ export function SigninPage({ onBack, onSignUp, onSubmit }: SigninPageProps) {
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Ton mot de passe"
           />
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="mt-0.5 cursor-pointer self-end text-xs font-medium text-role-strong hover:underline"
+          >
+            Mot de passe oublié ?
+          </button>
         </div>
 
         <Button type="submit" variant="role" size="xl" className="mt-1 w-full">
