@@ -1,9 +1,20 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { authControllerSignup } from '@/api/generated';
 import { SignupPage } from './SignupPage';
 
+vi.mock('@/api/generated', () => ({
+  authControllerSignup: vi.fn(),
+}));
+
+const signupRequest = vi.mocked(authControllerSignup);
+
 describe('SignupPage', () => {
+  beforeEach(() => {
+    signupRequest.mockResolvedValue({ data: undefined, status: 201, headers: new Headers() });
+  });
+
   it('soumet le rôle candidat par défaut avec email et mot de passe quand tout est valide', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
@@ -15,9 +26,14 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
+    expect(signupRequest).toHaveBeenCalledWith({
+      email: 'candidat@rekr.fr',
+      password: 'motdepasse1',
+      userType: 'candidate',
+    });
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith({
-      role: 'candidat',
+      role: 'candidate',
       email: 'candidat@rekr.fr',
       password: 'motdepasse1',
     });
@@ -35,7 +51,7 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ role: 'recruteur' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ role: 'recruiter' }));
   });
 
   it('bloque la soumission et affiche une erreur quand les mots de passe diffèrent', async () => {
@@ -109,11 +125,27 @@ describe('SignupPage', () => {
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith({
-      role: 'candidat',
+      role: 'candidate',
       email: 'candidat@rekr.fr',
       password: 'motdepasse1',
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it("affiche une erreur et ne notifie pas le parent quand l'API refuse la création", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    signupRequest.mockRejectedValue(new Error('Bad Request'));
+    render(<SignupPage onSubmit={onSubmit} />);
+
+    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Impossible de créer le compte.');
   });
 
   it("efface le message d'erreur dès que l'utilisateur modifie le mot de passe", async () => {
