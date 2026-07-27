@@ -61,6 +61,24 @@ describe('navigation onboarding', () => {
     expect(screen.getByRole('button', { name: 'Créer mon compte' })).toBeInTheDocument();
   });
 
+  it('navigue de la connexion vers le mot de passe oublié', async () => {
+    const user = userEvent.setup();
+    renderAt('/connexion');
+
+    await user.click(screen.getByRole('button', { name: 'Mot de passe oublié ?' }));
+
+    expect(screen.getByRole('button', { name: 'Envoyer le lien' })).toBeInTheDocument();
+  });
+
+  it('revient à la connexion depuis le mot de passe oublié', async () => {
+    const user = userEvent.setup();
+    renderAt('/mot-de-passe-oublie');
+
+    await user.click(screen.getByRole('button', { name: 'Retour' }));
+
+    expect(screen.getByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
+  });
+
   it('redirige toute route inconnue vers le Splash', () => {
     renderAt('/route-inexistante');
 
