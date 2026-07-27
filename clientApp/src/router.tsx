@@ -1,9 +1,17 @@
 import { createBrowserRouter, Navigate } from 'react-router';
-import { SplashRoute, SignupRoute, SigninRoute } from '@/features/onboarding/routes';
+import {
+  SplashRoute,
+  SignupRoute,
+  SigninRoute,
+  ForgotPasswordRoute,
+} from '@/features/onboarding/routes';
 
-export const router = createBrowserRouter([
+export const routes = [
   { path: '/', element: <SplashRoute /> },
   { path: '/inscription', element: <SignupRoute /> },
   { path: '/connexion', element: <SigninRoute /> },
+  { path: '/mot-de-passe-oublie', element: <ForgotPasswordRoute /> },
   { path: '*', element: <Navigate to="/" replace /> },
-]);
+];
+
+export const router = createBrowserRouter(routes);
