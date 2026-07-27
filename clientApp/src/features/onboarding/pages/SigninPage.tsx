@@ -22,9 +22,6 @@ export function SigninPage({ onBack, onSignUp, onSubmit }: SigninPageProps) {
         email,
         password,
       });
-
-      console.log(response);
-
       onSubmit?.({ email, password });
     } catch (error) {
       console.error(error);
