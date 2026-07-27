@@ -83,6 +83,27 @@ npx prisma generate      # génère le client Prisma
 
 L'API répond sur le réseau Docker à `http://backend:3001/api`.
 Depuis l'hôte, l'URL exposée est `http://localhost:3001/api` si le port forwarding Docker est disponible.
+Documentation Swagger: `http://localhost:3001/api/docs` (OpenAPI JSON: `http://localhost:3001/api/docs-json`).
+
+## Authentification (signup / login)
+
+Le backend expose:
+
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+
+Variables requises dans `backend/.env`:
+
+```bash
+JWT_SECRET="<secret-long-et-aleatoire>"
+```
+
+Payloads:
+
+- `signup`: `{ "email": "user@mail.com", "password": "min8chars", "userType": "candidate" | "recruiter" }`
+- `login`: `{ "email": "user@mail.com", "password": "min8chars" }`
+
+La réponse contient `accessToken` + un objet `user` (sans mot de passe).
 
 ## Base de données — Prisma
 

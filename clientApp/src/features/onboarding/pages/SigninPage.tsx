@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { authControllerLogin } from '@/api/generated';
 
 interface SigninPageProps {
   onBack?: () => void;
@@ -14,11 +15,19 @@ export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: Sig
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onSubmit?.({ email, password });
-  }
 
+    try {
+      await authControllerLogin({
+        email,
+        password,
+      });
+      onSubmit?.({ email, password });
+    } catch (error) {
+      console.error(error);
+    }
+  };
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background px-6 pt-4 pb-8">
       <header className="relative flex h-9 items-center justify-center">
