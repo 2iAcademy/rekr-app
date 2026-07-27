@@ -18,7 +18,7 @@ export function SigninPage({ onBack, onSignUp, onSubmit }: SigninPageProps) {
     event.preventDefault();
 
     try {
-      const response = await authControllerLogin({
+      await authControllerLogin({
         email,
         password,
       });
