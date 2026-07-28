@@ -51,22 +51,37 @@ async function main() {
   console.log(`[logs-sink] consuming ${topic} from ${brokers.join(', ')}`);
 
   await consumer.run({
+    // A message this handler cannot process must never be rethrown: kafkajs
+    // would replay the same batch forever, the offset would never advance and
+    // the whole partition would stop ingesting behind it. One malformed or
+    // Postgres-hostile payload (a NUL byte is enough — SQLSTATE 22021) would
+    // be a permanent denial of service on the log pipeline. The API rejects
+    // those at the DTO now, but this consumer must survive any producer.
     eachMessage: async ({ topic: messageTopic, partition, message }) => {
-      if (!message.value) {
-        throw new Error('Kafka message is empty.');
+      try {
+        if (!message.value) {
+          throw new Error('Kafka message is empty.');
+        }
+
+        const event = JSON.parse(
+          message.value.toString('utf8'),
+        ) as KafkaLogEvent;
+
+        await writer.upsert(event, {
+          topic: messageTopic,
+          partition,
+          offset: message.offset,
+        });
+
+        console.log(
+          `[logs-sink] stored ${event.eventId} from partition ${partition} offset ${message.offset}`,
+        );
+      } catch (error) {
+        console.error(
+          `[logs-sink] dropped an unprocessable message from partition ${partition} offset ${message.offset}`,
+          error,
+        );
       }
-
-      const event = JSON.parse(message.value.toString('utf8')) as KafkaLogEvent;
-
-      await writer.upsert(event, {
-        topic: messageTopic,
-        partition,
-        offset: message.offset,
-      });
-
-      console.log(
-        `[logs-sink] stored ${event.eventId} from partition ${partition} offset ${message.offset}`,
-      );
     },
   });
 }

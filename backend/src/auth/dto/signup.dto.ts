@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsIn, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsString, MaxLength, MinLength } from 'class-validator';
 import { normalizeEmail } from 'src/common/transforms/emails.transforms';
+import { MAX_PASSWORD_LENGTH } from 'src/common/validation/password-bounds';
 import { ApiProperty } from '@nestjs/swagger';
 
 const allowedUserTypes = ['candidate', 'recruiter'] as const;
@@ -32,11 +33,13 @@ export class SignupDto {
   email!: string;
 
   @ApiProperty({
-    example: 'password123',
+    example: 'correct-horse-battery-staple',
     minLength: 8,
+    maxLength: MAX_PASSWORD_LENGTH,
   })
   @IsString()
   @MinLength(8)
+  @MaxLength(MAX_PASSWORD_LENGTH)
   password!: string;
 
   @ApiProperty({
