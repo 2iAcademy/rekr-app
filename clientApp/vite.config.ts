@@ -12,6 +12,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Workbox writes the service worker after Sentry's delete hook has run,
+      // so its maps would survive in dist. They carry no app source, only the
+      // local build path — not worth publishing either.
+      workbox: {
+        sourcemap: false,
+      },
       manifest: {
         name: 'Rekr',
         short_name: 'Rekr',
@@ -32,13 +38,23 @@ export default defineConfig({
     sentryVitePlugin({
       org: 'diego-b0',
       project: 'rekr',
+      sourcemaps: {
+        // Sentry uploads the maps (matching is done via injected debug ids),
+        // then deletes them so they are never served next to the bundle.
+        // The plugin runs this in a `finally` block, so the files are removed
+        // even on a build without SENTRY_AUTH_TOKEN, where upload is skipped.
+        filesToDeleteAfterUpload: ['./dist/**/*.map'],
+      },
     }),
   ],
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
   build: {
-    sourcemap: true,
+    // 'hidden' still emits the .map files Sentry needs, but drops the
+    // `//# sourceMappingURL=` comment from the bundle, so the source is not
+    // discoverable from the browser even if a map ever survives the build.
+    sourcemap: 'hidden',
   },
   preview: {
     port: 8080,

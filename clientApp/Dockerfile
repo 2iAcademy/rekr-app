@@ -1,12 +1,14 @@
 FROM node:22-alpine AS base
 
 WORKDIR /app
+RUN chown node:node /app
+USER node
 
-COPY package*.json ./
+COPY --chown=node:node package*.json ./
 
 RUN npm ci
 
-COPY . .
+COPY --chown=node:node . .
 
 FROM base AS dev
 
