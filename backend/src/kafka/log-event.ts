@@ -1,9 +1,5 @@
 export type LogLevel =
-  | 'Debug'
-  | 'Information'
-  | 'Warning'
-  | 'Error'
-  | 'Critical';
+  'Debug' | 'Information' | 'Warning' | 'Error' | 'Critical';
 
 export interface KafkaLogEvent {
   eventId: string;
