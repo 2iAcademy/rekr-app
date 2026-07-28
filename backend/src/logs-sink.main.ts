@@ -26,7 +26,9 @@ async function main() {
       {
         topic,
         numPartitions: Number(process.env.KAFKA_TOPIC_PARTITIONS ?? 3),
-        replicationFactor: Number(process.env.KAFKA_TOPIC_REPLICATION_FACTOR ?? 1),
+        replicationFactor: Number(
+          process.env.KAFKA_TOPIC_REPLICATION_FACTOR ?? 1,
+        ),
       },
     ],
   });
@@ -54,9 +56,7 @@ async function main() {
         throw new Error('Kafka message is empty.');
       }
 
-      const event = JSON.parse(
-        message.value.toString('utf8'),
-      ) as KafkaLogEvent;
+      const event = JSON.parse(message.value.toString('utf8')) as KafkaLogEvent;
 
       await writer.upsert(event, {
         topic: messageTopic,

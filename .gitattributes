@@ -4,3 +4,5 @@
 # with `npm install --package-lock-only` instead of resolving it by hand.
 clientApp/package-lock.json -merge
 backend/package-lock.json -merge
+
+* text=auto eol=lf

@@ -1,8 +1,5 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
-import {
-  createErrorLogEvent,
-  createSampleLogEvent,
-} from '../kafka/log-event';
+import { createErrorLogEvent, createSampleLogEvent } from '../kafka/log-event';
 import { KafkaLogPublisherService } from '../kafka/kafka-log-publisher.service';
 
 @Controller('logs')
