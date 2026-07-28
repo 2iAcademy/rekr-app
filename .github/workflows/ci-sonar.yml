@@ -1,0 +1,93 @@
+name: CI Sonar
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'clientApp/**'
+      - 'sonar-project.properties'
+      - '.github/workflows/ci-sonar.yml'
+  push:
+    branches:
+      - preprod
+      - main
+    paths:
+      - 'backend/**'
+      - 'clientApp/**'
+      - 'sonar-project.properties'
+      - '.github/workflows/ci-sonar.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sonar:
+    name: Analyse
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rekr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rekr_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check Sonar configuration
+        id: config
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ] || [ -z "$SONAR_HOST_URL" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SONAR_TOKEN ou SONAR_HOST_URL absent — analyse ignoree."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.ready == 'true'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        if: steps.config.outputs.ready == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Backend coverage
+        if: steps.config.outputs.ready == 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rekr_test
+          JWT_SECRET: ci-test-secret
+        run: |
+          npm ci
+          npx prisma migrate deploy
+          npm run test:cov
+
+      - name: Frontend coverage
+        if: steps.config.outputs.ready == 'true'
+        working-directory: clientApp
+        run: |
+          npm ci
+          npm run test:cov
+
+      - name: SonarQube scan
+        if: steps.config.outputs.ready == 'true'
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

@@ -8,8 +8,7 @@ Monorepo : `backend/` (NestJS + Prisma + PostgreSQL) + `clientApp/` (React + Vit
 |---------|---------|
 | `backend/` | API NestJS 11 (TypeScript) · ORM **Prisma 7** · PostgreSQL 18 · Kafka producer |
 | `clientApp/` | Front React + Vite |
-| `sonarqube/` | Analyse de code en local |
-| `docker-compose.yml` | Stack locale avec PostgreSQL, Kafka, Kafka UI, backend, sink |
+| `compose.yml` | Stack locale : PostgreSQL, backend, frontend |
 
 ## Démarrage
 
@@ -143,35 +142,33 @@ Les variantes `lint` (backend) et `lint:fix` (frontend) **corrigent** les fichie
 
 Les fins de ligne sont normalisées en LF via `.gitattributes` : ESLint tolère les CRLF (`endOfLine: "auto"`), mais `prettier --check` les rejette.
 
-## Analyse de code — SonarQube en local
+## Analyse de code — SonarQube Cloud
 
-### Premier démarrage
+L'analyse tourne en CI, sur [SonarQube Cloud](https://sonarcloud.io) (gratuit : le repo est public). Le workflow `CI Sonar` produit les couvertures backend et frontend, puis lance une analyse unique pour tout le monorepo.
 
-```bash
-cd sonarqube
-cp .env.example .env
-# Renseigne SONAR_DB_USER / SONAR_DB_PASSWORD dans .env
-docker compose up -d
-```
+### Configuration
 
-SonarQube met ~1 à 2 minutes à démarrer. Accessible ensuite sur http://localhost:9000 (login initial `admin` / `admin`, mot de passe à changer au premier login).
+Deux secrets de dépôt sont requis (**Settings → Secrets and variables → Actions**) :
 
-### Lancer un scan du projet
+| Secret | Valeur |
+|--------|--------|
+| `SONAR_TOKEN` | token généré sur SonarQube Cloud (**My Account → Security**) |
+| `SONAR_HOST_URL` | `https://sonarcloud.io` |
 
-1. Dans l'UI SonarQube : **My Account → Security → Generate Tokens**, créer un token.
-2. Le placer dans `sonarqube/.env` dans la variable `SONAR_TOKEN`.
-3. Depuis `sonarqube/` :
+Tant que l'un des deux manque, le job se contente d'émettre une notice et passe — la CI ne devient pas rouge pour autant.
 
-```bash
-docker compose --profile scan run --rm scanner
-```
+La configuration du projet vit dans `sonar-project.properties` à la racine : `sonar.projectKey` et `sonar.organization` doivent correspondre à ceux affichés sur le dashboard Cloud.
 
-Le scanner lit `sonar-project.properties` à la racine du repo et pousse le rapport vers l'instance locale.
+### Couverture
 
-### Arrêter / nettoyer
+`sonar.javascript.lcov.reportPaths` lit `backend/coverage/lcov.info` et `clientApp/coverage/lcov.info`, produits par `npm run test:cov` dans chaque dossier.
+
+### Scan en local (facultatif)
+
+Il n'y a plus d'instance auto-hébergée : le scan local vise directement Cloud.
 
 ```bash
-cd sonarqube
-docker compose down        # stoppe, conserve les données
-docker compose down -v     # stoppe et wipe les volumes (reset complet)
+SONAR_TOKEN=<token> docker run --rm -e SONAR_TOKEN -e SONAR_HOST_URL=https://sonarcloud.io -v "$PWD:/usr/src" sonarsource/sonar-scanner-cli
 ```
+
+Lancer les tests avec couverture avant le scan, sinon l'analyse remonte 0 %.

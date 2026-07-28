@@ -4,3 +4,4 @@ build/
 coverage/
 .git/
 src/components/ui/
+src/api/generated.ts
