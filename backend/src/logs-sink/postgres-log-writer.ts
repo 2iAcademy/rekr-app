@@ -45,11 +45,14 @@ export class PostgresLogWriter {
     `);
   }
 
-  async upsert(event: KafkaLogEvent, kafkaMeta: {
-    topic: string;
-    partition: number;
-    offset: string;
-  }): Promise<void> {
+  async upsert(
+    event: KafkaLogEvent,
+    kafkaMeta: {
+      topic: string;
+      partition: number;
+      offset: string;
+    },
+  ): Promise<void> {
     await this.pool.query(
       `
         INSERT INTO logs_raw (

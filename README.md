@@ -129,6 +129,20 @@ docker compose up -d --build --renew-anon-volumes backend
 
 > Un `docker compose up --build` seul ne suffit pas : l'ancien volume `node_modules` masque la nouvelle image. `--renew-anon-volumes` est indispensable.
 
+## Checks qualité
+
+Le workflow `CI Backend` (job `Lint`) et le workflow `CI Frontend` (job `Lint`) vérifient le code sur chaque pull request. Pour les rejouer en local :
+
+| | Backend (`backend/`) | Frontend (`clientApp/`) |
+|---|---|---|
+| Vérifier | `npm run lint:check` | `npm run lint` |
+| Vérifier le format | `npm run format:check` | `npm run format:check` |
+| Corriger | `npm run lint` puis `npm run format` | `npm run lint:fix` puis `npm run format` |
+
+Les variantes `lint` (backend) et `lint:fix` (frontend) **corrigent** les fichiers : elles ne servent pas de vérification. En CI, seules les commandes `:check` sont utilisées.
+
+Les fins de ligne sont normalisées en LF via `.gitattributes` : ESLint tolère les CRLF (`endOfLine: "auto"`), mais `prettier --check` les rejette.
+
 ## Analyse de code — SonarQube en local
 
 ### Premier démarrage
