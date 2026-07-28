@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { ApiError, customFetch } from './customFetch';
+import { clearAccessToken, getAccessToken, onSessionExpired, setAccessToken } from './tokenStore';
 
 interface FetchResult {
   data: unknown;
@@ -186,5 +187,132 @@ describe('customFetch', () => {
       expect(error.message).not.toContain('abc123');
       expect(error.message).toContain('/api/auth/callback');
     });
+  });
+});
+
+describe('customFetch — session', () => {
+  beforeEach(() => {
+    clearAccessToken();
+    vi.restoreAllMocks();
+  });
+
+  const jsonResponse = (status: number, body: string) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: '',
+    headers: new Headers({ 'content-type': 'application/json' }),
+    text: vi.fn().mockResolvedValue(body),
+  });
+
+  const headersOf = (call: unknown[]): Headers => new Headers((call[1] as RequestInit).headers);
+
+  it('attaches the bearer token when one is held', async () => {
+    setAccessToken('jwt');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, '{}') as unknown as Response);
+
+    await customFetch('/api/offers', { method: 'GET' });
+
+    expect(headersOf(fetchSpy.mock.calls[0]).get('Authorization')).toBe('Bearer jwt');
+  });
+
+  it('sends no Authorization header when no token is held', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, '{}') as unknown as Response);
+
+    await customFetch('/api/offers', { method: 'GET' });
+
+    expect(headersOf(fetchSpy.mock.calls[0]).has('Authorization')).toBe(false);
+  });
+
+  it('refreshes on 401 and replays the request with the new token', async () => {
+    setAccessToken('stale');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse(401, '{}') as unknown as Response)
+      .mockResolvedValueOnce(jsonResponse(200, '{"accessToken":"fresh"}') as unknown as Response)
+      .mockResolvedValueOnce(jsonResponse(200, '{"ok":true}') as unknown as Response);
+
+    await customFetch('/api/offers', { method: 'GET' });
+
+    expect(fetchSpy.mock.calls[1][0]).toBe('/api/auth/refresh');
+    expect(headersOf(fetchSpy.mock.calls[2]).get('Authorization')).toBe('Bearer fresh');
+    expect(getAccessToken()).toBe('fresh');
+  });
+
+  /** Two tabs racing would both send the old cookie; the server would read the
+   * loser as a replay and cut the session. One refresh in flight at a time is
+   * the front half of the fix. */
+  it('refreshes once for two requests failing at the same instant', async () => {
+    setAccessToken('stale');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).includes('/api/auth/refresh')) {
+        return Promise.resolve(jsonResponse(200, '{"accessToken":"fresh"}') as unknown as Response);
+      }
+
+      return Promise.resolve(
+        (getAccessToken() === 'fresh'
+          ? jsonResponse(200, '{}')
+          : jsonResponse(401, '{}')) as unknown as Response,
+      );
+    });
+
+    await Promise.all([
+      customFetch('/api/offers', { method: 'GET' }),
+      customFetch('/api/matches', { method: 'GET' }),
+    ]);
+
+    const refreshCalls = fetchSpy.mock.calls.filter((call) =>
+      String(call[0]).includes('/api/auth/refresh'),
+    );
+    expect(refreshCalls).toHaveLength(1);
+  });
+
+  it('clears the token and propagates the error when the refresh fails', async () => {
+    setAccessToken('stale');
+    const expired = vi.fn();
+    onSessionExpired(expired);
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse(401, '{}') as unknown as Response)
+      .mockResolvedValueOnce(jsonResponse(401, '{}') as unknown as Response);
+
+    await expect(customFetch('/api/offers', { method: 'GET' })).rejects.toBeInstanceOf(ApiError);
+    expect(getAccessToken()).toBeNull();
+    expect(expired).toHaveBeenCalled();
+  });
+
+  /** A wrong password is a 401 too. Refreshing there would be nonsense, and
+   * would mask the real error. */
+  it('does not refresh when the login itself returns 401', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(401, '{}') as unknown as Response);
+
+    await expect(customFetch('/api/auth/login', { method: 'POST' })).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('replays a request at most once', async () => {
+    setAccessToken('stale');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((url) =>
+        Promise.resolve(
+          (String(url).includes('/api/auth/refresh')
+            ? jsonResponse(200, '{"accessToken":"fresh"}')
+            : jsonResponse(401, '{}')) as unknown as Response,
+        ),
+      );
+
+    await expect(customFetch('/api/offers', { method: 'GET' })).rejects.toBeInstanceOf(ApiError);
+
+    const businessCalls = fetchSpy.mock.calls.filter(
+      (call) => !String(call[0]).includes('/api/auth/refresh'),
+    );
+    expect(businessCalls).toHaveLength(2);
   });
 });

@@ -28,6 +28,7 @@ const DEFAULT_LIMITS: Record<ThrottleBudgetName, number> = {
   login: 5,
   signup: 10,
   logs: 20,
+  refresh: 30,
 };
 
 export function buildThrottlerOptions(
@@ -76,6 +77,11 @@ function readLimits(
       configService,
       'THROTTLE_LOGS_LIMIT',
       DEFAULT_LIMITS.logs,
+    ),
+    refresh: readPositiveInt(
+      configService,
+      'THROTTLE_REFRESH_LIMIT',
+      DEFAULT_LIMITS.refresh,
     ),
   };
 }

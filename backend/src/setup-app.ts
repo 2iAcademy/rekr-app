@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { shouldExposeSwagger } from './swagger';
@@ -137,6 +138,8 @@ function readTrustProxyHops(): number {
 }
 
 export function configureApp(app: INestApplication): void {
+  app.use(cookieParser());
+
   app.setGlobalPrefix('api');
 
   const hops = readTrustProxyHops();

@@ -3,7 +3,8 @@ import { Check, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { authControllerSignup } from '@/api/generated';
+import { ApiError } from '@/api/customFetch';
+import { useAuth } from '@/features/auth/useAuth';
 
 const roleOptions = [
   { value: 'candidate', title: 'Candidat', subtitle: 'Je cherche un poste' },
@@ -19,6 +20,7 @@ interface SignupPageProps {
 }
 
 export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
+  const { signup } = useAuth();
   const [role, setRole] = useState<Role>(roleOptions[0].value);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,17 +44,15 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
     }
 
     try {
-      await authControllerSignup({
-        email,
-        password,
-        userType: role,
-      });
-
+      await signup(email, password, role);
       setError(null);
-
       onSubmit?.({ role, email, password });
-    } catch {
-      setError('Impossible de créer le compte.');
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError && caught.status === 409
+          ? 'Un compte existe déjà pour cet email.'
+          : 'Impossible de créer le compte.',
+      );
     }
   };
 

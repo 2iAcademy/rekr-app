@@ -11,6 +11,8 @@ import { Prisma, User } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
+import { RefreshTokenService } from './refresh-token.service';
+import type { PublicUser, Session, SessionContext } from './session.interface';
 
 @Injectable()
 export class AuthService {
@@ -31,6 +33,7 @@ export class AuthService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly refreshTokens: RefreshTokenService,
   ) {}
 
   /**
@@ -48,7 +51,10 @@ export class AuthService {
     return createHash('sha256').update(password, 'utf8').digest('base64');
   }
 
-  async signup(signupDto: SignupDto) {
+  async signup(
+    signupDto: SignupDto,
+    context: SessionContext,
+  ): Promise<Session> {
     const passwordHash = await bcrypt.hash(
       AuthService.preHashPassword(signupDto.password),
       AuthService.PASSWORD_SALT_ROUNDS,
@@ -75,10 +81,10 @@ export class AuthService {
       throw error;
     }
 
-    return this.buildAuthResponse(user);
+    return this.buildSession(user, context);
   }
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, context: SessionContext): Promise<Session> {
     const user = await this.prismaService.user.findUnique({
       where: { email: loginDto.email },
     });
@@ -104,7 +110,88 @@ export class AuthService {
       throw new ForbiddenException('This account is inactive.');
     }
 
-    return this.buildAuthResponse(user);
+    return this.buildSession(user, context);
+  }
+
+  async refresh(
+    rawToken: string | undefined,
+    context: SessionContext,
+  ): Promise<Session> {
+    if (!rawToken) {
+      throw new UnauthorizedException('Invalid refresh token.');
+    }
+
+    const stored = await this.refreshTokens.findByToken(rawToken);
+    if (!stored) {
+      throw new UnauthorizedException('Invalid refresh token.');
+    }
+
+    // An already-revoked row is either a repeat of a rotation that just
+    // happened — two tabs, a retried request — in which case the successor it
+    // recorded is served again, or it is a token that leaked, because the
+    // legitimate client moved on and would never send this one. Asked before
+    // any account check, so a leak still cuts the session on an account that
+    // has meanwhile been deactivated.
+    const replayed = stored.revokedAt
+      ? await this.refreshTokens.replaySuccessor(stored, rawToken)
+      : null;
+
+    if (stored.revokedAt && !replayed) {
+      return this.rejectAsReuse(stored.familyId);
+    }
+
+    if (stored.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException('Invalid refresh token.');
+    }
+
+    const user = await this.prismaService.user.findUnique({
+      where: { id: stored.userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('This account no longer exists.');
+    }
+
+    if (!user.isActive) {
+      throw new ForbiddenException('This account is inactive.');
+    }
+
+    // A replay serves the successor already minted; only a live token rotates.
+    // `rotate` returns null when it lost the compare-and-swap to a link that
+    // holds nothing replayable — a concurrent logout, or a family already cut.
+    const refreshToken =
+      replayed ?? (await this.refreshTokens.rotate(stored, rawToken, context));
+
+    if (!refreshToken) {
+      return this.rejectAsReuse(stored.familyId);
+    }
+
+    return {
+      accessToken: this.signAccessToken(user),
+      user: this.toPublicUser(user),
+      refreshToken,
+    };
+  }
+
+  /** Cut the entire session, not just the link presented — whoever leaked this
+   * token may hold its successor too. */
+  private async rejectAsReuse(familyId: string): Promise<never> {
+    await this.refreshTokens.revokeFamily(familyId);
+
+    throw new UnauthorizedException('Invalid refresh token.');
+  }
+
+  async logout(rawToken: string | undefined): Promise<void> {
+    if (!rawToken) {
+      return;
+    }
+
+    const stored = await this.refreshTokens.findByToken(rawToken);
+    if (!stored || stored.revokedAt) {
+      return;
+    }
+
+    await this.refreshTokens.revokeById(stored.id);
   }
 
   async me(userId: number) {
@@ -123,23 +210,25 @@ export class AuthService {
     return this.toPublicUser(user);
   }
 
-  private buildAuthResponse(user: User) {
-    const accessToken = this.jwtService.sign(
-      {
-        userType: user.userType,
-      },
-      {
-        subject: String(user.id),
-      },
-    );
-
+  private async buildSession(
+    user: User,
+    context: SessionContext,
+  ): Promise<Session> {
     return {
-      accessToken,
+      accessToken: this.signAccessToken(user),
       user: this.toPublicUser(user),
+      refreshToken: await this.refreshTokens.issue(user.id, context),
     };
   }
 
-  private toPublicUser(user: User) {
+  private signAccessToken(user: User): string {
+    return this.jwtService.sign(
+      { userType: user.userType },
+      { subject: String(user.id) },
+    );
+  }
+
+  private toPublicUser(user: User): PublicUser {
     return {
       id: user.id,
       email: user.email,
