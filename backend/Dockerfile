@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 WORKDIR /app
 COPY package*.json ./
 
@@ -23,7 +23,7 @@ CMD ["npm", "run", "start:dev"]
 FROM base AS prod-deps
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=prod-deps /app/node_modules ./node_modules
