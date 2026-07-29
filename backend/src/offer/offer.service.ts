@@ -69,6 +69,55 @@ export class OfferService {
     });
   }
 
+  async findAllOpen() {
+    return this.prisma.offer.findMany({
+      where: { status: 'open' },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            size: true,
+            description: true,
+            city: true,
+          },
+        },
+        offerTags: {
+          include: { tag: { select: { id: true, label: true, category: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findOneById(id: number) {
+    const offer = await this.prisma.offer.findUnique({
+      where: { id },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            size: true,
+            description: true,
+            city: true,
+          },
+        },
+        offerTags: {
+          include: { tag: { select: { id: true, label: true, category: true } } },
+        },
+      },
+    });
+
+    if (!offer) {
+      throw new NotFoundException('Offer not found');
+    }
+
+    return offer;
+  }
+
   private async syncSkills(
     tx: Prisma.TransactionClient,
     offerId: number,

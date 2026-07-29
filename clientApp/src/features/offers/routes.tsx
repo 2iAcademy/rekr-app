@@ -3,6 +3,7 @@ import { OfferDetailPage } from '@/features/offers/pages/OfferDetailPage';
 
 export function OfferDetailRoute() {
   const navigate = useNavigate();
+
   return (
     <OfferDetailPage
       onBack={() => navigate('/')}

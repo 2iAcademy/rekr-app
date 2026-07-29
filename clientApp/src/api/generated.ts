@@ -326,28 +326,29 @@ export const companyControllerUpdateMine = async (
   );
 };
 
-export type offerControllerCreateResponse201 = {
+export type offerControllerFindOneByIdResponse200 = {
   data: void;
-  status: 201;
+  status: 200;
 };
 
-export type offerControllerCreateResponseSuccess = offerControllerCreateResponse201 & {
+export type offerControllerFindOneByIdResponseSuccess = offerControllerFindOneByIdResponse200 & {
   headers: Headers;
 };
-export const getOfferControllerCreateUrl = () => {
-  return `/api/offers`;
+export const getOfferControllerFindOneByIdUrl = (id: number) => {
+  return `/api/offers/${id}`;
 };
 
-export const offerControllerCreate = async (
-  createOfferDto: CreateOfferDto,
+export const offerControllerFindOneById = async (
+  id: number,
   options?: Parameters<typeof customFetch>[1],
-): Promise<offerControllerCreateResponseSuccess> => {
-  return customFetch<offerControllerCreateResponseSuccess>(getOfferControllerCreateUrl(), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(createOfferDto),
-  });
+): Promise<offerControllerFindOneByIdResponseSuccess> => {
+  return customFetch<offerControllerFindOneByIdResponseSuccess>(
+    getOfferControllerFindOneByIdUrl(id),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type offerControllerUpdateResponse200 = {
@@ -372,5 +373,29 @@ export const offerControllerUpdate = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(updateOfferDto),
+  });
+};
+
+export type offerControllerCreateResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type offerControllerCreateResponseSuccess = offerControllerCreateResponse201 & {
+  headers: Headers;
+};
+export const getOfferControllerCreateUrl = () => {
+  return `/api/offers`;
+};
+
+export const offerControllerCreate = async (
+  createOfferDto: CreateOfferDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerCreateResponseSuccess> => {
+  return customFetch<offerControllerCreateResponseSuccess>(getOfferControllerCreateUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createOfferDto),
   });
 };

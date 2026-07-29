@@ -1,20 +1,93 @@
 import { Heart, Maximize2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { mockOffer, type Offer } from '@/features/offers/data/mock-offer';
+import { useEffect, useState } from 'react';
+import { offerControllerFindOneById } from '@/api/generated';
+import { useParams } from 'react-router';
+
+interface OfferCompany {
+  id: number;
+  name: string;
+  logo: string | null;
+  size: string | null;
+  description: string | null;
+  city: string | null;
+}
+
+interface OfferTag {
+  tag: {
+    id: number;
+    label: string;
+    category: string;
+  };
+}
+
+interface OfferDetail {
+  id: number;
+  title: string;
+  description: string | null;
+  city: string | null;
+  contractType: string | null;
+  minExperienceLevel: string | null;
+  remotePolicy: string | null;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  status: string;
+  company: OfferCompany;
+  offerTags: OfferTag[];
+}
 
 interface OfferDetailPageProps {
   onBack?: () => void;
   onPass?: () => void;
   onLike?: () => void;
-  offer?: Offer;
 }
 
-export function OfferDetailPage({
-  onBack,
-  onPass,
-  onLike,
-  offer = mockOffer,
-}: OfferDetailPageProps) {
+export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps) {
+  const { id } = useParams();
+  const [offer, setOffer] = useState<OfferDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchOffer = async () => {
+      try {
+        const res = await offerControllerFindOneById(Number(id));
+        setOffer(res.data as unknown as OfferDetail);
+      } catch (err) {
+        console.error(err);
+        setError('Offre introuvable.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    if (id) {
+      fetchOffer();
+    }
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-lg items-center justify-center bg-background">
+        <p className="text-sm text-ink-muted">Chargement…</p>
+      </main>
+    );
+  }
+
+  if (error || !offer) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col items-center justify-center gap-4 bg-background">
+        <p className="text-sm text-ink-muted">{error ?? 'Offre introuvable.'}</p>
+      </main>
+    );
+  }
+
+  const { company, offerTags, salaryMin, salaryMax, remotePolicy, city } = offer;
+  const stack = offerTags
+    .filter((ot) => ot.tag.category === 'skill' || ot.tag.category === 'tech')
+    .map((ot) => ot.tag.label);
+  const salary =
+    salaryMin || salaryMax ? `${salaryMin ?? '?'} - ${salaryMax ?? '?'} k€` : 'Non communiqué';
+
   return (
     <main
       data-role="candidat"
@@ -41,7 +114,15 @@ export function OfferDetailPage({
 
       <section className="relative flex h-52 items-center justify-center bg-role-gradient pt-12">
         <div className="flex size-24 items-center justify-center rounded-full bg-white shadow-md">
-          <span className="font-heading text-3xl font-bold text-brand">{offer.company[0]}</span>
+          {company.logo ? (
+            <img
+              src={company.logo}
+              alt={company.name}
+              className="size-full rounded-full object-cover"
+            />
+          ) : (
+            <span className="font-heading text-3xl font-bold text-brand">{company.name[0]}</span>
+          )}
         </div>
       </section>
 
@@ -49,7 +130,9 @@ export function OfferDetailPage({
         <div className="flex flex-col gap-1">
           <h2 className="font-heading text-2xl font-bold text-ink">{offer.title}</h2>
           <p className="text-sm text-ink-muted">
-            {offer.company} · {offer.companySize} · {offer.location}
+            {company.name}
+            {company.size ? ` · ${company.size}` : ''}
+            {city ? ` · ${city}` : ''}
           </p>
         </div>
 
@@ -58,7 +141,7 @@ export function OfferDetailPage({
             Stack technique
           </h3>
           <div className="flex flex-wrap gap-2">
-            {offer.stack.map((tech) => (
+            {stack.map((tech) => (
               <span
                 key={tech}
                 className="rounded-full bg-brand-tint px-3 py-1 text-xs font-medium text-brand-strong"
@@ -66,27 +149,40 @@ export function OfferDetailPage({
                 {tech}
               </span>
             ))}
+            {remotePolicy && (
+              <span className="rounded-full bg-brand-tint px-3 py-1 text-xs font-medium text-brand-strong">
+                {remotePolicy === 'FULL_REMOTE'
+                  ? 'Remote'
+                  : remotePolicy === 'HYBRID'
+                    ? 'Hybride'
+                    : 'Présentiel'}
+              </span>
+            )}
           </div>
         </div>
 
         <div className="mt-6 flex flex-col gap-1">
           <h3 className="text-xs font-semibold tracking-wider text-ink-muted uppercase">Salaire</h3>
-          <p className="text-base font-bold text-ink">{offer.salary}</p>
+          <p className="text-base font-bold text-ink">{salary}</p>
         </div>
 
-        <div className="mt-6 flex flex-col gap-2">
-          <h3 className="text-xs font-semibold tracking-wider text-ink-muted uppercase">
-            À propos du poste
-          </h3>
-          <p className="text-sm leading-relaxed text-ink-muted">{offer.aboutRole}</p>
-        </div>
+        {offer.description && (
+          <div className="mt-6 flex flex-col gap-2">
+            <h3 className="text-xs font-semibold tracking-wider text-ink-muted uppercase">
+              À propos du poste
+            </h3>
+            <p className="text-sm leading-relaxed text-ink-muted">{offer.description}</p>
+          </div>
+        )}
 
-        <div className="mt-6 flex flex-col gap-2">
-          <h3 className="text-xs font-semibold tracking-wider text-ink-muted uppercase">
-            À propos de l'entreprise
-          </h3>
-          <p className="text-sm leading-relaxed text-ink-muted">{offer.aboutCompany}</p>
-        </div>
+        {company.description && (
+          <div className="mt-6 flex flex-col gap-2">
+            <h3 className="text-xs font-semibold tracking-wider text-ink-muted uppercase">
+              À propos de l'entreprise
+            </h3>
+            <p className="text-sm leading-relaxed text-ink-muted">{company.description}</p>
+          </div>
+        )}
       </section>
 
       <div className="sticky bottom-0 flex gap-3 bg-background/80 px-6 py-4 backdrop-blur-md">
