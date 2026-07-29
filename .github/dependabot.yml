@@ -17,6 +17,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     groups:
       # Framework packages move together; separate PRs for @nestjs/* would
       # conflict with each other on the lockfile and none would merge.
@@ -41,6 +45,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
     groups:
       react:
         patterns:
@@ -61,24 +69,44 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: docker
     directory: /backend
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: docker
     directory: /clientApp
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
 
   # compose.yml at the repository root.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: docker
     directory: /docker
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
