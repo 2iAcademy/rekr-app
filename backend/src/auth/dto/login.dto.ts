@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsEmail, IsString, MinLength } from 'class-validator';
-import { normalizeEmail } from 'src/common/transforms/emails.transforms';
+import { normalizeEmail } from '../../common/transforms/emails.transforms';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {

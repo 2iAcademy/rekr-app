@@ -1,7 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsEmail, IsIn, IsString, MaxLength, MinLength } from 'class-validator';
-import { normalizeEmail } from 'src/common/transforms/emails.transforms';
-import { MAX_PASSWORD_LENGTH } from 'src/common/validation/password-bounds';
+import { normalizeEmail } from '../../common/transforms/emails.transforms';
+import { MAX_PASSWORD_LENGTH } from '../../common/validation/password-bounds';
 import { ApiProperty } from '@nestjs/swagger';
 
 const allowedUserTypes = ['candidate', 'recruiter'] as const;
