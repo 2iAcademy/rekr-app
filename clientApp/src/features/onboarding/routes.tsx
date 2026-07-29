@@ -26,6 +26,7 @@ export function SigninRoute() {
       onBack={() => navigate('/')}
       onSignUp={() => navigate('/inscription')}
       onForgotPassword={() => navigate('/mot-de-passe-oublie')}
+      onSubmit={() => navigate('/')}
     />
   );
 }

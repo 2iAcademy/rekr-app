@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { authControllerLogin } from '@/api/generated';
+import { useAuth } from '@/features/auth/useAuth';
 
 interface SigninPageProps {
   onBack?: () => void;
@@ -12,20 +12,20 @@ interface SigninPageProps {
 }
 
 export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: SigninPageProps) {
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError(null);
 
     try {
-      await authControllerLogin({
-        email,
-        password,
-      });
+      await login(email, password);
       onSubmit?.({ email, password });
-    } catch (error) {
-      console.error(error);
+    } catch {
+      setError('Email ou mot de passe incorrect.');
     }
   };
   return (
@@ -84,6 +84,12 @@ export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: Sig
             Mot de passe oublié ?
           </button>
         </div>
+
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
         <Button type="submit" variant="role" size="xl" className="mt-1 w-full">
           Se connecter

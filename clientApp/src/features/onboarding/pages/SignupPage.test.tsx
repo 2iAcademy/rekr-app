@@ -2,23 +2,52 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { authControllerSignup } from '@/api/generated';
+import { AuthProvider } from '@/features/auth/AuthProvider';
 import { SignupPage } from './SignupPage';
 
 vi.mock('@/api/generated', () => ({
   authControllerSignup: vi.fn(),
+  authControllerLogin: vi.fn(),
+  authControllerLogout: vi.fn(),
 }));
 
 const signupRequest = vi.mocked(authControllerSignup);
 
+const authenticatedUser = {
+  id: 1,
+  email: 'candidat@rekr.fr',
+  role: 'user',
+  userType: 'candidate',
+  isActive: true,
+};
+
+const renderSignup = (props: Parameters<typeof SignupPage>[0] = {}) =>
+  render(
+    <AuthProvider>
+      <SignupPage {...props} />
+    </AuthProvider>,
+  );
+
 describe('SignupPage', () => {
   beforeEach(() => {
-    signupRequest.mockResolvedValue({ data: undefined, status: 201, headers: new Headers() });
+    // The provider always fires a boot refresh on mount; without a token to
+    // adopt here, it settles on anonymous and leaves these tests unaffected.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+    signupRequest.mockResolvedValue({
+      data: { accessToken: 'test-token', user: authenticatedUser },
+      status: 201,
+      headers: new Headers(),
+    } as unknown as Awaited<ReturnType<typeof authControllerSignup>>);
   });
 
   it('soumet le rôle candidat par défaut avec email et mot de passe quand tout est valide', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    render(<SignupPage onSubmit={onSubmit} />);
+    renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
@@ -42,7 +71,7 @@ describe('SignupPage', () => {
   it('transmet le rôle recruteur quand il est sélectionné', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    render(<SignupPage onSubmit={onSubmit} />);
+    renderSignup({ onSubmit });
 
     await user.click(screen.getByRole('radio', { name: /recruteur/i }));
     await user.type(screen.getByLabelText('Email'), 'recruteur@rekr.fr');
@@ -57,7 +86,7 @@ describe('SignupPage', () => {
   it('bloque la soumission et affiche une erreur quand les mots de passe diffèrent', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    render(<SignupPage onSubmit={onSubmit} />);
+    renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
@@ -76,7 +105,7 @@ describe('SignupPage', () => {
   it('bloque la soumission et affiche une erreur quand les CGU ne sont pas acceptées', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    render(<SignupPage onSubmit={onSubmit} />);
+    renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
@@ -94,7 +123,7 @@ describe('SignupPage', () => {
   it('priorise le message de mot de passe quand mots de passe ET CGU sont invalides', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    render(<SignupPage onSubmit={onSubmit} />);
+    renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
@@ -108,7 +137,7 @@ describe('SignupPage', () => {
   it("permet une soumission réussie après correction de l'erreur", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    render(<SignupPage onSubmit={onSubmit} />);
+    renderSignup({ onSubmit });
 
     const confirm = screen.getByLabelText('Confirmer le mot de passe');
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
@@ -136,7 +165,7 @@ describe('SignupPage', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     signupRequest.mockRejectedValue(new Error('Bad Request'));
-    render(<SignupPage onSubmit={onSubmit} />);
+    renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
@@ -145,12 +174,12 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Impossible de créer le compte.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Impossible de créer le compte.');
   });
 
   it("efface le message d'erreur dès que l'utilisateur modifie le mot de passe", async () => {
     const user = userEvent.setup();
-    render(<SignupPage onSubmit={vi.fn()} />);
+    renderSignup({ onSubmit: vi.fn() });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
@@ -167,7 +196,7 @@ describe('SignupPage', () => {
   it('déclenche onBack au clic sur le bouton retour', async () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
-    render(<SignupPage onBack={onBack} />);
+    renderSignup({ onBack });
 
     await user.click(screen.getByRole('button', { name: 'Retour' }));
 
@@ -177,7 +206,7 @@ describe('SignupPage', () => {
   it('déclenche onSignIn au clic sur le lien Connexion', async () => {
     const user = userEvent.setup();
     const onSignIn = vi.fn();
-    render(<SignupPage onSignIn={onSignIn} />);
+    renderSignup({ onSignIn });
 
     await user.click(screen.getByRole('button', { name: 'Connexion' }));
 

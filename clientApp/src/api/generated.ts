@@ -198,6 +198,48 @@ export const authControllerLogin = async (
   });
 };
 
+export type authControllerRefreshResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type authControllerRefreshResponseSuccess = authControllerRefreshResponse200 & {
+  headers: Headers;
+};
+export const getAuthControllerRefreshUrl = () => {
+  return `/api/auth/refresh`;
+};
+
+export const authControllerRefresh = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<authControllerRefreshResponseSuccess> => {
+  return customFetch<authControllerRefreshResponseSuccess>(getAuthControllerRefreshUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type authControllerLogoutResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type authControllerLogoutResponseSuccess = authControllerLogoutResponse204 & {
+  headers: Headers;
+};
+export const getAuthControllerLogoutUrl = () => {
+  return `/api/auth/logout`;
+};
+
+export const authControllerLogout = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<authControllerLogoutResponseSuccess> => {
+  return customFetch<authControllerLogoutResponseSuccess>(getAuthControllerLogoutUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type authControllerMeResponse200 = {
   data: void;
   status: 200;

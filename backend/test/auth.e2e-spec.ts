@@ -4,6 +4,7 @@ import request from 'supertest';
 import { httpRequest } from './http-client';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { RefreshTokenService } from '../src/auth/refresh-token.service';
 import { configureApp } from '../src/setup-app';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
@@ -19,6 +20,18 @@ describe('Auth (e2e)', () => {
 
   const tokenOf = (res: request.Response): string =>
     (res.body as { accessToken: string }).accessToken;
+
+  const cookiesOf = (res: request.Response): string[] =>
+    (res.headers['set-cookie'] as unknown as string[] | undefined) ?? [];
+
+  const refreshCookieOf = (res: request.Response): string => {
+    const raw = cookiesOf(res).find((cookie) => cookie.startsWith('rekr_rt='));
+    if (!raw) {
+      throw new Error('No refresh cookie in response');
+    }
+
+    return raw.split(';')[0];
+  };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -230,5 +243,208 @@ describe('Auth (e2e)', () => {
         userType: 'candidate',
       })
       .expect(400);
+  });
+
+  describe('session lifecycle', () => {
+    it('sets a hardened refresh cookie on login', async () => {
+      await signup('cookie@test.dev', 'candidate');
+      const res = await httpRequest(app)
+        .post('/api/auth/login')
+        .send({ email: 'cookie@test.dev', password: 'Sup3rSecret!' })
+        .expect(200);
+
+      const raw = cookiesOf(res).find((c) => c.startsWith('rekr_rt='));
+      expect(raw).toContain('HttpOnly');
+      expect(raw).toContain('SameSite=Strict');
+      expect(raw).toContain('Path=/api/auth');
+    });
+
+    it('never puts the refresh token in the response body', async () => {
+      const res = await signup('nobody@test.dev', 'candidate');
+
+      expect(JSON.stringify(res.body)).not.toContain('rekr_rt');
+      expect(res.body).not.toHaveProperty('refreshToken');
+    });
+
+    it('rejects a refresh with no cookie', async () => {
+      await httpRequest(app).post('/api/auth/refresh').expect(401);
+    });
+
+    it('returns a working access token and a new cookie', async () => {
+      const signed = await signup('rotate@test.dev', 'candidate');
+      const first = refreshCookieOf(signed);
+
+      const refreshed = await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', first)
+        .expect(200);
+
+      expect(refreshCookieOf(refreshed)).not.toBe(first);
+
+      await httpRequest(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${tokenOf(refreshed)}`)
+        .expect(200);
+    });
+
+    /** The reuse alarm, end to end: replaying a rotated cookie must not only
+     * fail, it must take the successor down with it. */
+    it('kills the whole session when a rotated cookie is replayed', async () => {
+      const signed = await signup('reuse@test.dev', 'candidate');
+      const first = refreshCookieOf(signed);
+
+      const rotated = await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', first)
+        .expect(200);
+      const second = refreshCookieOf(rotated);
+
+      // Beyond the grace window the replay is treated as theft.
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
+
+      await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', first)
+        .expect(401);
+
+      await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', second)
+        .expect(401);
+    });
+
+    /**
+     * The contract the front is built against. Two refreshes carrying the same
+     * live cookie used to answer 200 each and leave the family with two live
+     * successors that nothing ever reconciled: reuse detection blind to the
+     * fork, logout unable to close it, and the extra branch good for a further
+     * 30 sliding days. Both callers must now land on the one successor.
+     *
+     * Which of the two paths gets taken here is up to the interleaving — the
+     * later caller either loses the compare-and-swap or finds the row already
+     * revoked and replays it. Both converge, which is the point; the guard
+     * itself is pinned by the test below, where the interleaving is forced.
+     */
+    it('hands the same successor to two simultaneous refreshes', async () => {
+      const signed = await signup('race@test.dev', 'candidate');
+      const cookie = refreshCookieOf(signed);
+
+      const [first, second] = await Promise.all([
+        httpRequest(app).post('/api/auth/refresh').set('Cookie', cookie),
+        httpRequest(app).post('/api/auth/refresh').set('Cookie', cookie),
+      ]);
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(refreshCookieOf(first)).toBe(refreshCookieOf(second));
+
+      const live = await prisma.refreshToken.findMany({
+        where: { revokedAt: null },
+      });
+      expect(live).toHaveLength(1);
+
+      await httpRequest(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${tokenOf(second)}`)
+        .expect(200);
+    });
+
+    /**
+     * The guard itself, against a real database. Both callers start from the
+     * same row read before either wrote — the interleaving two HTTP requests
+     * only reach by luck, and the one `revoked_at IS NULL` exists for. Drop it
+     * from the WHERE and both updates land, both mint, and the family forks.
+     */
+    it('lets only one of two interleaved rotations mint a successor', async () => {
+      const signed = await signup('cas@test.dev', 'candidate');
+      const raw = refreshCookieOf(signed).slice('rekr_rt='.length);
+
+      const refreshTokens = app.get(RefreshTokenService);
+      const row = await refreshTokens.findByToken(raw);
+
+      const [first, second] = await Promise.all([
+        refreshTokens.rotate(row!, raw, {}),
+        refreshTokens.rotate(row!, raw, {}),
+      ]);
+
+      expect(first?.token).toBe(second?.token);
+
+      const live = await prisma.refreshToken.findMany({
+        where: { revokedAt: null },
+      });
+      expect(live).toHaveLength(1);
+    });
+
+    /**
+     * The surplus branch used to make a signed-out session look alive, so the
+     * predecessor of a logged-out token still replayed. A logout revokes
+     * without recording a successor, and that empty column is what stops the
+     * chain — even well inside the replay window.
+     */
+    it('refuses the predecessor of a token that has been logged out', async () => {
+      const signed = await signup('logout-chain@test.dev', 'candidate');
+      const first = refreshCookieOf(signed);
+
+      const rotated = await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', first)
+        .expect(200);
+
+      await httpRequest(app)
+        .post('/api/auth/logout')
+        .set('Cookie', refreshCookieOf(rotated))
+        .expect(204);
+
+      await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', first)
+        .expect(401);
+    });
+
+    it('clears the cookie on logout and refuses to refresh afterwards', async () => {
+      const signed = await signup('bye@test.dev', 'candidate');
+      const cookie = refreshCookieOf(signed);
+
+      const res = await httpRequest(app)
+        .post('/api/auth/logout')
+        .set('Cookie', cookie)
+        .expect(204);
+
+      expect(cookiesOf(res).some((c) => c.startsWith('rekr_rt=;'))).toBe(true);
+
+      await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', cookie)
+        .expect(401);
+    });
+
+    it('answers 204 on a logout with no cookie', async () => {
+      await httpRequest(app).post('/api/auth/logout').expect(204);
+    });
+
+    /** One row per session: signing out of the laptop must leave the phone
+     * signed in. */
+    it('leaves the other devices of the same user untouched', async () => {
+      await signup('two-devices@test.dev', 'candidate');
+
+      const phone = await httpRequest(app)
+        .post('/api/auth/login')
+        .send({ email: 'two-devices@test.dev', password: 'Sup3rSecret!' })
+        .expect(200);
+      const laptop = await httpRequest(app)
+        .post('/api/auth/login')
+        .send({ email: 'two-devices@test.dev', password: 'Sup3rSecret!' })
+        .expect(200);
+
+      await httpRequest(app)
+        .post('/api/auth/logout')
+        .set('Cookie', refreshCookieOf(laptop))
+        .expect(204);
+
+      await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', refreshCookieOf(phone))
+        .expect(200);
+    });
   });
 });

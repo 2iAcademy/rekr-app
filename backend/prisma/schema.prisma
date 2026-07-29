@@ -115,8 +115,33 @@ model User {
   candidateTags      CandidateTag[]
   matchesAsCandidate Match[]                   @relation("MatchCandidate")
   matchesAsRecruiter Match[]                   @relation("MatchRecruiter")
+  refreshTokens      RefreshToken[]
 
   @@map("user")
+}
+
+model RefreshToken {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("fk_user")
+  tokenHash       String    @unique @map("token_hash") @db.Char(64)
+  familyId        String    @map("family_id") @db.Uuid
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  /// Successor minted by the rotation that revoked this row, sealed under a key
+  /// derived from this row's own plaintext token. Lets a lost rotation race
+  /// replay the winner's token instead of forking the family. NULL means the
+  /// row was revoked without succession — a logout or a family kill — which is
+  /// what tells reuse apart from a benign race.
+  successorSealed String?   @map("successor_sealed") @db.VarChar(128)
+  userAgent       String?   @map("user_agent") @db.VarChar(255)
+  ip              String?   @db.VarChar(45)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_token")
 }
 
 model CandidateProfile {
