@@ -84,7 +84,15 @@ export class OfferService {
           },
         },
         offerTags: {
-          include: { tag: { select: { id: true, label: true, category: true } } },
+          include: {
+            tag: {
+              select: {
+                id: true,
+                label: true,
+                category: true,
+              },
+            },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -106,7 +114,15 @@ export class OfferService {
           },
         },
         offerTags: {
-          include: { tag: { select: { id: true, label: true, category: true } } },
+          include: {
+            tag: {
+              select: {
+                id: true,
+                label: true,
+                category: true,
+              },
+            },
+          },
         },
       },
     });

@@ -13,7 +13,7 @@ const mockOffer = {
   id: 1,
   title: 'Développeur Full-Stack',
   description:
-    "Équipe de 8 personnes, produit principal en forte croissance. Stack moderne, autonomie sur les choix techniques et environnement bienveillant.",
+    'Équipe de 8 personnes, produit principal en forte croissance. Stack moderne, autonomie sur les choix techniques et environnement bienveillant.',
   city: 'Lyon',
   postalCode: '69000',
   contractType: 'CDI',
@@ -28,7 +28,7 @@ const mockOffer = {
     logo: null,
     size: 'PME',
     description:
-      "Acme Corp construit des outils SaaS pour PME industrielles. Fondée en 2018, basée à Lyon, 35 personnes.",
+      'Acme Corp construit des outils SaaS pour PME industrielles. Fondée en 2018, basée à Lyon, 35 personnes.',
     city: 'Lyon',
   },
   offerTags: [
@@ -38,7 +38,9 @@ const mockOffer = {
   ],
 };
 
-const renderPage = (props: { onBack?: () => void; onPass?: () => void; onLike?: () => void } = {}) =>
+const renderPage = (
+  props: { onBack?: () => void; onPass?: () => void; onLike?: () => void } = {},
+) =>
   render(
     <MemoryRouter initialEntries={['/offres/1']}>
       <Routes>
@@ -51,7 +53,7 @@ describe('OfferDetailPage', () => {
   beforeEach(() => {
     vi.mocked(offerControllerFindOneById).mockResolvedValue({
       data: mockOffer,
-    } as Awaited<ReturnType<typeof offerControllerFindOneById>>);
+    } as unknown as Awaited<ReturnType<typeof offerControllerFindOneById>>);
   });
 
   it("affiche le titre de l'offre", async () => {
@@ -117,7 +119,7 @@ describe('OfferDetailPage', () => {
     });
   });
 
-  it("affiche les boutons Passer et Liker", async () => {
+  it('affiche les boutons Passer et Liker', async () => {
     renderPage();
 
     await waitFor(() => {
