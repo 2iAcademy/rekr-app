@@ -1,12 +1,19 @@
-FROM node:22-alpine
+FROM node:22-alpine AS base
 
 WORKDIR /app
+RUN chown node:node /app
+USER node
 
-COPY package.json package-lock.json ./
+COPY --chown=node:node package*.json ./
+
 RUN npm ci
 
-COPY . .
+COPY --chown=node:node . .
 
-EXPOSE 8080
+FROM base AS dev
 
-CMD ["npm", "run", "dev"]
+CMD ["npm","run","dev"]
+
+FROM base AS build
+
+RUN npm run build

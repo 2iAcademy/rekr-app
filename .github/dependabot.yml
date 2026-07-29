@@ -1,0 +1,112 @@
+# Dependency updates.
+#
+# This file is the counterpart to pinning image tags. Pinning without an
+# updater does not make the stack safer, it freezes it: the base images stop
+# receiving Alpine security patches and nobody notices, because nothing is
+# watching. `provectuslabs/kafka-ui` is the cautionary tale already in this
+# repo — it sat on `:latest` and `:latest` has not moved since April 2024.
+#
+# Scope note: `npm` ecosystems are declared for the two real applications.
+# `docker` is declared per directory because Dependabot matches Dockerfiles and
+# compose files by directory, not recursively.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+    groups:
+      # Framework packages move together; separate PRs for @nestjs/* would
+      # conflict with each other on the lockfile and none would merge.
+      nestjs:
+        patterns:
+          - '@nestjs/*'
+      prisma:
+        patterns:
+          - 'prisma'
+          - '@prisma/*'
+      sentry:
+        patterns:
+          - '@sentry/*'
+      dev-tooling:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /clientApp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+    groups:
+      react:
+        patterns:
+          - 'react'
+          - 'react-dom'
+          - '@types/react'
+          - '@types/react-dom'
+      sentry:
+        patterns:
+          - '@sentry/*'
+      dev-tooling:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /clientApp
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+
+  # compose.yml at the repository root.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major

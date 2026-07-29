@@ -4,10 +4,337 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  user
+
+  @@map("user_role")
+}
+
+enum UserType {
+  candidate
+  recruiter
+  admin
+
+  @@map("user_type")
+}
+
+enum CompanySize {
+  TPE
+  PME
+  ETI
+  GE
+
+  @@map("company_size")
+}
+
+enum OfferStatus {
+  draft
+  open
+  paused
+  filled
+  closed
+
+  @@map("offer_status")
+}
+
+enum TagCategory {
+  skill
+  tech
+  contract
+  theme
+  other
+  language
+  benefit
+
+  @@map("tag_category")
+}
+
+enum ContractType {
+  CDI
+  CDD
+  ALTERNANCE
+  STAGE
+  FREELANCE
+  INTERIM
+
+  @@map("contract_type")
+}
+
+enum ExperienceLevel {
+  JUNIOR
+  CONFIRME
+  SENIOR
+  EXPERT
+
+  @@map("experience_level")
+}
+
+enum RemotePolicy {
+  ON_SITE
+  HYBRID
+  FULL_REMOTE
+
+  @@map("remote_policy")
+}
+
+enum Availability {
+  IMMEDIATE
+  WITHIN_DELAY
+  SPECIFIC_DATE
+
+  @@map("availability")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  userType     UserType @map("user_type")
+  role         UserRole @default(user)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  candidateProfile   CandidateProfile?
+  createdOffers      Offer[]
+  likedOffers        CandidateLikesOffer[]
+  likesGiven         RecruiterLikesCandidate[] @relation("RecruiterLikes")
+  likesReceived      RecruiterLikesCandidate[] @relation("CandidateLikedByRecruiter")
+  recruiterProfile   RecruiterProfile?
+  candidateTags      CandidateTag[]
+  matchesAsCandidate Match[]                   @relation("MatchCandidate")
+  matchesAsRecruiter Match[]                   @relation("MatchRecruiter")
+  refreshTokens      RefreshToken[]
+
+  @@map("user")
+}
+
+model RefreshToken {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("fk_user")
+  tokenHash       String    @unique @map("token_hash") @db.Char(64)
+  familyId        String    @map("family_id") @db.Uuid
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  /// Successor minted by the rotation that revoked this row, sealed under a key
+  /// derived from this row's own plaintext token. Lets a lost rotation race
+  /// replay the winner's token instead of forking the family. NULL means the
+  /// row was revoked without succession — a logout or a family kill — which is
+  /// what tells reuse apart from a benign race.
+  successorSealed String?   @map("successor_sealed") @db.VarChar(128)
+  userAgent       String?   @map("user_agent") @db.VarChar(255)
+  ip              String?   @db.VarChar(45)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_token")
+}
+
+model CandidateProfile {
+  id                      Int              @id @default(autoincrement())
+  userId                  Int              @unique @map("fk_user")
+  firstName               String           @map("first_name") @db.VarChar(100)
+  lastName                String           @map("last_name") @db.VarChar(100)
+  picture                 String?          @db.VarChar(255)
+  bio                     String?          @db.Text
+  city                    String?          @db.VarChar(100)
+  postalCode              String?          @map("postal_code") @db.VarChar(10)
+  latitude                Decimal?         @db.Decimal(10, 7)
+  longitude               Decimal?         @db.Decimal(10, 7)
+  desiredJobTitle         String?          @map("desired_job_title") @db.VarChar(255)
+  contractTypes           ContractType[]   @map("contract_types")
+  experienceLevel         ExperienceLevel? @map("experience_level")
+  availability            Availability?
+  availabilityDelayMonths Int?             @map("availability_delay_months")
+  availabilityDate        DateTime?        @map("availability_date") @db.Timestamptz(6)
+  remotePolicy            RemotePolicy?    @map("remote_policy")
+  mobilityRadiusKm        Int?             @map("mobility_radius_km")
+  mobilityNationwide      Boolean?         @map("mobility_nationwide")
+  salaryMin               Int?             @map("salary_min")
+  salaryMax               Int?             @map("salary_max")
+  linkedinUrl             String?          @map("linkedin_url") @db.VarChar(255)
+  cvUrl                   String?          @map("cv_url") @db.VarChar(255)
+  createdAt               DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("candidate_profile")
+}
+
+model RecruiterProfile {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique @map("fk_user")
+  companyId Int      @map("fk_company")
+  firstName String   @map("first_name") @db.VarChar(100)
+  lastName  String   @map("last_name") @db.VarChar(100)
+  avatar    String?  @db.VarChar(255)
+  jobTitle  String?  @map("job_title") @db.VarChar(150)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("recruiter_profile")
+}
+
+model Company {
+  id          Int          @id @default(autoincrement())
+  name        String       @db.VarChar(255)
+  logo        String?      @db.VarChar(255)
+  size        CompanySize?
+  sectorId    Int?         @map("fk_sector")
+  description String?      @db.Text
+  siteUrl     String?      @map("site_url") @db.VarChar(255)
+  coverImage  String?      @map("cover_image") @db.VarChar(255)
+  city        String?      @db.VarChar(100)
+  postalCode  String?      @map("postal_code") @db.VarChar(10)
+  latitude    Decimal?     @db.Decimal(10, 7)
+  longitude   Decimal?     @db.Decimal(10, 7)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  recruiter   RecruiterProfile[]
+  offers      Offer[]
+  companyTags CompanyTag[]
+
+  sector Sector? @relation(fields: [sectorId], references: [id], onDelete: SetNull)
+
+  @@map("company")
+}
+
+model Sector {
+  id    Int    @id @default(autoincrement())
+  label String @unique @db.VarChar(100)
+
+  company Company[]
+
+  @@map("sector")
+}
+
+model Offer {
+  id                 Int              @id @default(autoincrement())
+  companyId          Int              @map("fk_company")
+  createdById        Int?             @map("fk_user_created")
+  title              String           @db.VarChar(255)
+  description        String?          @db.Text
+  city               String?          @db.VarChar(100)
+  postalCode         String?          @map("postal_code") @db.VarChar(10)
+  latitude           Decimal?         @db.Decimal(10, 7)
+  longitude          Decimal?         @db.Decimal(10, 7)
+  contractType       ContractType?    @map("contract_type")
+  minExperienceLevel ExperienceLevel? @map("min_experience_level")
+  remotePolicy       RemotePolicy?    @map("remote_policy")
+  salaryMin          Int?             @map("salary_min")
+  salaryMax          Int?             @map("salary_max")
+  status             OfferStatus      @default(draft)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user           User?                 @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  offerTags      OfferTag[]
+  candidateLikes CandidateLikesOffer[]
+  matches        Match[]
+
+  @@map("offer")
+}
+
+model Tag {
+  id       Int         @id @default(autoincrement())
+  label    String      @unique @db.VarChar(100)
+  category TagCategory
+
+  offerTags     OfferTag[]
+  candidateTags CandidateTag[]
+  companyTags   CompanyTag[]
+
+  @@map("tag")
+}
+
+model OfferTag {
+  offerId Int @map("fk_offer")
+  tagId   Int @map("fk_tag")
+
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@id([offerId, tagId])
+  @@map("offer_tag")
+}
+
+model CandidateTag {
+  candidateUserId Int @map("fk_user_candidate")
+  tagId           Int @map("fk_tag")
+
+  user User @relation(fields: [candidateUserId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([candidateUserId, tagId])
+  @@map("candidate_tag")
+}
+
+model CompanyTag {
+  companyId Int @map("fk_company")
+  tagId     Int @map("fk_tag")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, tagId])
+  @@map("company_tag")
+}
+
+model CandidateLikesOffer {
+  candidateUserId Int      @map("fk_user_candidate")
+  offerId         Int      @map("fk_offer")
+  likedAt         DateTime @default(now()) @map("liked_at") @db.Timestamptz(6)
+
+  user  User  @relation(fields: [candidateUserId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@id([candidateUserId, offerId])
+  @@map("candidate_likes_offer")
+}
+
+model RecruiterLikesCandidate {
+  recruiterUserId Int      @map("fk_user_recruiter")
+  candidateUserId Int      @map("fk_user_candidate")
+  likedAt         DateTime @default(now()) @map("liked_at") @db.Timestamptz(6)
+
+  recruiter User @relation("RecruiterLikes", fields: [recruiterUserId], references: [id], onDelete: Cascade)
+  candidate User @relation("CandidateLikedByRecruiter", fields: [candidateUserId], references: [id], onDelete: Cascade)
+
+  @@id([recruiterUserId, candidateUserId])
+  @@map("recruiter_likes_candidate")
+}
+
+model Match {
+  id              Int      @id @default(autoincrement())
+  candidateUserId Int      @map("fk_user_candidate")
+  offerId         Int      @map("fk_offer")
+  recruiterUserId Int?     @map("fk_user_recruiter")
+  matchedAt       DateTime @default(now()) @map("matched_at") @db.Timestamptz(6)
+
+  candidate User  @relation("MatchCandidate", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  offer     Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  recruiter User? @relation("MatchRecruiter", fields: [recruiterUserId], references: [id], onDelete: SetNull)
+
+  @@unique([candidateUserId, offerId])
+  @@map("match")
 }

@@ -1,0 +1,89 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    command: npm run start:dev
+    environment:
+      NODE_ENV: development
+      PORT: ${PORT:-3001}
+      DATABASE_URL: ${DATABASE_URL:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-}
+      THROTTLE_TTL_SECONDS: ${THROTTLE_TTL_SECONDS:-}
+      THROTTLE_DEFAULT_LIMIT: ${THROTTLE_DEFAULT_LIMIT:-}
+      THROTTLE_LOGIN_LIMIT: ${THROTTLE_LOGIN_LIMIT:-}
+      THROTTLE_SIGNUP_LIMIT: ${THROTTLE_SIGNUP_LIMIT:-}
+      THROTTLE_LOGS_LIMIT: ${THROTTLE_LOGS_LIMIT:-}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    ports:
+      - "${PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./clientApp
+      dockerfile: Dockerfile
+      target: dev
+    environment:
+      VITE_API_TARGET: ${VITE_API_TARGET:-http://backend:3001}
+      VITE_API_URL: ${VITE_API_URL:-/api}
+    volumes:
+      - ./clientApp:/app
+      # Named, not anonymous, and that is the whole point.
+      #
+      # The image now runs as `node` (uid 1000). Anonymous volumes are
+      # reattached to the recreated container, so the one seeded before that
+      # change is still owned by root — Vite then cannot write
+      # `node_modules/.vite` and the container dies at startup with EACCES,
+      # which reads as a code problem and is not one. Recovering needs
+      # `--renew-anon-volumes`, a flag nobody remembers to pass.
+      #
+      # A named volume fixes it for any machine that does not have one yet:
+      # Docker populates an EMPTY volume from the image, with the image's
+      # ownership, and the stale anonymous volume is left behind.
+      #
+      # It does NOT fix a volume that already exists — Docker only seeds an
+      # empty one, so a volume first created from a root-owned image stays
+      # root-owned no matter how often the image is rebuilt. That was verified,
+      # not assumed. On a machine that has already run this service:
+      #
+      #   docker compose rm -sf frontend
+      #   docker volume rm rekr-app_frontend_node_modules
+      #   docker compose up -d --build frontend
+      #
+      # Being named is what makes that recovery addressable at all, instead of
+      # hunting a 64-character hash in `docker inspect`.
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "8080:8080"
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg18_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pg18_data:
+  frontend_node_modules:

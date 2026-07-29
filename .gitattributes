@@ -1,0 +1,8 @@
+# Lockfiles must never be auto-merged: git can splice two JSON versions into a
+# syntactically invalid file without reporting a conflict, which breaks `npm ci`.
+# With `-merge`, git reports a conflict and keeps "ours" — regenerate the lock
+# with `npm install --package-lock-only` instead of resolving it by hand.
+clientApp/package-lock.json -merge
+backend/package-lock.json -merge
+
+* text=auto eol=lf
