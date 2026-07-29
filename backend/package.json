@@ -51,7 +51,7 @@
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
-    "@sentry/cli": "^2.58.5",
+    "@sentry/cli": "^2.58.6",
     "@sentry/nestjs": "^10.68.0",
     "@sentry/profiling-node": "^10.50.0",
     "bcrypt": "^6.0.0",
