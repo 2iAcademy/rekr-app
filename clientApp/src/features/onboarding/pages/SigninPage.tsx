@@ -16,7 +16,7 @@ export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: Sig
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-
+  console.log('test');
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);

@@ -1,0 +1,20 @@
+{
+  "name": "rekr-app-tools",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "clientApp/**/*.{ts,tsx}": [
+      "npx --prefix clientApp eslint --fix"
+    ],
+    "backend/**/*.{ts,js}": [
+      "npx --prefix backend eslint --fix"
+    ]
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2"
+  }
+}
