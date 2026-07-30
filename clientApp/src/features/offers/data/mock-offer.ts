@@ -23,7 +23,7 @@ export const mockOffer: Offer = {
   salary: '45 - 55 k€ selon expérience',
   stack: ['React', 'Node', 'TypeScript', 'PostgreSQL', 'AWS', 'Docker', 'Remote OK'],
   aboutRole:
-    "Équipe de 8 personnes, produit principal en forte croissance. Stack moderne, autonomie sur les choix techniques et environnement bienveillant.",
+    'Équipe de 8 personnes, produit principal en forte croissance. Stack moderne, autonomie sur les choix techniques et environnement bienveillant.',
   aboutCompany:
-    "Acme Corp construit des outils SaaS pour PME industrielles. Fondée en 2018, basée à Lyon, 35 personnes.",
+    'Acme Corp construit des outils SaaS pour PME industrielles. Fondée en 2018, basée à Lyon, 35 personnes.',
 };
