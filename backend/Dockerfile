@@ -9,11 +9,11 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 COPY tsconfig*.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-RUN npx prisma generate
 
 FROM common AS build
 COPY nest-cli.json ./
 COPY src ./src
+RUN npx prisma generate
 RUN npx nest build
 
 FROM common AS dev
