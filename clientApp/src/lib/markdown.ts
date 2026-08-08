@@ -2,18 +2,16 @@
  * Minimal Markdown reader for the subset the editor produces: bold, italic and
  * bullet lists.
  *
- * It yields plain data, never an HTML string. Whatever renders these blocks
- * builds React elements from them, so markup typed by a user stays text and can
- * never become a tag — no `dangerouslySetInnerHTML`, no sanitiser to keep in
- * sync, no XSS surface.
+ * `markdownToHtml` builds an HTML string, which the editor assigns to
+ * `innerHTML`, so every piece of user text goes through `escapeHtml` — nothing
+ * here is ever interpolated into an attribute, and there is no
+ * `dangerouslySetInnerHTML` anywhere.
  */
-export interface Span {
+interface Span {
   text: string;
   bold?: true;
   italic?: true;
 }
-
-export type Block = { type: 'paragraph'; spans: Span[] } | { type: 'list'; items: Span[][] };
 
 const BULLET = '- ';
 
@@ -88,8 +86,8 @@ const spansToHtml = (spans: Span[]): string =>
 /**
  * Markdown to the HTML shown inside the editable area.
  *
- * Line-per-block, unlike `parseMarkdown`, which merges consecutive lines into
- * paragraphs: while editing, a line the recruiter typed must stay a line.
+ * One block per line: while editing, a line the recruiter typed must stay a
+ * line.
  *
  * Every piece of text goes through `escapeHtml`. This string is assigned to
  * `innerHTML`, so that escaping is the only thing standing between a typed
@@ -203,45 +201,4 @@ export const htmlToMarkdown = (html: string): string => {
   }
 
   return lines.join('\n');
-};
-
-export const parseMarkdown = (source: string): Block[] => {
-  const blocks: Block[] = [];
-  let paragraph: string[] = [];
-
-  const flushParagraph = (): void => {
-    if (paragraph.length > 0) {
-      blocks.push({ type: 'paragraph', spans: parseSpans(paragraph.join(' ')) });
-      paragraph = [];
-    }
-  };
-
-  for (const line of source.split('\n')) {
-    const trimmed = line.trim();
-
-    if (trimmed === '') {
-      flushParagraph();
-      continue;
-    }
-
-    if (trimmed.startsWith(BULLET)) {
-      flushParagraph();
-      const item = parseSpans(trimmed.slice(BULLET.length));
-      const last = blocks[blocks.length - 1];
-
-      if (last?.type === 'list') {
-        last.items.push(item);
-      } else {
-        blocks.push({ type: 'list', items: [item] });
-      }
-
-      continue;
-    }
-
-    paragraph.push(trimmed);
-  }
-
-  flushParagraph();
-
-  return blocks;
 };

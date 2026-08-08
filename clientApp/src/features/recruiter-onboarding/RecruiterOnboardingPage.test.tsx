@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ApiError } from '@/api/customFetch';
 import {
   companyControllerCreate,
+  companyControllerUpdateMine,
   offerControllerCreate,
   sectorControllerFindAll,
 } from '@/api/generated';
@@ -11,15 +12,18 @@ import { RecruiterOnboardingPage } from './RecruiterOnboardingPage';
 
 vi.mock('@/api/generated', () => ({
   companyControllerCreate: vi.fn(),
+  companyControllerUpdateMine: vi.fn(),
   offerControllerCreate: vi.fn(),
   sectorControllerFindAll: vi.fn(),
 }));
 
 const createCompany = vi.mocked(companyControllerCreate);
+const updateCompany = vi.mocked(companyControllerUpdateMine);
 const createOffer = vi.mocked(offerControllerCreate);
 const findSectors = vi.mocked(sectorControllerFindAll);
 
 const created = { data: undefined, status: 201, headers: new Headers() };
+const updated = { data: undefined, status: 200, headers: new Headers() };
 
 const companyConflict = new ApiError({
   status: 409,
@@ -82,6 +86,9 @@ describe('RecruiterOnboardingPage', () => {
     vi.clearAllMocks();
     sessionStorage.clear();
     createCompany.mockResolvedValue(created as Awaited<ReturnType<typeof companyControllerCreate>>);
+    updateCompany.mockResolvedValue(
+      updated as Awaited<ReturnType<typeof companyControllerUpdateMine>>,
+    );
     createOffer.mockResolvedValue(created as Awaited<ReturnType<typeof offerControllerCreate>>);
     findSectors.mockResolvedValue({
       data: [{ id: 4, label: 'Informatique & Numérique' }],
@@ -365,6 +372,51 @@ describe('RecruiterOnboardingPage', () => {
     expect(createOffer).toHaveBeenCalledTimes(1);
     expect(onCompleted).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // The 409 says the profile exists, not that the form was pointless: without
+  // this replay the second run publishes an offer and drops every company field
+  // the recruiter just typed, while showing them a success.
+  it('rejoue la saisie en mise à jour quand la société existe déjà', async () => {
+    const user = userEvent.setup({ delay: null });
+    const onCompleted = vi.fn();
+    createCompany.mockRejectedValue(companyConflict);
+    render(<RecruiterOnboardingPage userId={1} onCompleted={onCompleted} />);
+
+    await fillIdentity(user);
+    await fillCompany(user);
+    await fillCulture(user);
+    await fillOffer(user);
+    await fillMatching(user);
+    await publishAndSettle(user, onCompleted);
+
+    expect(updateCompany).toHaveBeenCalledTimes(1);
+    expect(updateCompany).toHaveBeenCalledWith({
+      firstName: 'Julien',
+      lastName: 'Lemaitre',
+      jobTitle: 'Responsable RH',
+      name: 'Rekr',
+      sectorId: 4,
+      size: 'PME',
+      city: 'Lyon',
+      postalCode: '69003',
+      description: 'On construit Rekr.',
+    });
+  });
+
+  it('ne tente aucune mise à jour quand la société vient d’être créée', async () => {
+    const user = userEvent.setup({ delay: null });
+    const onCompleted = vi.fn();
+    render(<RecruiterOnboardingPage userId={1} onCompleted={onCompleted} />);
+
+    await fillIdentity(user);
+    await fillCompany(user);
+    await fillCulture(user);
+    await fillOffer(user);
+    await fillMatching(user);
+    await publishAndSettle(user, onCompleted);
+
+    expect(updateCompany).not.toHaveBeenCalled();
   });
 
   // The dead end this replaces: company created, offer failed, recruiter

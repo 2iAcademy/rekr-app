@@ -1,6 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApiError } from '@/api/customFetch';
-import { companyControllerCreate, offerControllerCreate } from '@/api/generated';
+import {
+  companyControllerCreate,
+  companyControllerUpdateMine,
+  offerControllerCreate,
+} from '@/api/generated';
 import { WizardShell } from './components/WizardShell';
 import { clearDraft, loadDraft, saveDraft } from './draftStorage';
 import { buildCompanyPayload, buildOfferPayload } from './payload';
@@ -76,10 +80,11 @@ export function RecruiterOnboardingPage({ userId, onCompleted }: RecruiterOnboar
   };
 
   /**
-   * `CompanyService.create` answers 409 as soon as the recruiter profile exists.
-   * That is the state this call is asking for, so it is a success: anything else
-   * would strand a recruiter whose company was created by an earlier attempt,
-   * with no way left to publish the offer.
+   * `CompanyService.create` answers 409 as soon as the recruiter profile exists
+   * — because an earlier attempt failed after creating it, or because the
+   * recruiter is going through the wizard a second time. Treating that as a
+   * plain success would publish the offer while silently dropping everything
+   * typed in steps 1 to 3, so the same payload is replayed as an update.
    */
   const ensureCompany = async (): Promise<void> => {
     try {
@@ -88,6 +93,8 @@ export function RecruiterOnboardingPage({ userId, onCompleted }: RecruiterOnboar
       if (!(caught instanceof ApiError) || caught.status !== 409) {
         throw caught;
       }
+
+      await companyControllerUpdateMine(buildCompanyPayload(state));
     }
   };
 

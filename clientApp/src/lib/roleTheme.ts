@@ -10,6 +10,3 @@
 export const ROLE_THEMES = ['candidate', 'recruiter'] as const;
 
 export type RoleTheme = (typeof ROLE_THEMES)[number];
-
-export const isRoleTheme = (value: string): value is RoleTheme =>
-  (ROLE_THEMES as readonly string[]).includes(value);

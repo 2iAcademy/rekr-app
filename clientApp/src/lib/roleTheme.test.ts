@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ROLE_THEMES, isRoleTheme } from './roleTheme';
+import { ROLE_THEMES } from './roleTheme';
 
 /**
  * `data-role` couples components to the palette scopes in `index.css` through a
@@ -17,15 +17,9 @@ describe('thèmes de rôle', () => {
     expect(ROLE_THEMES).toEqual(['candidate', 'recruiter']);
   });
 
-  it('reconnaît les rôles connus', () => {
-    for (const role of ROLE_THEMES) {
-      expect(isRoleTheme(role)).toBe(true);
-    }
-  });
-
-  it('rejette les anciennes valeurs françaises et toute valeur inconnue', () => {
-    for (const value of ['candidat', 'recruteur', 'admin', '']) {
-      expect(isRoleTheme(value)).toBe(false);
+  it('ne contient aucune des anciennes valeurs françaises', () => {
+    for (const value of ['candidat', 'recruteur']) {
+      expect(ROLE_THEMES).not.toContain(value);
     }
   });
 });

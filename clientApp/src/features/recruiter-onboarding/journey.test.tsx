@@ -46,6 +46,9 @@ const route = (url: string): Response => {
       { id: 9, label: 'Juridique' },
     ]);
   }
+  if (url.includes('/api/companies/mine')) {
+    return json(200, {});
+  }
   if (url.includes('/api/companies') || url.includes('/api/offers')) {
     return json(201, {});
   }
@@ -194,10 +197,10 @@ describe('parcours recruteur de bout en bout', () => {
     );
 
     // The company was created by the first attempt, so the replayed call gets the
-    // 409 the real backend raises. That is the state the call asked for, and the
-    // retry has to reach the offer anyway.
+    // 409 the real backend raises. The wizard has to fall back to the update and
+    // reach the offer anyway — the creation endpoint alone would drop the form.
     fetchMock.mockImplementation((url: string) =>
-      url.includes('/api/companies')
+      url.includes('/api/companies') && !url.includes('/mine')
         ? Promise.resolve(json(409, { message: 'Recruiter already has a company' }))
         : Promise.resolve(route(url)),
     );
@@ -206,5 +209,9 @@ describe('parcours recruteur de bout en bout', () => {
     expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
     const offerCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/offers'));
     expect(offerCalls).toHaveLength(2);
+
+    const update = callTo('/api/companies/mine');
+    expect(update.method).toBe('PATCH');
+    expect(update.body).toMatchObject({ name: 'Rekr', jobTitle: 'Responsable RH', sectorId: 4 });
   });
 });

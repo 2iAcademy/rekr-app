@@ -5,7 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type PrismaMock = {
   company: { create: jest.Mock; update: jest.Mock };
-  recruiterProfile: { findUnique: jest.Mock; create: jest.Mock };
+  recruiterProfile: {
+    findUnique: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+  };
   companyTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
@@ -14,7 +18,11 @@ type PrismaMock = {
 const buildPrismaMock = (): PrismaMock => {
   const mock: PrismaMock = {
     company: { create: jest.fn(), update: jest.fn() },
-    recruiterProfile: { findUnique: jest.fn(), create: jest.fn() },
+    recruiterProfile: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
     companyTag: { deleteMany: jest.fn(), createMany: jest.fn() },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
@@ -97,6 +105,33 @@ describe('CompanyService', () => {
       expect(result).toEqual(
         expect.objectContaining({ id: 10, name: 'Acme 2' }),
       );
+    });
+
+    // The identity fields live on `recruiterProfile`, not on `company`: routing
+    // them to the company update would drop them without any error.
+    it('routes the recruiter identity to its own table', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({
+        id: 1,
+        userId: 7,
+        companyId: 10,
+      });
+      prisma.company.update.mockResolvedValue({ id: 10, name: 'Acme 2' });
+
+      await service.updateMine(7, {
+        name: 'Acme 2',
+        firstName: 'Rachael',
+        lastName: 'Tyrell',
+        jobTitle: 'CTO',
+      });
+
+      expect(prisma.recruiterProfile.update).toHaveBeenCalledWith({
+        where: { userId: 7 },
+        data: { firstName: 'Rachael', lastName: 'Tyrell', jobTitle: 'CTO' },
+      });
+      expect(prisma.company.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { name: 'Acme 2' },
+      });
     });
 
     it('rejects update when the recruiter has no company', async () => {

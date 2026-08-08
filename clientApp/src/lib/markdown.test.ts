@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToMarkdown, markdownToHtml, parseMarkdown } from './markdown';
+import { htmlToMarkdown, markdownToHtml } from './markdown';
 
 describe('markdownToHtml', () => {
   it('rend le gras et l’italique', () => {
@@ -74,86 +74,5 @@ describe('htmlToMarkdown', () => {
     const source = 'Une **équipe** *soudée*';
 
     expect(htmlToMarkdown(markdownToHtml(source))).toBe(source);
-  });
-});
-
-describe('parseMarkdown', () => {
-  it('rend un texte simple en un paragraphe', () => {
-    expect(parseMarkdown('Une équipe soudée')).toEqual([
-      { type: 'paragraph', spans: [{ text: 'Une équipe soudée' }] },
-    ]);
-  });
-
-  it('reconnaît le gras', () => {
-    expect(parseMarkdown('Une **équipe** soudée')).toEqual([
-      {
-        type: 'paragraph',
-        spans: [{ text: 'Une ' }, { text: 'équipe', bold: true }, { text: ' soudée' }],
-      },
-    ]);
-  });
-
-  it('reconnaît l’italique', () => {
-    expect(parseMarkdown('Une *équipe* soudée')).toEqual([
-      {
-        type: 'paragraph',
-        spans: [{ text: 'Une ' }, { text: 'équipe', italic: true }, { text: ' soudée' }],
-      },
-    ]);
-  });
-
-  it('combine gras et italique dans la même ligne', () => {
-    expect(parseMarkdown('**Notre** métier, *sur mesure*')).toEqual([
-      {
-        type: 'paragraph',
-        spans: [
-          { text: 'Notre', bold: true },
-          { text: ' métier, ' },
-          { text: 'sur mesure', italic: true },
-        ],
-      },
-    ]);
-  });
-
-  it('regroupe les lignes à puces en une liste', () => {
-    expect(parseMarkdown('- Mutuelle\n- Tickets resto')).toEqual([
-      {
-        type: 'list',
-        items: [[{ text: 'Mutuelle' }], [{ text: 'Tickets resto' }]],
-      },
-    ]);
-  });
-
-  it('sépare les paragraphes sur une ligne vide', () => {
-    expect(parseMarkdown('Premier\n\nSecond')).toEqual([
-      { type: 'paragraph', spans: [{ text: 'Premier' }] },
-      { type: 'paragraph', spans: [{ text: 'Second' }] },
-    ]);
-  });
-
-  it('enchaîne paragraphe et liste', () => {
-    const blocks = parseMarkdown('Nos avantages :\n- Mutuelle');
-
-    expect(blocks).toHaveLength(2);
-    expect(blocks[0].type).toBe('paragraph');
-    expect(blocks[1]).toEqual({ type: 'list', items: [[{ text: 'Mutuelle' }]] });
-  });
-
-  it('laisse un marqueur non fermé tel quel', () => {
-    expect(parseMarkdown('Une **équipe soudée')).toEqual([
-      { type: 'paragraph', spans: [{ text: 'Une **équipe soudée' }] },
-    ]);
-  });
-
-  // The whole point of parsing to React nodes: markup in the source is data,
-  // never structure. It can never become a tag.
-  it('traite le HTML saisi comme du texte, jamais comme du balisage', () => {
-    expect(parseMarkdown('<script>alert(1)</script>')).toEqual([
-      { type: 'paragraph', spans: [{ text: '<script>alert(1)</script>' }] },
-    ]);
-  });
-
-  it('ne rend rien pour un texte vide', () => {
-    expect(parseMarkdown('   ')).toEqual([]);
   });
 });
