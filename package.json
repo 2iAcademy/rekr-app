@@ -2,21 +2,7 @@
   "name": "rekr-app-tools",
   "private": true,
   "scripts": {
-    "prepare": "husky",
-    "pre-commit": "npx lint-staged"
-  },
-  "lint-staged": {
-    "clientApp/**/*.{ts,tsx}": [
-      "clientApp/node_modules/.bin/eslint --config clientApp/eslint.config.js --fix",
-      "prettier --write"
-    ],
-    "backend/**/*.{ts,js}": [
-      "npm run eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,md,yml,yaml,css}": [
-      "prettier --write"
-    ]
+    "prepare": "husky"
   },
   "devDependencies": {
     "eslint": "^10.8.1",
