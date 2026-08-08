@@ -7,7 +7,7 @@
   },
   "lint-staged": {
     "clientApp/**/*.{ts,tsx}": [
-      "npm run eslint --fix",
+      "clientApp/node_modules/.bin/eslint --config clientApp/eslint.config.js --fix",
       "prettier --write"
     ],
     "backend/**/*.{ts,js}": [
