@@ -1,0 +1,12 @@
+#!/bin/sh
+
+echo "Running type-check on clientApp..."
+npm run type-check --prefix clientApp || exit 1
+
+echo "Running frontend tests..."
+npm run test --prefix clientApp || exit 1
+
+echo "Running backend tests..."
+npm run test --prefix backend || exit 1
+
+echo "✅ All checks passed"

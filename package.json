@@ -1,0 +1,16 @@
+{
+  "name": "rekr-app-tools",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,css,md,yml,yaml}": "prettier --write",
+    "*.{js,jsx,ts,tsx}": "eslint --fix"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "prettier": "^3.9.6"
+  }
+}
