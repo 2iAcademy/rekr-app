@@ -1,12 +1,19 @@
-#!/bin/sh
+#!/usr/bin/env sh
+set -e
 
-echo "Running type-check on clientApp..."
-npm run type-check --prefix clientApp || exit 1
+echo "Running frontend type-check..."
+docker compose exec -T frontend npm run type-check
+
+echo "Running frontend lint..."
+docker compose exec -T frontend ./node_modules/.bin/eslint .
 
 echo "Running frontend tests..."
-npm run test --prefix clientApp || exit 1
+docker compose exec -T frontend npm run test
+
+echo "Running backend lint..."
+docker compose exec -T backend ./node_modules/.bin/eslint "{src,apps,libs,test}/**/*.ts"
 
 echo "Running backend tests..."
-npm run test --prefix backend || exit 1
+docker compose exec -T backend npm run test
 
-echo "✅ All checks passed"
+echo "All pre-push checks passed"
