@@ -57,6 +57,12 @@ export interface UpdateOfferDto {
   [key: string]: unknown;
 }
 
+export interface SectorDto {
+  id: number;
+  /** @maxLength 100 */
+  label: string;
+}
+
 export type appControllerGetHelloResponse200 = {
   data: void;
   status: 200;
@@ -414,5 +420,26 @@ export const offerControllerUpdate = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(updateOfferDto),
+  });
+};
+
+export type sectorControllerFindAllResponse200 = {
+  data: SectorDto[];
+  status: 200;
+};
+
+export type sectorControllerFindAllResponseSuccess = sectorControllerFindAllResponse200 & {
+  headers: Headers;
+};
+export const getSectorControllerFindAllUrl = () => {
+  return `/api/sectors`;
+};
+
+export const sectorControllerFindAll = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<sectorControllerFindAllResponseSuccess> => {
+  return customFetch<sectorControllerFindAllResponseSuccess>(getSectorControllerFindAllUrl(), {
+    ...options,
+    method: 'GET',
   });
 };

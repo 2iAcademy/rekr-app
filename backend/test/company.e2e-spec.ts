@@ -63,6 +63,30 @@ describe('Company (e2e)', () => {
       .expect(403);
   });
 
+  /**
+   * `CompanySize` was narrowed to the product's target (TPE, PME). These guard
+   * the contract in both directions: the kept values still pass, and the values
+   * dropped from the enum are refused rather than silently stored.
+   */
+  it.each(['TPE', 'PME'])('accepts %s as a company size', async (size) => {
+    const recruiter = await createUser('recruiter');
+
+    await asRecruiter(recruiter.id)
+      .send({ name: 'Acme', size, firstName: 'Rick', lastName: 'Deckard' })
+      .expect(201);
+  });
+
+  it.each(['ETI', 'GE', 'XL'])(
+    'rejects %s, outside the product scope (400)',
+    async (size) => {
+      const recruiter = await createUser('recruiter');
+
+      await asRecruiter(recruiter.id)
+        .send({ name: 'Acme', size, firstName: 'Rick', lastName: 'Deckard' })
+        .expect(400);
+    },
+  );
+
   it('creates the company, the linked recruiter profile and its benefits', async () => {
     const recruiter = await createUser('recruiter');
 
