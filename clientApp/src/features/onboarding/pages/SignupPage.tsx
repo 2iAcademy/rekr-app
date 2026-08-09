@@ -42,7 +42,7 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
       setError('Tu dois accepter les CGU pour continuer.');
       return;
     }
-
+    console.log('ge');
     try {
       await signup(email, password, role);
       setError(null);
