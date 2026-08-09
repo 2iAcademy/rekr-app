@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { authControllerLogin } from '@/api/generated';
+import { useAuth } from '@/features/auth/useAuth';
 
 interface SigninPageProps {
   onBack?: () => void;
@@ -12,20 +12,20 @@ interface SigninPageProps {
 }
 
 export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: SigninPageProps) {
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError(null);
 
     try {
-      await authControllerLogin({
-        email,
-        password,
-      });
+      await login(email, password);
       onSubmit?.({ email, password });
-    } catch (error) {
-      console.error(error);
+    } catch {
+      setError('Email ou mot de passe incorrect.');
     }
   };
   return (
@@ -43,8 +43,8 @@ export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: Sig
       </header>
 
       <div className="mt-10 flex flex-col gap-1.5">
-        <h2 className="font-heading text-2xl font-bold text-ink">Heureux de te revoir.</h2>
-        <p className="text-sm text-ink-muted">Connecte-toi pour reprendre tes matches.</p>
+        <h2 className="font-heading text-2xl font-bold text-ink">Heureux de vous revoir.</h2>
+        <p className="text-sm text-ink-muted">Connectez-vous pour reprendre vos matches.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
@@ -59,7 +59,7 @@ export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: Sig
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="ton@email.com"
+            placeholder="nom@email.com"
           />
         </div>
 
@@ -74,7 +74,7 @@ export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: Sig
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Ton mot de passe"
+            placeholder="Votre mot de passe"
           />
           <button
             type="button"
@@ -84,6 +84,12 @@ export function SigninPage({ onBack, onSignUp, onForgotPassword, onSubmit }: Sig
             Mot de passe oublié ?
           </button>
         </div>
+
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
         <Button type="submit" variant="role" size="xl" className="mt-1 w-full">
           Se connecter

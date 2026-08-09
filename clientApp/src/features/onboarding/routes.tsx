@@ -16,7 +16,19 @@ export function SplashRoute() {
 
 export function SignupRoute() {
   const navigate = useNavigate();
-  return <SignupPage onBack={() => navigate('/')} onSignIn={() => navigate('/connexion')} />;
+  return (
+    <SignupPage
+      onBack={() => navigate('/')}
+      onSignIn={() => navigate('/connexion')}
+      onSubmit={({ role }) => {
+        // Only the recruiter journey exists so far; a candidate stays put rather
+        // than being sent to the anonymous splash.
+        if (role === 'recruiter') {
+          navigate('/recruteur/profil');
+        }
+      }}
+    />
+  );
 }
 
 export function SigninRoute() {
@@ -26,6 +38,7 @@ export function SigninRoute() {
       onBack={() => navigate('/')}
       onSignUp={() => navigate('/inscription')}
       onForgotPassword={() => navigate('/mot-de-passe-oublie')}
+      onSubmit={() => navigate('/')}
     />
   );
 }

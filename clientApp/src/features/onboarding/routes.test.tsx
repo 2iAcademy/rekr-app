@@ -1,15 +1,31 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { routes } from '@/router';
+import { AuthProvider } from '@/features/auth/AuthProvider';
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  render(<RouterProvider router={router} />);
+  render(
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>,
+  );
 }
 
 describe('navigation onboarding', () => {
+  beforeEach(() => {
+    // SigninPage/SignupPage now read `useAuth()`, so every route in this
+    // suite needs a provider. Its boot refresh is irrelevant to navigation,
+    // so it is stubbed to settle on anonymous straight away.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+  });
+
   it('affiche le Splash sur /', () => {
     renderAt('/');
 

@@ -57,6 +57,12 @@ export interface UpdateOfferDto {
   [key: string]: unknown;
 }
 
+export interface SectorDto {
+  id: number;
+  /** @maxLength 100 */
+  label: string;
+}
+
 export type appControllerGetHelloResponse200 = {
   data: void;
   status: 200;
@@ -195,6 +201,48 @@ export const authControllerLogin = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(loginDto),
+  });
+};
+
+export type authControllerRefreshResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type authControllerRefreshResponseSuccess = authControllerRefreshResponse200 & {
+  headers: Headers;
+};
+export const getAuthControllerRefreshUrl = () => {
+  return `/api/auth/refresh`;
+};
+
+export const authControllerRefresh = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<authControllerRefreshResponseSuccess> => {
+  return customFetch<authControllerRefreshResponseSuccess>(getAuthControllerRefreshUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type authControllerLogoutResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type authControllerLogoutResponseSuccess = authControllerLogoutResponse204 & {
+  headers: Headers;
+};
+export const getAuthControllerLogoutUrl = () => {
+  return `/api/auth/logout`;
+};
+
+export const authControllerLogout = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<authControllerLogoutResponseSuccess> => {
+  return customFetch<authControllerLogoutResponseSuccess>(getAuthControllerLogoutUrl(), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -397,5 +445,23 @@ export const offerControllerCreate = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(createOfferDto),
+export type sectorControllerFindAllResponse200 = {
+  data: SectorDto[];
+  status: 200;
+};
+
+export type sectorControllerFindAllResponseSuccess = sectorControllerFindAllResponse200 & {
+  headers: Headers;
+};
+export const getSectorControllerFindAllUrl = () => {
+  return `/api/sectors`;
+};
+
+export const sectorControllerFindAll = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<sectorControllerFindAllResponseSuccess> => {
+  return customFetch<sectorControllerFindAllResponseSuccess>(getSectorControllerFindAllUrl(), {
+    ...options,
+    method: 'GET',
   });
 };

@@ -48,7 +48,7 @@ export function SplashPage({ onCreateAccount, onSignIn, weeklyMatches = 0 }: Spl
         </Button>
 
         <p className="mt-2 text-center text-xs leading-snug text-ink-faint">
-          En continuant, tu acceptes les CGU et la politique de confidentialité.
+          En continuant, vous acceptez les CGU et la politique de confidentialité.
         </p>
       </section>
     </main>

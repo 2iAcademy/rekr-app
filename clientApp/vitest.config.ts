@@ -14,6 +14,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
+    // The journey specs drive five wizard steps through the real stack; under
+    // v8 coverage on a 2-vCPU runner they sit close to the 5s default.
+    testTimeout: 20000,
     css: false,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     coverage: {
@@ -27,6 +30,12 @@ export default defineConfig({
       // a markup-chasing game. Sonar enforces 80% on new code separately.
       thresholds: {
         'src/features/onboarding/**': {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
+        'src/features/recruiter-onboarding/**': {
           statements: 80,
           branches: 80,
           functions: 80,
