@@ -1,10 +1,12 @@
-import type {
-  CompanySize,
-  ContractType,
-  ExperienceLevel,
-  RecruiterOnboardingState,
-  RemotePolicy,
-} from './state';
+import type { CompanySize, ContractType, ExperienceLevel, RemotePolicy } from '@/domain/enums';
+import {
+  optionalEnum,
+  optionalInteger,
+  optionalList,
+  optionalText,
+  withoutEmptyFields,
+} from '@/lib/payload';
+import type { RecruiterOnboardingState } from './state';
 
 /**
  * Declared as type aliases, not interfaces: orval types the generated DTOs as
@@ -39,28 +41,6 @@ export type OfferPayload = {
   salaryMax?: number;
   status: 'open';
 };
-
-/**
- * The backend DTOs mark optional fields `@IsOptional()`, which skips validation
- * on `undefined` only — an empty string is still validated, and `siteUrl: ''`
- * would fail `@IsUrl`. So unset fields have to be absent from the body, not
- * present-and-empty.
- */
-const withoutEmptyFields = <T extends object>(source: T): T =>
-  Object.fromEntries(Object.entries(source).filter(([, value]) => value !== undefined)) as T;
-
-const optionalText = (value: string): string | undefined => value.trim() || undefined;
-
-const optionalList = (values: string[]): string[] | undefined =>
-  values.length > 0 ? values : undefined;
-
-const optionalInteger = (value: string): number | undefined => {
-  const parsed = Number.parseInt(value, 10);
-
-  return Number.isNaN(parsed) ? undefined : parsed;
-};
-
-const optionalEnum = <T extends string>(value: T | ''): T | undefined => value || undefined;
 
 export const buildCompanyPayload = (state: RecruiterOnboardingState): CompanyPayload =>
   withoutEmptyFields({

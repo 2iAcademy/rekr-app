@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TagInput } from './TagInput';
-import { MAX_TAGS } from '../bounds';
+import { MAX_TAGS } from '@/lib/bounds';
 
 const renderTags = (props: Partial<Parameters<typeof TagInput>[0]> = {}) =>
   render(

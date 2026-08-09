@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { Input } from '@/components/ui/input';
-import { MAX_SALARY_DIGITS } from '../bounds';
+import { MAX_SALARY_DIGITS } from '@/lib/bounds';
+import { digitsOnly } from '@/lib/numbers';
 
 interface SalaryRangeProps {
   min: string;
@@ -9,8 +10,6 @@ interface SalaryRangeProps {
   onMaxChange: (value: string) => void;
   describedBy?: string;
 }
-
-const digitsOnly = (value: string): string => value.replace(/\D/g, '');
 
 const isDecreasing = (min: string, max: string): boolean => {
   const from = Number.parseInt(min, 10);

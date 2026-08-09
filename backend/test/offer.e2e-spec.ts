@@ -6,7 +6,9 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { configureApp } from '../src/setup-app';
 import { bearerFor } from './auth-header';
+import { stubCityReference } from './city-reference';
 import { resetDb } from './reset-db';
+import { resetCityCache } from './city-cache-reset';
 import { resetThrottler } from './throttler-reset';
 
 describe('Offer (e2e)', () => {
@@ -59,6 +61,8 @@ describe('Offer (e2e)', () => {
   beforeEach(async () => {
     await resetDb(prisma);
     resetThrottler(app);
+    resetCityCache(app);
+    stubCityReference();
   });
 
   afterAll(async () => {
@@ -162,6 +166,8 @@ describe('Offer (e2e)', () => {
     });
     const candidate = await createUser('candidate');
 
+    // 403 and not 404 here: `RolesGuard` answers before the service ever looks
+    // the offer up, so nothing about its existence is revealed either way.
     await httpRequest(app)
       .patch(`/api/offers/${offer.id}`)
       .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
@@ -172,7 +178,7 @@ describe('Offer (e2e)', () => {
     expect(saved?.title).toBe('Dev');
   });
 
-  it('forbids a recruiter without a company from updating an offer (403)', async () => {
+  it('hides an offer from a recruiter without a company (404)', async () => {
     const { user, company } = await seedRecruiterWithCompany('Acme');
     const offer = await prisma.offer.create({
       data: { title: 'Dev', companyId: company.id, createdById: user.id },
@@ -183,13 +189,16 @@ describe('Offer (e2e)', () => {
       .patch(`/api/offers/${offer.id}`)
       .set('Authorization', bearerFor(app, orphan.id, 'recruiter'))
       .send({ title: 'Hijacked' })
-      .expect(403);
+      .expect(404);
 
     const saved = await prisma.offer.findUnique({ where: { id: offer.id } });
     expect(saved?.title).toBe('Dev');
   });
 
-  it("forbids updating another recruiter's offer (403)", async () => {
+  // 404 and not 403: telling a stranger « you may not touch this one » already
+  // tells them the id exists, which is the whole of what an enumeration needs.
+  // Same answer as a missing offer, checked side by side below.
+  it("hides another recruiter's offer behind a 404", async () => {
     const owner = await seedRecruiterWithCompany('Owner Corp');
     const intruder = await seedRecruiterWithCompany('Intruder Corp');
 
@@ -201,7 +210,7 @@ describe('Offer (e2e)', () => {
       .patch(`/api/offers/${offerIdOf(res)}`)
       .set('Authorization', bearerFor(app, intruder.user.id, 'recruiter'))
       .send({ title: 'Hijacked' })
-      .expect(403);
+      .expect(404);
 
     const saved = await prisma.offer.findUnique({
       where: { id: offerIdOf(res) },

@@ -5,7 +5,9 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { configureApp } from '../src/setup-app';
 import { bearerFor } from './auth-header';
+import { stubCityReference } from './city-reference';
 import { resetDb } from './reset-db';
+import { resetCityCache } from './city-cache-reset';
 import { resetThrottler } from './throttler-reset';
 
 describe('Company (e2e)', () => {
@@ -41,6 +43,8 @@ describe('Company (e2e)', () => {
   beforeEach(async () => {
     await resetDb(prisma);
     resetThrottler(app);
+    resetCityCache(app);
+    stubCityReference();
   });
 
   afterAll(async () => {
@@ -136,6 +140,39 @@ describe('Company (e2e)', () => {
 
     await asRecruiter(recruiter.id).send(payload).expect(201);
     await asRecruiter(recruiter.id).send(payload).expect(409);
+  });
+
+  it('rejects a city and postal code pair the reference does not know', async () => {
+    const recruiter = await createUser('recruiter');
+    (global.fetch as unknown as jest.Mock).mockResolvedValue(
+      new Response(JSON.stringify({ features: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    await asRecruiter(recruiter.id)
+      .send({
+        name: 'Acme',
+        firstName: 'R',
+        lastName: 'D',
+        city: 'Wakanda',
+        postalCode: '99999',
+      })
+      .expect(400);
+
+    const profile = await prisma.recruiterProfile.findUnique({
+      where: { userId: recruiter.id },
+    });
+    expect(profile).toBeNull();
+  });
+
+  it('rejects a company city sent without its postal code with 400', async () => {
+    const recruiter = await createUser('recruiter');
+
+    await asRecruiter(recruiter.id)
+      .send({ name: 'Acme', firstName: 'R', lastName: 'D', city: 'Marseille' })
+      .expect(400);
   });
 
   it('rejects an unauthenticated update with 401', async () => {

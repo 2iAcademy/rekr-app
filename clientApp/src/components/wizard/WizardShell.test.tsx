@@ -6,10 +6,12 @@ import { WizardShell } from './WizardShell';
 const renderShell = (props: Partial<Parameters<typeof WizardShell>[0]> = {}) =>
   render(
     <WizardShell
+      role="recruiter"
       title="Ma société"
       current={2}
       total={5}
       submitLabel="Continuer"
+      submittingLabel="Publication…"
       onBack={vi.fn()}
       onSubmit={vi.fn()}
       {...props}
@@ -29,10 +31,12 @@ describe('WizardShell', () => {
 
   // Anything outside `ROLE_THEMES` silently falls back to the candidate palette
   // (jsdom loads no CSS, so only `lib/roleTheme.test.ts` catches the drift).
-  it('applique le thème recruteur du design system', () => {
+  it('applique le thème du rôle demandé', () => {
     renderShell();
-
     expect(screen.getByRole('main')).toHaveAttribute('data-role', 'recruiter');
+
+    renderShell({ role: 'candidate' });
+    expect(screen.getAllByRole('main')[1]).toHaveAttribute('data-role', 'candidate');
   });
 
   // The mockups keep both a header chevron (mobile only) and an action-bar
@@ -88,9 +92,13 @@ describe('WizardShell', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('désactive l’action principale pendant l’envoi', () => {
-    renderShell({ submitting: true, submitLabel: 'Publier mon offre' });
+  it('désactive l’action principale pendant l’envoi et annonce le libellé fourni', () => {
+    renderShell({
+      submitting: true,
+      submitLabel: 'Publier mon profil',
+      submittingLabel: 'Enregistrement…',
+    });
 
-    expect(screen.getByRole('button', { name: /Publication/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Enregistrement…' })).toBeDisabled();
   });
 });

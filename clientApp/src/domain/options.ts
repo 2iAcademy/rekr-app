@@ -1,5 +1,11 @@
 import type { Option } from '@/components/form/OptionCards';
-import type { CompanySize, ContractType, ExperienceLevel, RemotePolicy } from './state';
+import type {
+  Availability,
+  CompanySize,
+  ContractType,
+  ExperienceLevel,
+  RemotePolicy,
+} from './enums';
 
 export const COMPANY_SIZE_OPTIONS = [
   { value: 'TPE', label: 'TPE' },
@@ -27,3 +33,9 @@ export const REMOTE_POLICY_OPTIONS = [
   { value: 'HYBRID', label: 'Hybride' },
   { value: 'FULL_REMOTE', label: 'Full remote' },
 ] as const satisfies readonly Option<RemotePolicy>[];
+
+export const AVAILABILITY_OPTIONS = [
+  { value: 'IMMEDIATE', label: 'Immédiate' },
+  { value: 'WITHIN_DELAY', label: 'Sous quelques mois' },
+  { value: 'SPECIFIC_DATE', label: 'À une date précise' },
+] as const satisfies readonly Option<Availability>[];

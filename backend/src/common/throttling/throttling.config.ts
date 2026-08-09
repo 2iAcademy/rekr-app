@@ -29,6 +29,10 @@ const DEFAULT_LIMITS: Record<ThrottleBudgetName, number> = {
   signup: 10,
   logs: 20,
   refresh: 30,
+  // One autocompletion field sends a request per debounced keystroke, and a
+  // shared office IP multiplies that by the number of people onboarding at
+  // once. The answers are cached server-side, so the cost of a burst is low.
+  cities: 200,
 };
 
 export function buildThrottlerOptions(
@@ -82,6 +86,11 @@ function readLimits(
       configService,
       'THROTTLE_REFRESH_LIMIT',
       DEFAULT_LIMITS.refresh,
+    ),
+    cities: readPositiveInt(
+      configService,
+      'THROTTLE_CITIES_LIMIT',
+      DEFAULT_LIMITS.cities,
     ),
   };
 }

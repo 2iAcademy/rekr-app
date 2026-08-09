@@ -46,6 +46,11 @@ const route = (url: string): Response => {
       { id: 9, label: 'Juridique' },
     ]);
   }
+  if (url.includes('/api/cities')) {
+    return json(200, [
+      { name: 'Lyon', postalCode: '69003', latitude: 45.751578, longitude: 4.869577 },
+    ]);
+  }
   if (url.includes('/api/companies/mine')) {
     return json(200, {});
   }
@@ -90,8 +95,8 @@ const completeWizard = async (user: User) => {
   await waitFor(() => expect(screen.getByLabelText('Secteur')).toBeEnabled());
   await user.selectOptions(screen.getByLabelText('Secteur'), '4');
   await user.click(screen.getByRole('radio', { name: 'PME' }));
-  await user.type(screen.getByLabelText('Ville'), 'Lyon');
-  await user.type(screen.getByLabelText('Code postal'), '69003');
+  await user.type(screen.getByRole('combobox', { name: 'Ville' }), 'lyon');
+  await user.click(await screen.findByRole('option', { name: 'Lyon (69003)' }));
   await user.type(screen.getByLabelText('Site web (optionnel)'), 'https://rekr.fr');
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 

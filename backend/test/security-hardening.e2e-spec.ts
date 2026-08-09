@@ -693,23 +693,31 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       expectRejectedField(res.body, 'salaryMax');
     });
 
+    // Coordinates are no longer part of the contract at all: the API derives
+    // them from the (city, postal code) pair. Sending them is not an
+    // out-of-range value any more, it is an unknown field — which is the
+    // stronger guarantee, since a bounded-but-arbitrary pair was enough to
+    // display one commune and be matched at another's.
     it.each([
+      ['latitude', 45.75],
       ['latitude', 91],
-      ['latitude', -91],
+      ['longitude', 4.83],
       ['longitude', 181],
-      ['longitude', -181],
-    ])('rejects %s = %s as off the globe', async (field, value) => {
-      const user = await createUser('candidate');
+    ])(
+      'refuses %s = %s, coordinates are not the client to send',
+      async (field, value) => {
+        const user = await createUser('candidate');
 
-      const res = await httpRequest(app)
-        .post('/api/candidate-profiles')
-        .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace', [field]: value });
+        const res = await httpRequest(app)
+          .post('/api/candidate-profiles')
+          .set('Authorization', bearerFor(app, user.id, 'candidate'))
+          .send({ firstName: 'Ada', lastName: 'Lovelace', [field]: value });
 
-      expect(res.status).toBe(400);
-      expectRejectedField(res.body, field);
-      expect(await prisma.candidateProfile.count()).toBe(0);
-    });
+        expect(res.status).toBe(400);
+        expectRejectedField(res.body, field);
+        expect(await prisma.candidateProfile.count()).toBe(0);
+      },
+    );
 
     it('rejects a mobility radius above the int4 ceiling', async () => {
       const user = await createUser('candidate');
@@ -727,7 +735,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       expectRejectedField(res.body, 'mobilityRadiusKm');
     });
 
-    it('keeps accepting real coordinates and a real salary', async () => {
+    it('keeps accepting a real salary and a real mobility radius', async () => {
       const user = await createUser('candidate');
 
       await httpRequest(app)
@@ -736,8 +744,6 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
         .send({
           firstName: 'Ada',
           lastName: 'Lovelace',
-          latitude: 45.7578137,
-          longitude: 4.8320114,
           salaryMin: 45_000,
           salaryMax: 60_000,
           mobilityRadiusKm: 50,

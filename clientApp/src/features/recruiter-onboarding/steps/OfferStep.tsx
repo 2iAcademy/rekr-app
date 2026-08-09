@@ -1,8 +1,14 @@
-import { RichTextField } from '../components/RichTextField';
-import { TagInput } from '../components/TagInput';
-import { TextField } from '../components/TextField';
-import { MAX_FREE_TEXT_LENGTH } from '../bounds';
-import { markIfInvalid, WIZARD_ERROR_ID, type StepProps } from './stepProps';
+import { CityField } from '@/components/form/CityField';
+import { RichTextField } from '@/components/form/RichTextField';
+import { TagInput } from '@/components/form/TagInput';
+import { TextField } from '@/components/form/TextField';
+import { MAX_FREE_TEXT_LENGTH } from '@/lib/bounds';
+import {
+  markGroupIfInvalid,
+  markIfInvalid,
+  WIZARD_ERROR_ID,
+} from '@/components/wizard/wizardError';
+import type { StepProps } from './stepProps';
 
 export function OfferStep({ state, onChange, invalidField }: StepProps) {
   return (
@@ -17,29 +23,27 @@ export function OfferStep({ state, onChange, invalidField }: StepProps) {
         placeholder="Chargé de clientèle"
       />
 
-      <div className="grid grid-cols-[2fr_1fr] gap-3">
-        <TextField
-          label="Ville"
-          aria-required
-          {...markIfInvalid(invalidField, 'offerCity')}
-          autoComplete="address-level2"
-          maxLength={100}
-          value={state.offerCity}
-          onChange={(event) => onChange({ offerCity: event.target.value })}
-          placeholder="Lyon"
-        />
-        <TextField
-          label="Code postal"
-          aria-required
-          {...markIfInvalid(invalidField, 'offerPostalCode')}
-          autoComplete="postal-code"
-          inputMode="numeric"
-          maxLength={10}
-          value={state.offerPostalCode}
-          onChange={(event) => onChange({ offerPostalCode: event.target.value })}
-          placeholder="69003"
-        />
-      </div>
+      <CityField
+        label="Ville du poste"
+        selected={
+          state.offerCity && state.offerPostalCode
+            ? { name: state.offerCity, postalCode: state.offerPostalCode }
+            : null
+        }
+        onSelect={(city) =>
+          onChange({
+            offerCity: city.name,
+            offerPostalCode: city.postalCode,
+          })
+        }
+        onClear={() =>
+          onChange({
+            offerCity: '',
+            offerPostalCode: '',
+          })
+        }
+        {...markGroupIfInvalid(invalidField, 'offerCity')}
+      />
 
       <RichTextField
         label="Missions"

@@ -2,14 +2,16 @@ import type { FormEvent, ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { RoleTheme } from '@/lib/roleTheme';
-import { WIZARD_ERROR_ID } from '../steps/stepProps';
+import { WIZARD_ERROR_ID } from './wizardError';
 import { WizardProgress } from './WizardProgress';
 
 interface WizardShellProps {
+  role: RoleTheme;
   title: string;
   current: number;
   total: number;
   submitLabel: string;
+  submittingLabel: string;
   error?: string | null;
   submitting?: boolean;
   onBack: () => void;
@@ -18,10 +20,12 @@ interface WizardShellProps {
 }
 
 export function WizardShell({
+  role,
   title,
   current,
   total,
   submitLabel,
+  submittingLabel,
   error = null,
   submitting = false,
   onBack,
@@ -37,7 +41,7 @@ export function WizardShell({
 
   return (
     <main
-      data-role={'recruiter' satisfies RoleTheme}
+      data-role={role}
       className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background px-6 pt-4 pb-8 md:max-w-3xl md:px-21 lg:max-w-none lg:items-center lg:justify-center lg:px-6 lg:py-10"
     >
       {/* Desktop lifts the form into a centred card; mobile and tablet keep the
@@ -84,7 +88,7 @@ export function WizardShell({
               </Button>
             )}
             <Button type="submit" variant="role" size="xl" disabled={submitting} className="flex-1">
-              {submitting ? 'Publication…' : submitLabel}
+              {submitting ? submittingLabel : submitLabel}
             </Button>
           </div>
         </form>

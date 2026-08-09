@@ -1,11 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
+  AVAILABILITY_OPTIONS,
   COMPANY_SIZE_OPTIONS,
   CONTRACT_TYPE_OPTIONS,
   EXPERIENCE_LEVEL_OPTIONS,
   REMOTE_POLICY_OPTIONS,
 } from './options';
-import { COMPANY_SIZES, CONTRACT_TYPES, EXPERIENCE_LEVELS, REMOTE_POLICIES } from './state';
+import {
+  AVAILABILITIES,
+  COMPANY_SIZES,
+  CONTRACT_TYPES,
+  EXPERIENCE_LEVELS,
+  REMOTE_POLICIES,
+} from './enums';
 
 // `satisfies` checks the shape of each option but not that the list covers the
 // enum, so a value added to `state.ts` without a label would silently render as
@@ -15,6 +22,7 @@ describe.each([
   ['type de contrat', CONTRACT_TYPE_OPTIONS, CONTRACT_TYPES],
   ["niveau d'expérience", EXPERIENCE_LEVEL_OPTIONS, EXPERIENCE_LEVELS],
   ['politique de télétravail', REMOTE_POLICY_OPTIONS, REMOTE_POLICIES],
+  ['disponibilité', AVAILABILITY_OPTIONS, AVAILABILITIES],
 ])('options de %s', (_name, options, values) => {
   it('couvre toutes les valeurs de l’enum, dans l’ordre déclaré', () => {
     expect(options.map((option) => option.value)).toEqual([...values]);

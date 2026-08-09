@@ -2,7 +2,9 @@ import { defineConfig } from 'orval';
 
 export default defineConfig({
   api: {
-    input: 'http://localhost:3001/api/docs-json',
+    // Overridable so the generation can run inside the front container, where
+    // the API answers on its compose service name rather than on localhost.
+    input: process.env.ORVAL_INPUT ?? 'http://localhost:3001/api/docs-json',
     output: {
       target: './src/api/generated.ts',
       client: 'fetch',

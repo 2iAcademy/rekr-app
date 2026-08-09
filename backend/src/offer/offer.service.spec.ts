@@ -1,6 +1,7 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { OfferService } from './offer.service';
+import { CityService } from '../city/city.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type PrismaMock = {
@@ -25,13 +26,111 @@ const buildPrismaMock = (): PrismaMock => {
 describe('OfferService', () => {
   let service: OfferService;
   let prisma: ReturnType<typeof buildPrismaMock>;
+  let cities: { assertKnown: jest.Mock };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
+    cities = { assertKnown: jest.fn().mockResolvedValue(undefined) };
     const moduleRef = await Test.createTestingModule({
-      providers: [OfferService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        OfferService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: CityService, useValue: cities },
+      ],
     }).compile();
     service = moduleRef.get(OfferService);
+  });
+
+  describe('city verification', () => {
+    it('submits the location of a new offer to the city reference', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      prisma.offer.create.mockResolvedValue({ id: 50, companyId: 10 });
+
+      await service.create(7, {
+        title: 'Dev',
+        city: 'Lyon',
+        postalCode: '69001',
+      });
+
+      expect(cities.assertKnown).toHaveBeenCalledWith(
+        expect.objectContaining({ city: 'Lyon', postalCode: '69001' }),
+      );
+    });
+
+    it('writes nothing when the reference refuses the location of a new offer', async () => {
+      cities.assertKnown.mockRejectedValue(new BadRequestException());
+
+      await expect(
+        service.create(7, {
+          title: 'Dev',
+          city: 'Wakanda',
+          postalCode: '99999',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prisma.offer.create).not.toHaveBeenCalled();
+    });
+
+    it('verifies a patched city against the postcode already stored', async () => {
+      prisma.offer.findUnique.mockResolvedValue({
+        id: 50,
+        companyId: 10,
+        city: 'Lyon',
+        postalCode: '69001',
+      });
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      prisma.offer.update.mockResolvedValue({ id: 50, companyId: 10 });
+
+      await service.update(7, 50, { city: 'Nîmes' });
+
+      expect(cities.assertKnown).toHaveBeenCalledWith({
+        city: 'Nîmes',
+        postalCode: '69001',
+      });
+    });
+
+    it('leaves the reference alone when the patch does not touch the location', async () => {
+      prisma.offer.findUnique.mockResolvedValue({ id: 50, companyId: 10 });
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      prisma.offer.update.mockResolvedValue({ id: 50, companyId: 10 });
+
+      await service.update(7, 50, { title: 'Dev renommé' });
+
+      expect(cities.assertKnown).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Answering 400 on the location of an offer the caller does not own would
+     * tell a stranger that the offer exists — and so would a 403. Someone
+     * else's offer and a missing one give the same answer, and nothing is
+     * verified until ownership is established.
+     */
+    it('answers 404 rather than a location error on someone else’s offer', async () => {
+      prisma.offer.findUnique.mockResolvedValue({
+        id: 50,
+        companyId: 99,
+        city: 'Lyon',
+        postalCode: '69001',
+      });
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+
+      await expect(
+        service.update(7, 50, { city: 'Wakanda', postalCode: '99999' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(cities.assertKnown).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 rather than a location error on a missing offer', async () => {
+      prisma.offer.findUnique.mockResolvedValue(null);
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+
+      await expect(
+        service.update(7, 50, { city: 'Wakanda', postalCode: '99999' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(cities.assertKnown).not.toHaveBeenCalled();
+    });
   });
 
   describe('create', () => {
@@ -89,7 +188,9 @@ describe('OfferService', () => {
       expect(result).toEqual(expect.objectContaining({ id: 50 }));
     });
 
-    it('rejects update of an offer from another company (403)', async () => {
+    // Indistinguishable from a missing offer on purpose: a 403 would confirm
+    // the id exists, which is all an enumeration needs.
+    it('rejects update of an offer from another company (404)', async () => {
       prisma.offer.findUnique.mockResolvedValue({ id: 50, companyId: 99 });
       prisma.recruiterProfile.findUnique.mockResolvedValue({
         id: 1,
@@ -99,7 +200,7 @@ describe('OfferService', () => {
 
       await expect(
         service.update(7, 50, { title: 'x' }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(prisma.offer.update).not.toHaveBeenCalled();
     });

@@ -1,8 +1,14 @@
+import { CityField } from '@/components/form/CityField';
 import { OptionCards } from '@/components/form/OptionCards';
 import { SectorField } from '../components/SectorField';
-import { TextField } from '../components/TextField';
-import { COMPANY_SIZE_OPTIONS } from '../options';
-import { markIfInvalid, WIZARD_ERROR_ID, type StepProps } from './stepProps';
+import { TextField } from '@/components/form/TextField';
+import { COMPANY_SIZE_OPTIONS } from '@/domain/options';
+import {
+  markGroupIfInvalid,
+  markIfInvalid,
+  WIZARD_ERROR_ID,
+} from '@/components/wizard/wizardError';
+import type { StepProps } from './stepProps';
 
 export function CompanyStep({ state, onChange, invalidField }: StepProps) {
   return (
@@ -36,29 +42,20 @@ export function CompanyStep({ state, onChange, invalidField }: StepProps) {
         describedBy={invalidField === 'size' ? WIZARD_ERROR_ID : undefined}
       />
 
-      <div className="grid grid-cols-[2fr_1fr] gap-3">
-        <TextField
-          label="Ville"
-          aria-required
-          {...markIfInvalid(invalidField, 'city')}
-          autoComplete="address-level2"
-          maxLength={100}
-          value={state.city}
-          onChange={(event) => onChange({ city: event.target.value })}
-          placeholder="Lyon"
-        />
-        <TextField
-          label="Code postal"
-          aria-required
-          {...markIfInvalid(invalidField, 'postalCode')}
-          autoComplete="postal-code"
-          inputMode="numeric"
-          maxLength={10}
-          value={state.postalCode}
-          onChange={(event) => onChange({ postalCode: event.target.value })}
-          placeholder="69003"
-        />
-      </div>
+      <CityField
+        label="Ville"
+        selected={
+          state.city && state.postalCode ? { name: state.city, postalCode: state.postalCode } : null
+        }
+        onSelect={(city) =>
+          onChange({
+            city: city.name,
+            postalCode: city.postalCode,
+          })
+        }
+        onClear={() => onChange({ city: '', postalCode: '' })}
+        {...markGroupIfInvalid(invalidField, 'city')}
+      />
 
       <TextField
         label="Site web (optionnel)"

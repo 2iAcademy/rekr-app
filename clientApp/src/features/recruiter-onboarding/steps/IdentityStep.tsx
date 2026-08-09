@@ -1,5 +1,6 @@
-import { TextField } from '../components/TextField';
-import { markIfInvalid, type StepProps } from './stepProps';
+import { TextField } from '@/components/form/TextField';
+import { markIfInvalid } from '@/components/wizard/wizardError';
+import type { StepProps } from './stepProps';
 
 export function IdentityStep({ state, onChange, invalidField }: StepProps) {
   return (

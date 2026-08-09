@@ -58,8 +58,8 @@ describe('validateStep', () => {
     [1, { companyName: '' }, 'companyName', 'Renseignez le nom de votre société.'],
     [1, { sectorId: '' }, 'sectorId', 'Choisissez le secteur de votre société.'],
     [1, { size: '' as const }, 'size', 'Choisissez la taille de votre société.'],
-    [1, { city: '' }, 'city', 'Renseignez la ville de votre société.'],
-    [1, { postalCode: '' }, 'postalCode', 'Renseignez le code postal de votre société.'],
+    [1, { city: '' }, 'city', 'Choisissez la commune de votre société dans la liste.'],
+    [1, { postalCode: '' }, 'city', 'Choisissez la commune de votre société dans la liste.'],
     [
       2,
       { description: '' },
@@ -69,8 +69,8 @@ describe('validateStep', () => {
     [3, { offerTitle: '' }, 'offerTitle', 'Renseignez le titre du poste.'],
     [3, { offerDescription: '' }, 'offerDescription', 'Décrivez les missions du poste.'],
     [3, { skills: [] }, 'skills', 'Ajoutez au moins une compétence recherchée.'],
-    [3, { offerCity: '' }, 'offerCity', 'Renseignez la ville du poste.'],
-    [3, { offerPostalCode: '' }, 'offerPostalCode', 'Renseignez le code postal du poste.'],
+    [3, { offerCity: '' }, 'offerCity', 'Choisissez la commune du poste dans la liste.'],
+    [3, { offerPostalCode: '' }, 'offerCity', 'Choisissez la commune du poste dans la liste.'],
     [4, { contractType: '' as const }, 'contractType', 'Choisissez le type de contrat.'],
     [
       4,

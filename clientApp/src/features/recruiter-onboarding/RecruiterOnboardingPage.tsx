@@ -5,7 +5,7 @@ import {
   companyControllerUpdateMine,
   offerControllerCreate,
 } from '@/api/generated';
-import { WizardShell } from './components/WizardShell';
+import { WizardShell } from '@/components/wizard/WizardShell';
 import { clearDraft, loadDraft, saveDraft } from './draftStorage';
 import { buildCompanyPayload, buildOfferPayload } from './payload';
 import { emptyRecruiterOnboarding, type RecruiterOnboardingState } from './state';
@@ -51,7 +51,11 @@ const failureMessage = (caught: unknown): string => {
  */
 const inheritCompanyLocation = (state: RecruiterOnboardingState): RecruiterOnboardingState =>
   state.offerCity === '' && state.offerPostalCode === ''
-    ? { ...state, offerCity: state.city, offerPostalCode: state.postalCode }
+    ? {
+        ...state,
+        offerCity: state.city,
+        offerPostalCode: state.postalCode,
+      }
     : state;
 
 interface RecruiterOnboardingPageProps {
@@ -143,10 +147,12 @@ export function RecruiterOnboardingPage({ userId, onCompleted }: RecruiterOnboar
 
   return (
     <WizardShell
+      role="recruiter"
       title={RECRUITER_STEPS[stepIndex].title}
       current={stepIndex + 1}
       total={RECRUITER_STEPS.length}
       submitLabel={stepIndex === LAST_STEP ? 'Publier mon offre' : 'Continuer'}
+      submittingLabel="Publication…"
       error={error?.message ?? null}
       submitting={submitting}
       onBack={handleBack}
