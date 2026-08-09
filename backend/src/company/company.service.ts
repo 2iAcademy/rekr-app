@@ -38,7 +38,7 @@ export class CompanyService {
   }
 
   async updateMine(userId: number, dto: UpdateCompanyDto) {
-    const { benefits, ...companyData } = dto;
+    const { firstName, lastName, jobTitle, benefits, ...companyData } = dto;
 
     return this.prisma.$transaction(async (tx) => {
       const profile = await tx.recruiterProfile.findUnique({
@@ -47,6 +47,13 @@ export class CompanyService {
       if (!profile) {
         throw new NotFoundException('Recruiter has no company');
       }
+
+      // Split across the two tables the same way `create` writes them, so the
+      // wizard can replay its whole payload instead of losing the identity half.
+      await tx.recruiterProfile.update({
+        where: { userId },
+        data: { firstName, lastName, jobTitle },
+      });
 
       const company = await tx.company.update({
         where: { id: profile.companyId },

@@ -113,7 +113,9 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Tu dois accepter les CGU pour continuer.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Vous devez accepter les CGU pour continuer.',
+    );
 
     const confirm = screen.getByLabelText('Confirmer le mot de passe');
     expect(confirm).toHaveAttribute('aria-invalid', 'false');

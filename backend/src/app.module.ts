@@ -14,6 +14,7 @@ import { AuthModule } from './auth/auth.module';
 import { CandidateProfileModule } from './candidate-profile/candidate-profile.module';
 import { CompanyModule } from './company/company.module';
 import { OfferModule } from './offer/offer.module';
+import { SectorModule } from './sector/sector.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { OfferModule } from './offer/offer.module';
     CandidateProfileModule,
     CompanyModule,
     OfferModule,
+    SectorModule,
   ],
   controllers: [AppController],
   providers: [

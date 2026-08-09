@@ -153,13 +153,17 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-[data-role='candidat'] {
+/* Keyed on the `UserType` values so the palette can be driven straight from the
+   authenticated user. These selectors MUST match `ROLE_THEMES` in
+   `lib/roleTheme.ts`: an unmatched value falls back to the candidate palette
+   without any error. */
+[data-role='candidate'] {
   --role: var(--brand);
   --role-strong: var(--brand-strong);
   --role-gradient: var(--gradient-brand);
   --role-shadow: var(--shadow-brand);
 }
-[data-role='recruteur'] {
+[data-role='recruiter'] {
   --role: var(--violet);
   --role-strong: var(--violet);
   --role-gradient: var(--gradient-violet);

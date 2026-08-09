@@ -53,8 +53,8 @@ export function ForgotPasswordPage({ onBack, onSignIn, onSubmit }: ForgotPasswor
             Email envoyé.
           </h2>
           <p className="text-sm text-ink-muted">
-            Si un compte est associé à <span className="font-medium text-ink">{email}</span>, tu
-            reçois un lien pour réinitialiser ton mot de passe. Pense à vérifier tes spams.
+            Si un compte est associé à <span className="font-medium text-ink">{email}</span>, vous
+            recevez un lien pour réinitialiser votre mot de passe. Pensez à vérifier vos spams.
           </p>
           <button
             type="button"
@@ -69,7 +69,7 @@ export function ForgotPasswordPage({ onBack, onSignIn, onSubmit }: ForgotPasswor
           <div className="mt-10 flex flex-col gap-1.5">
             <h2 className="font-heading text-2xl font-bold text-ink">Pas de panique.</h2>
             <p className="text-sm text-ink-muted">
-              Saisis ton email, on t'envoie un lien pour le réinitialiser.
+              Saisissez votre email, on vous envoie un lien pour le réinitialiser.
             </p>
           </div>
 
@@ -85,7 +85,7 @@ export function ForgotPasswordPage({ onBack, onSignIn, onSubmit }: ForgotPasswor
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="ton@email.com"
+                placeholder="nom@email.com"
               />
             </div>
 
@@ -97,7 +97,7 @@ export function ForgotPasswordPage({ onBack, onSignIn, onSubmit }: ForgotPasswor
       )}
 
       <p className="mt-8 flex items-center justify-center gap-1.5 text-sm text-ink-muted">
-        Tu t'en souviens ?
+        Vous vous en souvenez ?
         <button
           type="button"
           onClick={onSignIn}
