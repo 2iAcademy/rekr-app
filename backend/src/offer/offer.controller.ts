@@ -26,8 +26,12 @@ export class OfferController {
   constructor(private readonly service: OfferService) {}
 
   @Get(':id')
-  findOneById(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOneById(id);
+  @Roles('candidate', 'recruiter')
+  findOneById(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.service.findOneById(user, id);
   }
 
   @Post()

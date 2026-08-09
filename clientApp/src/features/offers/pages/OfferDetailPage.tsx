@@ -1,4 +1,4 @@
-import { Heart, Maximize2, X } from 'lucide-react';
+import { Heart, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { offerControllerFindOneById } from '@/api/generated';
@@ -85,8 +85,11 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
   const stack = offerTags
     .filter((ot) => ot.tag.category === 'skill' || ot.tag.category === 'tech')
     .map((ot) => ot.tag.label);
+  const toK = (value: number | null) => (value != null ? Math.round(value / 1000) : '?');
   const salary =
-    salaryMin || salaryMax ? `${salaryMin ?? '?'} - ${salaryMax ?? '?'} k€` : 'Non communiqué';
+    salaryMin != null || salaryMax != null
+      ? `${toK(salaryMin)} - ${toK(salaryMax)} k€`
+      : 'Non communiqué';
 
   return (
     <main
@@ -103,13 +106,7 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
           <X className="size-5" />
         </button>
         <h1 className="font-heading text-base font-bold text-ink">Détail</h1>
-        <button
-          type="button"
-          aria-label="Agrandir"
-          className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-card text-ink shadow-sm transition-colors hover:bg-muted"
-        >
-          <Maximize2 className="size-5" />
-        </button>
+        <div className="size-9" aria-hidden="true" />
       </header>
 
       <section className="relative flex h-52 items-center justify-center bg-role-gradient pt-12">

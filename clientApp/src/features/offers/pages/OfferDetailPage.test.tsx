@@ -78,7 +78,7 @@ describe('OfferDetailPage', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('45000 - 55000 k€')).toBeInTheDocument();
+      expect(screen.getByText('45 - 55 k€')).toBeInTheDocument();
     });
   });
 

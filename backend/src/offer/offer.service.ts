@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { resolveTagIds } from '../common/tags/tag-sync';
+import type { AuthUser } from '../auth/auth-user.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
@@ -69,39 +70,22 @@ export class OfferService {
     });
   }
 
-  async findAllOpen() {
-    return this.prisma.offer.findMany({
-      where: { status: 'open' },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-            logo: true,
-            size: true,
-            description: true,
-            city: true,
-          },
-        },
-        offerTags: {
-          include: {
-            tag: {
-              select: {
-                id: true,
-                label: true,
-                category: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+  async findOneById(user: AuthUser, id: number) {
+    const profile =
+      user.userType === 'recruiter'
+        ? await this.prisma.recruiterProfile.findUnique({
+            where: { userId: user.id },
+          })
+        : null;
 
-  async findOneById(id: number) {
-    const offer = await this.prisma.offer.findUnique({
-      where: { id },
+    const offer = await this.prisma.offer.findFirst({
+      where: {
+        id,
+        OR: [
+          { status: 'open' },
+          ...(profile ? [{ companyId: profile.companyId }] : []),
+        ],
+      },
       include: {
         company: {
           select: {
