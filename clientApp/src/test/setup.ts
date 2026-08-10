@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { toast } from 'sonner';
 
 /**
  * jsdom implements neither `execCommand` nor `contentEditable` editing, so the
@@ -28,7 +29,19 @@ Object.defineProperty(document, 'execCommand', {
   configurable: true,
 });
 
+/**
+ * Sonner's toast store is a module-level singleton that outlives `cleanup()`,
+ * and `ToastState.subscribe` replays every still-active toast to any newly
+ * mounted `<Toaster>`. A toast raised in one test is never dismissed — its
+ * Toaster is unmounted long before the auto-close timer fires — so it would
+ * reappear in the next test and break assertions that expect no toast at all.
+ *
+ * Dismissing marks them in `dismissedToasts`, which is what `getActiveToasts`
+ * filters on, so the replay finds nothing. This is deterministic: it does not
+ * depend on timers running.
+ */
 afterEach(() => {
   cleanup();
+  toast.dismiss();
   execCommand.mockClear();
 });
