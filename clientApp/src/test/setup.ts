@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { toast } from 'sonner';
 
 /**
  * jsdom implements neither `execCommand` nor `contentEditable` editing, so the
@@ -29,6 +30,7 @@ Object.defineProperty(document, 'execCommand', {
 });
 
 afterEach(() => {
+  toast.dismiss();
   cleanup();
   execCommand.mockClear();
 });
