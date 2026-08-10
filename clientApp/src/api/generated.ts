@@ -468,24 +468,3 @@ export const sectorControllerFindAll = async (
     method: 'GET',
   });
 };
-
-export type sectorControllerFindAllResponse200 = {
-  data: SectorDto[];
-  status: 200;
-};
-
-export type sectorControllerFindAllResponseSuccess = sectorControllerFindAllResponse200 & {
-  headers: Headers;
-};
-export const getSectorControllerFindAllUrl = () => {
-  return `/api/sectors`;
-};
-
-export const sectorControllerFindAll = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<sectorControllerFindAllResponseSuccess> => {
-  return customFetch<sectorControllerFindAllResponseSuccess>(getSectorControllerFindAllUrl(), {
-    ...options,
-    method: 'GET',
-  });
-};
