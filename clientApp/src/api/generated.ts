@@ -445,6 +445,9 @@ export const offerControllerCreate = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(createOfferDto),
+  });
+};
+
 export type sectorControllerFindAllResponse200 = {
   data: SectorDto[];
   status: 200;
