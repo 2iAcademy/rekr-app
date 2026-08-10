@@ -2,11 +2,13 @@ import { useState, type FormEvent } from 'react';
 import { Check, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/form/PasswordInput';
 import { cn } from '@/lib/utils';
-import { ApiError } from '@/api/customFetch';
 import { useAuth } from '@/features/auth/useAuth';
 import { OptionCards, type Option } from '@/components/form/OptionCards';
 import type { RoleTheme } from '@/lib/roleTheme';
+import { SIGNUP_SUCCESS, signupBusiness } from '@/features/auth/authFeedback';
+import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
 
 // Typed as `RoleTheme`: the selected value is fed straight to `data-role`, so a
 // value without a matching palette scope must not compile.
@@ -49,13 +51,10 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
     try {
       await signup(email, password, role);
       setError(null);
+      notifySuccess(SIGNUP_SUCCESS);
       onSubmit?.({ role, email, password });
     } catch (caught) {
-      setError(
-        caught instanceof ApiError && caught.status === 409
-          ? 'Un compte existe déjà pour cet email.'
-          : 'Impossible de créer le compte.',
-      );
+      notifyFailure(caught, signupBusiness);
     }
   };
 
@@ -108,9 +107,8 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
           <label htmlFor="signup-password" className="text-xs text-ink-muted">
             Mot de passe
           </label>
-          <Input
+          <PasswordInput
             id="signup-password"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}
@@ -127,9 +125,9 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
           <label htmlFor="signup-confirm-password" className="text-xs text-ink-muted">
             Confirmer le mot de passe
           </label>
-          <Input
+          <PasswordInput
             id="signup-confirm-password"
-            type="password"
+            subject="la confirmation du mot de passe"
             autoComplete="new-password"
             required
             value={confirmPassword}
