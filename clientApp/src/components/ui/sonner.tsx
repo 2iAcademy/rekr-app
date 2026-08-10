@@ -1,19 +1,20 @@
 "use client"
 
-import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
+const Toaster = ({ theme = "light", ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={theme}
+      position="top-right"
+      mobileOffset={{ top: "4rem" }}
+      closeButton
+      containerAriaLabel="Notifications"
       className="toaster group"
       icons={{
         success: (
-          <CircleCheckIcon className="size-4" />
+          <CircleCheckIcon className="size-4 text-brand-strong" />
         ),
         info: (
           <InfoIcon className="size-4" />
@@ -22,7 +23,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           <TriangleAlertIcon className="size-4" />
         ),
         error: (
-          <OctagonXIcon className="size-4" />
+          <OctagonXIcon className="size-4 text-destructive" />
         ),
         loading: (
           <Loader2Icon className="size-4 animate-spin" />
@@ -37,8 +38,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
         } as React.CSSProperties
       }
       toastOptions={{
+        closeButtonAriaLabel: "Fermer la notification",
         classNames: {
-          toast: "cn-toast",
+          success: "[--normal-bg:var(--brand-tint)] [--normal-border:var(--brand)] [--normal-text:var(--ink)]",
+          error: "[--normal-bg:var(--destructive-tint)] [--normal-border:var(--destructive)] [--normal-text:var(--ink)]",
         },
       }}
       {...props}
