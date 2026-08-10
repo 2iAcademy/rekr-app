@@ -41,6 +41,7 @@ Object.defineProperty(document, 'execCommand', {
  * depend on timers running.
  */
 afterEach(() => {
+  toast.dismiss();
   cleanup();
   toast.dismiss();
   execCommand.mockClear();

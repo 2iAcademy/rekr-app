@@ -5,6 +5,7 @@ import {
   SigninRoute,
   ForgotPasswordRoute,
 } from '@/features/onboarding/routes';
+import { OfferDetailRoute } from '@/features/offers/routes';
 import { RecruiterOnboardingRoute } from '@/features/recruiter-onboarding/routes';
 
 export const routes = [
@@ -12,6 +13,7 @@ export const routes = [
   { path: '/inscription', element: <SignupRoute /> },
   { path: '/connexion', element: <SigninRoute /> },
   { path: '/mot-de-passe-oublie', element: <ForgotPasswordRoute /> },
+  { path: '/offres/:id', element: <OfferDetailRoute /> },
   { path: '/recruteur/profil', element: <RecruiterOnboardingRoute /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ];
