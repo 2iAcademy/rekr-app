@@ -21,11 +21,7 @@ export function SignupRoute() {
       onBack={() => navigate('/')}
       onSignIn={() => navigate('/connexion')}
       onSubmit={({ role }) => {
-        // Only the recruiter journey exists so far; a candidate stays put rather
-        // than being sent to the anonymous splash.
-        if (role === 'recruiter') {
-          navigate('/recruteur/profil');
-        }
+        navigate(role === 'recruiter' ? '/recruteur/profil' : '/candidat/profil');
       }}
     />
   );

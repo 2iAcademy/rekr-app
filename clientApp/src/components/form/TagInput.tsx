@@ -1,7 +1,7 @@
 import { useId, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { MAX_TAG_LABEL_LENGTH, MAX_TAGS } from '../bounds';
+import { MAX_TAG_LABEL_LENGTH, MAX_TAGS } from '@/lib/bounds';
 
 interface TagInputProps {
   label: string;

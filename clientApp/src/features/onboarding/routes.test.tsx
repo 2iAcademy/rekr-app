@@ -117,7 +117,7 @@ describe('navigation onboarding', () => {
     expect(screen.getByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
   });
 
-  it('laisse le candidat sur place après une inscription réussie', async () => {
+  it('envoie le candidat sur son wizard de profil après une inscription réussie', async () => {
     const user = userEvent.setup();
     renderAt('/inscription');
 
@@ -129,8 +129,8 @@ describe('navigation onboarding', () => {
 
     await waitFor(() => expect(signupRequest).toHaveBeenCalled());
 
-    expect(screen.getByRole('button', { name: 'Créer mon compte' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: "J'ai déjà un compte" })).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Mon identité' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Créer mon compte' })).toBeNull();
   });
 
   it('redirige toute route inconnue vers le Splash', () => {

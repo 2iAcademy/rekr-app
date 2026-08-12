@@ -6,7 +6,6 @@ import {
   IsDate,
   IsEnum,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
   IsUrl,
@@ -20,14 +19,12 @@ import {
   ExperienceLevel,
   RemotePolicy,
 } from '../../../generated/prisma/client';
-import { MAX_SKILLS, MAX_TAG_LABEL_LENGTH } from '../../common/tags/tag-bounds';
 import {
-  MAX_INT4,
-  MAX_LATITUDE,
-  MAX_LONGITUDE,
-  MIN_LATITUDE,
-  MIN_LONGITUDE,
-} from '../../common/validation/numeric-bounds';
+  MAX_LANGUAGES,
+  MAX_SKILLS,
+  MAX_TAG_LABEL_LENGTH,
+} from '../../common/tags/tag-bounds';
+import { MAX_INT4 } from '../../common/validation/numeric-bounds';
 import { NoControlCharacters } from '../../common/validation/no-control-characters';
 import { MAX_FREE_TEXT_LENGTH } from '../../common/validation/text-bounds';
 import {
@@ -64,17 +61,10 @@ export class CreateCandidateProfileDto {
   @MaxLength(10)
   postalCode?: string;
 
-  @IsOptional()
-  @IsNumber()
-  @Min(MIN_LATITUDE)
-  @Max(MAX_LATITUDE)
-  latitude?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(MIN_LONGITUDE)
-  @Max(MAX_LONGITUDE)
-  longitude?: number;
+  // No `latitude` / `longitude` here: the pair (city, postal code) is the only
+  // location a client sends, and the coordinates are derived from it server-side
+  // by `CityService.assertKnown`. Accepting them would let a payload display one
+  // commune and be matched at another's coordinates.
 
   @IsOptional()
   @IsString()
@@ -146,4 +136,12 @@ export class CreateCandidateProfileDto {
   @MaxLength(MAX_TAG_LABEL_LENGTH, { each: true })
   @NoControlCharacters({ each: true })
   skills?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_LANGUAGES)
+  @IsString({ each: true })
+  @MaxLength(MAX_TAG_LABEL_LENGTH, { each: true })
+  @NoControlCharacters({ each: true })
+  languages?: string[];
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IdentityStep } from './IdentityStep';
-import { WIZARD_ERROR_ID } from './stepProps';
+import { WIZARD_ERROR_ID } from '@/components/wizard/wizardError';
 import { emptyRecruiterOnboarding } from '../state';
 
 const renderStep = (props: Partial<Parameters<typeof IdentityStep>[0]> = {}) =>

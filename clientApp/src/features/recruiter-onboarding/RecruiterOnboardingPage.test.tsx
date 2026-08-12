@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@/api/customFetch';
 import {
+  cityControllerSearch,
   companyControllerCreate,
   companyControllerUpdateMine,
   offerControllerCreate,
@@ -15,12 +16,14 @@ vi.mock('@/api/generated', () => ({
   companyControllerUpdateMine: vi.fn(),
   offerControllerCreate: vi.fn(),
   sectorControllerFindAll: vi.fn(),
+  cityControllerSearch: vi.fn(),
 }));
 
 const createCompany = vi.mocked(companyControllerCreate);
 const updateCompany = vi.mocked(companyControllerUpdateMine);
 const createOffer = vi.mocked(offerControllerCreate);
 const findSectors = vi.mocked(sectorControllerFindAll);
+const searchCities = vi.mocked(cityControllerSearch);
 
 const created = { data: undefined, status: 201, headers: new Headers() };
 const updated = { data: undefined, status: 200, headers: new Headers() };
@@ -44,13 +47,17 @@ const fillIdentity = async (user: User) => {
   await submit(user);
 };
 
+const pickCity = async (user: User, label: string, option = 'Lyon (69003)') => {
+  await user.type(screen.getByRole('combobox', { name: label }), 'lyon');
+  await user.click(await screen.findByRole('option', { name: option }));
+};
+
 const fillCompany = async (user: User) => {
   await user.type(screen.getByLabelText('Nom de la société'), 'Rekr');
   await waitFor(() => expect(screen.getByLabelText('Secteur')).toBeEnabled());
   await user.selectOptions(screen.getByLabelText('Secteur'), '4');
   await user.click(screen.getByRole('radio', { name: 'PME' }));
-  await user.type(screen.getByLabelText('Ville'), 'Lyon');
-  await user.type(screen.getByLabelText('Code postal'), '69003');
+  await pickCity(user, 'Ville');
   await submit(user);
 };
 
@@ -95,6 +102,11 @@ describe('RecruiterOnboardingPage', () => {
       status: 200,
       headers: new Headers(),
     } as Awaited<ReturnType<typeof sectorControllerFindAll>>);
+    searchCities.mockResolvedValue({
+      data: [{ name: 'Lyon', postalCode: '69003', latitude: 45.751, longitude: 4.869 }],
+      status: 200,
+      headers: new Headers(),
+    } as Awaited<ReturnType<typeof cityControllerSearch>>);
   });
 
   // Five steps of typing must survive a reload or a failed publish.
@@ -224,8 +236,7 @@ describe('RecruiterOnboardingPage', () => {
     await fillCompany(user);
     await fillCulture(user);
 
-    expect(screen.getByLabelText('Ville')).toHaveValue('Lyon');
-    expect(screen.getByLabelText('Code postal')).toHaveValue('69003');
+    expect(screen.getByRole('combobox', { name: 'Ville du poste' })).toHaveValue('Lyon (69003)');
   });
 
   it('ne réécrase pas une localisation d’offre déjà modifiée', async () => {
@@ -236,13 +247,19 @@ describe('RecruiterOnboardingPage', () => {
     await fillCompany(user);
     await fillCulture(user);
 
-    const city = screen.getByLabelText('Ville');
-    await user.clear(city);
-    await user.type(city, 'Villeurbanne');
+    searchCities.mockResolvedValue({
+      data: [{ name: 'Villeurbanne', postalCode: '69100', latitude: 45.766, longitude: 4.879 }],
+      status: 200,
+      headers: new Headers(),
+    } as Awaited<ReturnType<typeof cityControllerSearch>>);
+    await user.clear(screen.getByRole('combobox', { name: 'Ville du poste' }));
+    await pickCity(user, 'Ville du poste', 'Villeurbanne (69100)');
     await user.click(screen.getAllByRole('button', { name: 'Retour' })[0]);
     await submit(user);
 
-    expect(screen.getByLabelText('Ville')).toHaveValue('Villeurbanne');
+    expect(screen.getByRole('combobox', { name: 'Ville du poste' })).toHaveValue(
+      'Villeurbanne (69100)',
+    );
   });
 
   it('propose de publier l’offre à la dernière étape', async () => {
@@ -468,13 +485,15 @@ describe('RecruiterOnboardingPage', () => {
     await fillIdentity(user);
     await fillCompany(user);
     await fillCulture(user);
-    await user.clear(screen.getByLabelText('Ville'));
+    await user.clear(screen.getByRole('combobox', { name: 'Ville du poste' }));
     await user.type(screen.getByLabelText('Titre du poste'), 'Développeur Front React');
     await user.type(screen.getByLabelText('Missions'), 'Construire le swipe.');
     await user.type(screen.getByLabelText('Compétences recherchées'), 'React{Enter}');
     await submit(user);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Renseignez la ville du poste.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Choisissez la commune du poste dans la liste.',
+    );
   });
 
   it('refuse de publier une fourchette de salaire incohérente', async () => {

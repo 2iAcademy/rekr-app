@@ -1,7 +1,8 @@
-import { RichTextField } from '../components/RichTextField';
-import { TagInput } from '../components/TagInput';
-import { MAX_FREE_TEXT_LENGTH } from '../bounds';
-import { markIfInvalid, type StepProps } from './stepProps';
+import { RichTextField } from '@/components/form/RichTextField';
+import { TagInput } from '@/components/form/TagInput';
+import { MAX_FREE_TEXT_LENGTH } from '@/lib/bounds';
+import { markIfInvalid } from '@/components/wizard/wizardError';
+import type { StepProps } from './stepProps';
 
 export function CultureStep({ state, onChange, invalidField }: StepProps) {
   return (

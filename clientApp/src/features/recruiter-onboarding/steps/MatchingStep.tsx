@@ -1,14 +1,16 @@
 import { OptionCards } from '@/components/form/OptionCards';
-import { SalaryRange } from '../components/SalaryRange';
-import { CONTRACT_TYPE_OPTIONS, EXPERIENCE_LEVEL_OPTIONS, REMOTE_POLICY_OPTIONS } from '../options';
-import { WIZARD_ERROR_ID, type StepProps } from './stepProps';
+import { SalaryRange } from '@/components/form/SalaryRange';
+import {
+  CONTRACT_TYPE_OPTIONS,
+  EXPERIENCE_LEVEL_OPTIONS,
+  REMOTE_POLICY_OPTIONS,
+} from '@/domain/options';
+import { markGroupIfInvalid, WIZARD_ERROR_ID } from '@/components/wizard/wizardError';
+import type { StepProps } from './stepProps';
 import type { RecruiterField } from '../wizard';
 
 export function MatchingStep({ state, onChange, invalidField }: StepProps) {
-  const markGroup = (field: RecruiterField) => ({
-    invalid: invalidField === field,
-    describedBy: invalidField === field ? WIZARD_ERROR_ID : undefined,
-  });
+  const markGroup = (field: RecruiterField) => markGroupIfInvalid(invalidField, field);
 
   return (
     <>

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { clearAllDrafts, clearDraft, draftStorageKey, loadDraft, saveDraft } from './draftStorage';
+import { clearAllDrafts } from '@/lib/draftStorage';
+import { clearDraft, draftStorageKey, loadDraft, saveDraft } from './draftStorage';
 import { emptyRecruiterOnboarding } from './state';
 
 const filled = { ...emptyRecruiterOnboarding, firstName: 'Julien', skills: ['React'] };

@@ -23,11 +23,10 @@ export function normaliseTagLabels(labels: string[]): string[] {
  * per-label loop it replaces made the request cost grow linearly and blew past
  * the Prisma transaction timeout on large payloads.
  *
- * `skipDuplicates` relies on the unique index on `tag.label`, and leaves the
- * category of an already-known label untouched — same semantics as the upsert
- * with an empty `update` clause. A label is therefore returned whatever
- * category it was first stored under, which is why callers must NOT filter
- * their unlink query by category: see the `sync*` methods of the services.
+ * `skipDuplicates` relies on the unique index on `(tag.label, tag.category)`,
+ * and the lookup is scoped to the same category: a label carries one row per
+ * category it is used in, so « Anglais » can be a skill for one candidate and a
+ * language for another without either of them overwriting the other.
  */
 export async function resolveTagIds(
   tx: Prisma.TransactionClient,
@@ -45,7 +44,7 @@ export async function resolveTagIds(
   });
 
   const tags = await tx.tag.findMany({
-    where: { label: { in: uniqueLabels } },
+    where: { label: { in: uniqueLabels }, category },
     select: { id: true },
   });
 

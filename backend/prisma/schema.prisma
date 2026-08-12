@@ -255,13 +255,18 @@ model Offer {
 
 model Tag {
   id       Int         @id @default(autoincrement())
-  label    String      @unique @db.VarChar(100)
+  label    String      @db.VarChar(100)
   category TagCategory
 
   offerTags     OfferTag[]
   candidateTags CandidateTag[]
   companyTags   CompanyTag[]
 
+  // Unique on the pair, not on the label: « Anglais » is both a plausible skill
+  // and the canonical name of a language. With a label-wide unique index the
+  // first writer decided the category for everyone, and no later payload could
+  // ever correct it.
+  @@unique([label, category])
   @@map("tag")
 }
 

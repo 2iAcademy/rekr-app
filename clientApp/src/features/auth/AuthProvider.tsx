@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { authControllerLogin, authControllerLogout, authControllerSignup } from '@/api/generated';
 import { clearAccessToken, onSessionExpired, setAccessToken } from '@/api/tokenStore';
-import { clearAllDrafts } from '@/features/recruiter-onboarding/draftStorage';
+import { clearAllDrafts } from '@/lib/draftStorage';
 import {
   AuthContext,
   type AuthContextValue,

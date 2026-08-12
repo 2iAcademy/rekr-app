@@ -68,13 +68,11 @@ const RULES: Record<RecruiterStepId, Rule[]> = {
     },
     {
       field: 'city',
-      message: 'Renseignez la ville de votre société.',
-      isSatisfied: filled('city'),
-    },
-    {
-      field: 'postalCode',
-      message: 'Renseignez le code postal de votre société.',
-      isSatisfied: filled('postalCode'),
+      message: 'Choisissez la commune de votre société dans la liste.',
+      // `CityField` writes the name and the postcode together and clears them
+      // together, so a half-filled pair means the field was edited after a
+      // selection — or the draft was tampered with.
+      isSatisfied: (state) => filled('city')(state) && filled('postalCode')(state),
     },
   ],
   culture: [
@@ -102,13 +100,8 @@ const RULES: Record<RecruiterStepId, Rule[]> = {
     },
     {
       field: 'offerCity',
-      message: 'Renseignez la ville du poste.',
-      isSatisfied: filled('offerCity'),
-    },
-    {
-      field: 'offerPostalCode',
-      message: 'Renseignez le code postal du poste.',
-      isSatisfied: filled('offerPostalCode'),
+      message: 'Choisissez la commune du poste dans la liste.',
+      isSatisfied: (state) => filled('offerCity')(state) && filled('offerPostalCode')(state),
     },
   ],
   matching: [

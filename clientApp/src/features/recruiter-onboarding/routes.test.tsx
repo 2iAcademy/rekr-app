@@ -10,8 +10,12 @@ vi.mock('@/api/generated', () => ({
   authControllerSignup: vi.fn(),
   authControllerLogin: vi.fn(),
   authControllerLogout: vi.fn(),
+  candidateProfileControllerCreate: vi.fn(),
+  candidateProfileControllerUpdate: vi.fn(),
   companyControllerCreate: vi.fn(),
+  companyControllerUpdateMine: vi.fn(),
   offerControllerCreate: vi.fn(),
+  sectorControllerFindAll: vi.fn(),
 }));
 
 const signupRequest = vi.mocked(authControllerSignup);
@@ -113,11 +117,23 @@ describe('navigation création de profil recruteur', () => {
     expect(await screen.findByRole('heading', { name: 'Mon identité' })).toBeInTheDocument();
   });
 
-  // The candidate onboarding does not exist yet, so signing up as a candidate
-  // keeps its previous behaviour (no navigation) rather than landing on the
-  // anonymous splash.
+  // Both wizards open on « Mon identité »; only the step count tells them apart.
   it('n’envoie pas un candidat sur le parcours recruteur', async () => {
     const user = userEvent.setup();
+    signupRequest.mockResolvedValue({
+      data: {
+        accessToken: 'test-token',
+        user: {
+          id: 1,
+          email: 'candidat@rekr.fr',
+          role: 'user',
+          userType: 'candidate',
+          isActive: true,
+        },
+      },
+      status: 201,
+      headers: new Headers(),
+    } as unknown as Awaited<ReturnType<typeof authControllerSignup>>);
     renderAt('/inscription');
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
@@ -126,7 +142,7 @@ describe('navigation création de profil recruteur', () => {
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
-    expect(screen.queryByRole('heading', { name: 'Mon identité' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Créer mon compte' })).toBeInTheDocument();
+    expect(await screen.findByText('Étape 1 sur 4')).toBeInTheDocument();
+    expect(screen.queryByText('Étape 1 sur 5')).not.toBeInTheDocument();
   });
 });

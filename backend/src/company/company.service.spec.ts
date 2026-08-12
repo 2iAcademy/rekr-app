@@ -1,6 +1,11 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { CompanyService } from './company.service';
+import { CityService } from '../city/city.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type PrismaMock = {
@@ -33,13 +38,97 @@ const buildPrismaMock = (): PrismaMock => {
 describe('CompanyService', () => {
   let service: CompanyService;
   let prisma: ReturnType<typeof buildPrismaMock>;
+  let cities: { assertKnown: jest.Mock };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
+    cities = { assertKnown: jest.fn().mockResolvedValue(undefined) };
     const moduleRef = await Test.createTestingModule({
-      providers: [CompanyService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        CompanyService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: CityService, useValue: cities },
+      ],
     }).compile();
     service = moduleRef.get(CompanyService);
+  });
+
+  describe('city verification', () => {
+    it('submits the location of a new company to the city reference', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(null);
+      prisma.company.create.mockResolvedValue({ id: 10 });
+
+      await service.create(7, {
+        name: 'Acme',
+        firstName: 'R',
+        lastName: 'D',
+        city: 'Lyon',
+        postalCode: '69001',
+      });
+
+      expect(cities.assertKnown).toHaveBeenCalledWith(
+        expect.objectContaining({ city: 'Lyon', postalCode: '69001' }),
+      );
+    });
+
+    it('writes nothing when the reference refuses the location of a new company', async () => {
+      cities.assertKnown.mockRejectedValue(new BadRequestException());
+
+      await expect(
+        service.create(7, {
+          name: 'Acme',
+          firstName: 'R',
+          lastName: 'D',
+          city: 'Wakanda',
+          postalCode: '99999',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prisma.company.create).not.toHaveBeenCalled();
+    });
+
+    // A patch may carry only one half of the pair; the other half is whatever
+    // the company already holds, and that is what has to be verified.
+    it('verifies a patched city against the postcode already stored', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({
+        userId: 7,
+        companyId: 10,
+        company: { city: 'Lyon', postalCode: '69001' },
+      });
+      prisma.company.update.mockResolvedValue({ id: 10 });
+
+      await service.updateMine(7, { city: 'Nîmes' });
+
+      expect(cities.assertKnown).toHaveBeenCalledWith({
+        city: 'Nîmes',
+        postalCode: '69001',
+      });
+    });
+
+    it('leaves the reference alone when the patch does not touch the location', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({
+        userId: 7,
+        companyId: 10,
+        company: { city: 'Lyon', postalCode: '69001' },
+      });
+      prisma.company.update.mockResolvedValue({ id: 10 });
+
+      await service.updateMine(7, { name: 'Acme Renamed' });
+
+      expect(cities.assertKnown).not.toHaveBeenCalled();
+    });
+
+    // The recruiter owns no company yet: answering 400 on the location would
+    // hide the 404 the request actually deserves.
+    it('does not verify anything when the recruiter has no company', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateMine(7, { city: 'Lyon', postalCode: '69001' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(cities.assertKnown).not.toHaveBeenCalled();
+    });
   });
 
   describe('create', () => {
