@@ -1,3 +1,6 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 /**
  * The e2e database is imposed, never inherited.
  *
@@ -27,5 +30,13 @@ if (!databaseName.includes('test')) {
 
 process.env.DATABASE_URL = targetDatabaseUrl;
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+
+/**
+ * Uploads are imposed on a scratch directory for the same reason the database
+ * is: the suite empties it between tests. Inside the backend container
+ * `UPLOADS_DIR` points at the Docker volume that holds real files, and letting
+ * it through would wipe them.
+ */
+process.env.UPLOADS_DIR = join(tmpdir(), 'rekr-uploads-e2e');
 process.env.REFRESH_TOKEN_REPLAY_SECONDS =
   process.env.REFRESH_TOKEN_REPLAY_SECONDS || '1';

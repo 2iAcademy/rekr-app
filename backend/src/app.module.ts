@@ -16,6 +16,7 @@ import { CityModule } from './city/city.module';
 import { CompanyModule } from './company/company.module';
 import { OfferModule } from './offer/offer.module';
 import { SectorModule } from './sector/sector.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { SectorModule } from './sector/sector.module';
     CompanyModule,
     OfferModule,
     SectorModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [
