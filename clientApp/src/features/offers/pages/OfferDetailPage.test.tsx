@@ -151,7 +151,10 @@ describe('OfferDetailPage', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Liker' }));
-    expect(onLike).toHaveBeenCalledTimes(1);
+    expect(onLike).toHaveBeenCalledWith({
+      name: mockOffer.company.name,
+      avatarUrl: mockOffer.company.logo,
+    });
   });
 
   it('déclenche onBack au clic sur le bouton fermer', async () => {

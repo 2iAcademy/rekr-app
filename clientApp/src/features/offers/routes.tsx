@@ -8,7 +8,11 @@ export function OfferDetailRoute() {
     <OfferDetailPage
       onBack={() => navigate('/')}
       onPass={() => navigate('/')}
-      onLike={() => navigate('/')}
+      onLike={(matchedProfile) =>
+        navigate('/match', {
+          state: { matchedProfile },
+        })
+      }
     />
   );
 }

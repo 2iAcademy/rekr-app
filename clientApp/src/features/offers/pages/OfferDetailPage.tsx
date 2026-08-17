@@ -36,10 +36,15 @@ interface OfferDetail {
   offerTags: OfferTag[];
 }
 
+interface MatchedProfile {
+  name: string;
+  avatarUrl: string | null;
+}
+
 interface OfferDetailPageProps {
   onBack?: () => void;
   onPass?: () => void;
-  onLike?: () => void;
+  onLike?: (matchedProfile: MatchedProfile) => void;
 }
 
 export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps) {
@@ -197,7 +202,7 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
           variant="role"
           size="xl"
           className="flex-1 rounded-full"
-          onClick={onLike}
+          onClick={() => onLike?.({ name: company.name, avatarUrl: company.logo })}
         >
           <Heart className="size-5" />
           Liker
