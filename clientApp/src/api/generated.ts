@@ -72,12 +72,59 @@ export interface SectorDto {
   label: string;
 }
 
+export interface MatchOfferDto {
+  id: number;
+  title: string;
+}
+
+export type MatchCounterpartDtoKind =
+  (typeof MatchCounterpartDtoKind)[keyof typeof MatchCounterpartDtoKind];
+
+export const MatchCounterpartDtoKind = {
+  company: 'company',
+  candidate: 'candidate',
+} as const;
+
+export interface MatchCounterpartDto {
+  kind: MatchCounterpartDtoKind;
+  id: number;
+  name: string;
+  /** @nullable */
+  avatarUrl?: string | null;
+  /** @nullable */
+  headline?: string | null;
+}
+
+export interface MatchListItemDto {
+  id: number;
+  matchedAt: string;
+  offer: MatchOfferDto;
+  /** @nullable */
+  counterpart?: MatchCounterpartDto | null;
+}
+
+export type CandidateProfileControllerReplacePictureBody = {
+  file: Blob;
+};
+
+export type CandidateProfileControllerReplaceCvBody = {
+  file: Blob;
+};
+
 export type CityControllerSearchParams = {
   /**
    * @minLength 3
    * @maxLength 100
    */
   q: string;
+};
+
+export type CompanyControllerReplaceLogoBody = {
+  file: Blob;
+};
+
+export type CompanyControllerReplaceCoverImageBody = {
+  file: Blob;
 };
 
 export type appControllerGetHelloResponse200 = {
@@ -340,6 +387,141 @@ export const candidateProfileControllerUpdate = async (
   );
 };
 
+export type candidateProfileControllerReplacePictureResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type candidateProfileControllerReplacePictureResponseSuccess =
+  candidateProfileControllerReplacePictureResponse200 & {
+    headers: Headers;
+  };
+export const getCandidateProfileControllerReplacePictureUrl = () => {
+  return `/api/candidate-profiles/me/picture`;
+};
+
+export const candidateProfileControllerReplacePicture = async (
+  candidateProfileControllerReplacePictureBody: CandidateProfileControllerReplacePictureBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<candidateProfileControllerReplacePictureResponseSuccess> => {
+  const formData = new FormData();
+  formData.append(`file`, candidateProfileControllerReplacePictureBody.file);
+
+  return customFetch<candidateProfileControllerReplacePictureResponseSuccess>(
+    getCandidateProfileControllerReplacePictureUrl(),
+    {
+      ...options,
+      method: 'PUT',
+      body: formData,
+    },
+  );
+};
+
+export type candidateProfileControllerRemovePictureResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type candidateProfileControllerRemovePictureResponseSuccess =
+  candidateProfileControllerRemovePictureResponse200 & {
+    headers: Headers;
+  };
+export const getCandidateProfileControllerRemovePictureUrl = () => {
+  return `/api/candidate-profiles/me/picture`;
+};
+
+export const candidateProfileControllerRemovePicture = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<candidateProfileControllerRemovePictureResponseSuccess> => {
+  return customFetch<candidateProfileControllerRemovePictureResponseSuccess>(
+    getCandidateProfileControllerRemovePictureUrl(),
+    {
+      ...options,
+      method: 'DELETE',
+    },
+  );
+};
+
+export type candidateProfileControllerReplaceCvResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type candidateProfileControllerReplaceCvResponseSuccess =
+  candidateProfileControllerReplaceCvResponse200 & {
+    headers: Headers;
+  };
+export const getCandidateProfileControllerReplaceCvUrl = () => {
+  return `/api/candidate-profiles/me/cv`;
+};
+
+export const candidateProfileControllerReplaceCv = async (
+  candidateProfileControllerReplaceCvBody: CandidateProfileControllerReplaceCvBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<candidateProfileControllerReplaceCvResponseSuccess> => {
+  const formData = new FormData();
+  formData.append(`file`, candidateProfileControllerReplaceCvBody.file);
+
+  return customFetch<candidateProfileControllerReplaceCvResponseSuccess>(
+    getCandidateProfileControllerReplaceCvUrl(),
+    {
+      ...options,
+      method: 'PUT',
+      body: formData,
+    },
+  );
+};
+
+export type candidateProfileControllerRemoveCvResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type candidateProfileControllerRemoveCvResponseSuccess =
+  candidateProfileControllerRemoveCvResponse200 & {
+    headers: Headers;
+  };
+export const getCandidateProfileControllerRemoveCvUrl = () => {
+  return `/api/candidate-profiles/me/cv`;
+};
+
+export const candidateProfileControllerRemoveCv = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<candidateProfileControllerRemoveCvResponseSuccess> => {
+  return customFetch<candidateProfileControllerRemoveCvResponseSuccess>(
+    getCandidateProfileControllerRemoveCvUrl(),
+    {
+      ...options,
+      method: 'DELETE',
+    },
+  );
+};
+
+export type candidateProfileControllerReadCvResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type candidateProfileControllerReadCvResponseSuccess =
+  candidateProfileControllerReadCvResponse200 & {
+    headers: Headers;
+  };
+export const getCandidateProfileControllerReadCvUrl = () => {
+  return `/api/candidate-profiles/me/cv`;
+};
+
+export const candidateProfileControllerReadCv = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<candidateProfileControllerReadCvResponseSuccess> => {
+  return customFetch<candidateProfileControllerReadCvResponseSuccess>(
+    getCandidateProfileControllerReadCvUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
 export type cityControllerSearchResponse200 = {
   data: CityDto[];
   status: 200;
@@ -370,6 +552,39 @@ export const cityControllerSearch = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type filesControllerReadResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type filesControllerReadResponseSuccess = filesControllerReadResponse200 & {
+  headers: Headers;
+};
+export const getFilesControllerReadUrl = (
+  scope: string,
+  ownerId: string,
+  kind: string,
+  fileName: string,
+) => {
+  return `/api/files/${scope}/${ownerId}/${kind}/${fileName}`;
+};
+
+export const filesControllerRead = async (
+  scope: string,
+  ownerId: string,
+  kind: string,
+  fileName: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<filesControllerReadResponseSuccess> => {
+  return customFetch<filesControllerReadResponseSuccess>(
+    getFilesControllerReadUrl(scope, ownerId, kind, fileName),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type companyControllerCreateResponse201 = {
@@ -419,6 +634,115 @@ export const companyControllerUpdateMine = async (
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...options?.headers },
       body: JSON.stringify(updateCompanyDto),
+    },
+  );
+};
+
+export type companyControllerReplaceLogoResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type companyControllerReplaceLogoResponseSuccess =
+  companyControllerReplaceLogoResponse200 & {
+    headers: Headers;
+  };
+export const getCompanyControllerReplaceLogoUrl = () => {
+  return `/api/companies/mine/logo`;
+};
+
+export const companyControllerReplaceLogo = async (
+  companyControllerReplaceLogoBody: CompanyControllerReplaceLogoBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<companyControllerReplaceLogoResponseSuccess> => {
+  const formData = new FormData();
+  formData.append(`file`, companyControllerReplaceLogoBody.file);
+
+  return customFetch<companyControllerReplaceLogoResponseSuccess>(
+    getCompanyControllerReplaceLogoUrl(),
+    {
+      ...options,
+      method: 'PUT',
+      body: formData,
+    },
+  );
+};
+
+export type companyControllerRemoveLogoResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type companyControllerRemoveLogoResponseSuccess = companyControllerRemoveLogoResponse200 & {
+  headers: Headers;
+};
+export const getCompanyControllerRemoveLogoUrl = () => {
+  return `/api/companies/mine/logo`;
+};
+
+export const companyControllerRemoveLogo = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<companyControllerRemoveLogoResponseSuccess> => {
+  return customFetch<companyControllerRemoveLogoResponseSuccess>(
+    getCompanyControllerRemoveLogoUrl(),
+    {
+      ...options,
+      method: 'DELETE',
+    },
+  );
+};
+
+export type companyControllerReplaceCoverImageResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type companyControllerReplaceCoverImageResponseSuccess =
+  companyControllerReplaceCoverImageResponse200 & {
+    headers: Headers;
+  };
+export const getCompanyControllerReplaceCoverImageUrl = () => {
+  return `/api/companies/mine/cover-image`;
+};
+
+export const companyControllerReplaceCoverImage = async (
+  companyControllerReplaceCoverImageBody: CompanyControllerReplaceCoverImageBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<companyControllerReplaceCoverImageResponseSuccess> => {
+  const formData = new FormData();
+  formData.append(`file`, companyControllerReplaceCoverImageBody.file);
+
+  return customFetch<companyControllerReplaceCoverImageResponseSuccess>(
+    getCompanyControllerReplaceCoverImageUrl(),
+    {
+      ...options,
+      method: 'PUT',
+      body: formData,
+    },
+  );
+};
+
+export type companyControllerRemoveCoverImageResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type companyControllerRemoveCoverImageResponseSuccess =
+  companyControllerRemoveCoverImageResponse200 & {
+    headers: Headers;
+  };
+export const getCompanyControllerRemoveCoverImageUrl = () => {
+  return `/api/companies/mine/cover-image`;
+};
+
+export const companyControllerRemoveCoverImage = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<companyControllerRemoveCoverImageResponseSuccess> => {
+  return customFetch<companyControllerRemoveCoverImageResponseSuccess>(
+    getCompanyControllerRemoveCoverImageUrl(),
+    {
+      ...options,
+      method: 'DELETE',
     },
   );
 };
@@ -513,6 +837,27 @@ export const sectorControllerFindAll = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<sectorControllerFindAllResponseSuccess> => {
   return customFetch<sectorControllerFindAllResponseSuccess>(getSectorControllerFindAllUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type matchControllerFindMineResponse200 = {
+  data: MatchListItemDto[];
+  status: 200;
+};
+
+export type matchControllerFindMineResponseSuccess = matchControllerFindMineResponse200 & {
+  headers: Headers;
+};
+export const getMatchControllerFindMineUrl = () => {
+  return `/api/matches`;
+};
+
+export const matchControllerFindMine = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<matchControllerFindMineResponseSuccess> => {
+  return customFetch<matchControllerFindMineResponseSuccess>(getMatchControllerFindMineUrl(), {
     ...options,
     method: 'GET',
   });

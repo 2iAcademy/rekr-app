@@ -17,6 +17,7 @@ import { CompanyModule } from './company/company.module';
 import { OfferModule } from './offer/offer.module';
 import { SectorModule } from './sector/sector.module';
 import { StorageModule } from './storage/storage.module';
+import { MatchModule } from './match/match.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { StorageModule } from './storage/storage.module';
     OfferModule,
     SectorModule,
     StorageModule,
+    MatchModule,
   ],
   controllers: [AppController],
   providers: [
