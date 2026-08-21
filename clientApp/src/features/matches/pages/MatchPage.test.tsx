@@ -12,7 +12,7 @@ describe('MatchPage', () => {
   it('affiche la célébration et les deux parties du match', () => {
     renderPage();
 
-    expect(screen.getByRole('dialog', { name: "C'est un match !" })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: "C'est un match !" })).toBeInTheDocument();
     expect(screen.getByText('Toi')).toBeInTheDocument();
     expect(screen.getByText('Acme')).toBeInTheDocument();
   });
@@ -22,6 +22,16 @@ describe('MatchPage', () => {
 
     expect(screen.getByRole('button', { name: 'Écrire un message' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continuer à swiper' })).toBeInTheDocument();
+  });
+
+  it('affiche les avatars lorsque leurs URLs sont disponibles', () => {
+    renderPage({
+      currentUser: { name: 'Camille', avatarUrl: '/camille.png' },
+      matchedProfile: { name: 'Acme', avatarUrl: '/acme.png' },
+    });
+
+    expect(screen.getByRole('img', { name: 'Camille' })).toHaveAttribute('src', '/camille.png');
+    expect(screen.getByRole('img', { name: 'Acme' })).toHaveAttribute('src', '/acme.png');
   });
 
   it('déclenche les actions correspondantes', async () => {

@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from 'react-router';
+import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '@/features/auth/useAuth';
 import { MatchPage } from '@/features/matches/pages/MatchPage';
 
@@ -12,7 +12,20 @@ interface MatchRouteState {
 export function MatchRoute() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { status, user } = useAuth();
+
+  if (status === 'loading') {
+    return null;
+  }
+
+  if (status !== 'authenticated') {
+    return <Navigate to="/connexion" replace />;
+  }
+
+  if (user?.userType !== 'candidate') {
+    return <Navigate to="/" replace />;
+  }
+
   const { matchedProfile = { name: 'Votre match', avatarUrl: null } } =
     (location.state as MatchRouteState | null) ?? {};
   const currentUserName = user?.email.split('@')[0] || 'Toi';

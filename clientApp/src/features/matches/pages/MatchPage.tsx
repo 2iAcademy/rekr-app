@@ -42,12 +42,7 @@ export function MatchPage({
   onWriteMessage,
 }: MatchPageProps) {
   return (
-    <main
-      className="fixed inset-0 z-50 isolate flex min-h-dvh w-full overflow-y-auto bg-brand-strong-gradient text-white"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="match-title"
-    >
+    <main className="fixed inset-0 z-50 isolate flex min-h-dvh w-full overflow-y-auto bg-brand-strong-gradient text-white">
       <div
         className="pointer-events-none absolute inset-0 opacity-30"
         aria-hidden="true"
@@ -66,10 +61,7 @@ export function MatchPage({
           <p className="text-sm font-medium tracking-[0.2em] text-white/75 uppercase">
             Félicitations
           </p>
-          <h1
-            id="match-title"
-            className="mt-2 font-heading text-4xl font-bold tracking-tight sm:text-5xl"
-          >
+          <h1 className="mt-2 font-heading text-4xl font-bold tracking-tight sm:text-5xl">
             C&apos;est un match !
           </h1>
           <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-white/85">
