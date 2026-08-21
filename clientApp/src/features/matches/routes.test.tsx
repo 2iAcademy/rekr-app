@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { routes } from '@/router';
@@ -75,5 +76,25 @@ describe('navigation vers le match', () => {
 
     expect(screen.queryByRole('heading', { name: "C'est un match !" })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Se connecter' })).not.toBeInTheDocument();
+  });
+
+  it('revient à l’accueil après avoir choisi d’écrire un message', async () => {
+    const user = userEvent.setup();
+    authenticateAs('candidate');
+    renderAt('/match');
+
+    await user.click(await screen.findByRole('button', { name: 'Écrire un message' }));
+
+    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+  });
+
+  it('revient à l’accueil après avoir choisi de continuer à swiper', async () => {
+    const user = userEvent.setup();
+    authenticateAs('candidate');
+    renderAt('/match');
+
+    await user.click(await screen.findByRole('button', { name: 'Continuer à swiper' }));
+
+    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
   });
 });
