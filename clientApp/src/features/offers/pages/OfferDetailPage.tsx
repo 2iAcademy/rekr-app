@@ -2,6 +2,7 @@ import { Heart, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { offerControllerFindOneById } from '@/api/generated';
+import { fileUrl } from '@/lib/fileUrl';
 import { useParams } from 'react-router';
 
 interface OfferCompany {
@@ -36,10 +37,15 @@ interface OfferDetail {
   offerTags: OfferTag[];
 }
 
+interface MatchedProfile {
+  name: string;
+  avatarUrl: string | null;
+}
+
 interface OfferDetailPageProps {
   onBack?: () => void;
   onPass?: () => void;
-  onLike?: () => void;
+  onLike?: (matchedProfile: MatchedProfile) => void;
 }
 
 export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps) {
@@ -82,6 +88,7 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
   }
 
   const { company, offerTags, salaryMin, salaryMax, remotePolicy, city } = offer;
+  const companyLogoUrl = fileUrl(company.logo);
   const stack = offerTags
     .filter((ot) => ot.tag.category === 'skill' || ot.tag.category === 'tech')
     .map((ot) => ot.tag.label);
@@ -111,9 +118,9 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
 
       <section className="relative flex h-52 items-center justify-center bg-role-gradient pt-12">
         <div className="flex size-24 items-center justify-center rounded-full bg-white shadow-md">
-          {company.logo ? (
+          {companyLogoUrl ? (
             <img
-              src={company.logo}
+              src={companyLogoUrl}
               alt={company.name}
               className="size-full rounded-full object-cover"
             />
@@ -197,7 +204,7 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
           variant="role"
           size="xl"
           className="flex-1 rounded-full"
-          onClick={onLike}
+          onClick={() => onLike?.({ name: company.name, avatarUrl: companyLogoUrl })}
         >
           <Heart className="size-5" />
           Liker

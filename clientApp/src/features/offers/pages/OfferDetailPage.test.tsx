@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -25,7 +26,7 @@ const mockOffer = {
   company: {
     id: 1,
     name: 'Acme Corp',
-    logo: null,
+    logo: 'companies/1/logo/acme.png',
     size: 'PME',
     description:
       'Acme Corp construit des outils SaaS pour PME industrielles. Fondée en 2018, basée à Lyon, 35 personnes.',
@@ -38,9 +39,7 @@ const mockOffer = {
   ],
 };
 
-const renderPage = (
-  props: { onBack?: () => void; onPass?: () => void; onLike?: () => void } = {},
-) =>
+const renderPage = (props: Partial<ComponentProps<typeof OfferDetailPage>> = {}) =>
   render(
     <MemoryRouter initialEntries={['/offres/1']}>
       <Routes>
@@ -151,7 +150,10 @@ describe('OfferDetailPage', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Liker' }));
-    expect(onLike).toHaveBeenCalledTimes(1);
+    expect(onLike).toHaveBeenCalledExactlyOnceWith({
+      name: mockOffer.company.name,
+      avatarUrl: '/api/files/companies/1/logo/acme.png',
+    });
   });
 
   it('déclenche onBack au clic sur le bouton fermer', async () => {
