@@ -1,5 +1,8 @@
 import { Heart, X } from 'lucide-react';
+import { AvatarBanner } from '@/components/ui/avatar-banner';
 import { Button } from '@/components/ui/button';
+import { chipVariants } from '@/components/ui/chip-variants';
+import { SectionTitle } from '@/components/ui/section-title';
 import { useEffect, useState } from 'react';
 import { offerControllerFindOneById } from '@/api/generated';
 import { fileUrl } from '@/lib/fileUrl';
@@ -116,19 +119,7 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
         <div className="size-9" aria-hidden="true" />
       </header>
 
-      <section className="relative flex h-52 items-center justify-center bg-role-gradient pt-12">
-        <div className="flex size-24 items-center justify-center rounded-full bg-white shadow-md">
-          {companyLogoUrl ? (
-            <img
-              src={companyLogoUrl}
-              alt={company.name}
-              className="size-full rounded-full object-cover"
-            />
-          ) : (
-            <span className="font-heading text-3xl font-bold text-brand">{company.name[0]}</span>
-          )}
-        </div>
-      </section>
+      <AvatarBanner size="lg" name={company.name} imageUrl={companyLogoUrl} />
 
       <section className="relative -mt-4 flex flex-1 flex-col rounded-t-3xl bg-background px-6 pt-6 pb-32">
         <div className="flex flex-col gap-1">
@@ -141,20 +132,15 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
         </div>
 
         <div className="mt-6 flex flex-col gap-3">
-          <h3 className="text-xs font-semibold tracking-wider text-ink-muted uppercase">
-            Stack technique
-          </h3>
+          <SectionTitle>Stack technique</SectionTitle>
           <div className="flex flex-wrap gap-2">
             {stack.map((tech) => (
-              <span
-                key={tech}
-                className="rounded-full bg-brand-tint px-3 py-1 text-xs font-medium text-brand-strong"
-              >
+              <span key={tech} className={chipVariants({ size: 'sm' })}>
                 {tech}
               </span>
             ))}
             {remotePolicy && (
-              <span className="rounded-full bg-brand-tint px-3 py-1 text-xs font-medium text-brand-strong">
+              <span className={chipVariants({ size: 'sm' })}>
                 {remotePolicy === 'FULL_REMOTE'
                   ? 'Remote'
                   : remotePolicy === 'HYBRID'
@@ -166,24 +152,20 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
         </div>
 
         <div className="mt-6 flex flex-col gap-1">
-          <h3 className="text-xs font-semibold tracking-wider text-ink-muted uppercase">Salaire</h3>
+          <SectionTitle>Salaire</SectionTitle>
           <p className="text-base font-bold text-ink">{salary}</p>
         </div>
 
         {offer.description && (
           <div className="mt-6 flex flex-col gap-2">
-            <h3 className="text-xs font-semibold tracking-wider text-ink-muted uppercase">
-              À propos du poste
-            </h3>
+            <SectionTitle>À propos du poste</SectionTitle>
             <p className="text-sm leading-relaxed text-ink-muted">{offer.description}</p>
           </div>
         )}
 
         {company.description && (
           <div className="mt-6 flex flex-col gap-2">
-            <h3 className="text-xs font-semibold tracking-wider text-ink-muted uppercase">
-              À propos de l'entreprise
-            </h3>
+            <SectionTitle>À propos de l'entreprise</SectionTitle>
             <p className="text-sm leading-relaxed text-ink-muted">{company.description}</p>
           </div>
         )}

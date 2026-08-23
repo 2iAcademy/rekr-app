@@ -11,6 +11,7 @@ import {
 import { OfferDetailRoute } from '@/features/offers/routes';
 import { MatchRoute } from '@/features/matches/routes';
 import { ProfileRoute } from '@/features/profile/routes';
+import { RecruiterFeedRoute } from '@/features/recruiter-feed/routes';
 import { RecruiterOnboardingRoute } from '@/features/recruiter-onboarding/routes';
 
 export const routes = [
@@ -22,7 +23,10 @@ export const routes = [
   { path: '/offres/:id', element: <OfferDetailRoute /> },
   {
     element: <AppDrawer />,
-    children: [{ path: '/matches', element: <MatchesRoute /> }],
+    children: [
+      { path: '/matches', element: <MatchesRoute /> },
+      { path: '/recruteur/candidats', element: <RecruiterFeedRoute /> },
+    ],
   },
   { path: '/match', element: <MatchRoute /> },
   { path: '/candidat/profil', element: <CandidateOnboardingRoute /> },

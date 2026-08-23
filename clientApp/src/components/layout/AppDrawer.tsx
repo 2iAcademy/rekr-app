@@ -3,9 +3,12 @@ import { Menu, X } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 import { Logo } from '@/components/brand/Logo';
 import { useAuth } from '@/features/auth/useAuth';
+import type { RoleTheme } from '@/lib/roleTheme';
 
-const sharedNavigationItems = [
-  { label: 'Feed', to: '/' },
+// Only the feed differs between the two roles: a recruiter browses candidates,
+// a candidate still lands on the splash until their own feed exists.
+const navigationItems = (isRecruiter: boolean) => [
+  { label: 'Feed', to: isRecruiter ? '/recruteur/candidats' : '/' },
   { label: 'Matches', to: '/matches' },
   { label: 'Profil', to: '/profil' },
 ];
@@ -51,12 +54,18 @@ export function AppDrawer() {
   const userName = user?.email.split('@')[0] ?? 'Toi';
   const userRole = isRecruiter ? 'Recruteur' : 'Candidat';
 
+  // The shell owns the palette now that it wraps the pages: `data-role` has to
+  // sit on the outermost element, or the chrome keeps the candidate colours
+  // around a recruiter screen.
+  const roleTheme: RoleTheme = isRecruiter ? 'recruiter' : 'candidate';
+  const items = navigationItems(isRecruiter);
+
   return (
-    <main className="flex min-h-dvh w-full bg-background">
+    <main data-role={roleTheme} className="flex min-h-dvh w-full bg-background">
       <aside className="hidden w-40 shrink-0 flex-col border-r border-line bg-card px-5 py-6 md:flex lg:w-48">
         <Logo size="sm" />
 
-        <AppNavigation items={sharedNavigationItems} />
+        <AppNavigation items={items} />
 
         <div className="mt-auto flex items-center gap-2">
           <span className="flex size-7 items-center justify-center rounded-full bg-violet font-heading text-xs font-bold text-white shadow-violet">
@@ -104,10 +113,7 @@ export function AppDrawer() {
               </button>
             </div>
 
-            <AppNavigation
-              items={sharedNavigationItems}
-              onNavigate={() => setIsMobileMenuOpen(false)}
-            />
+            <AppNavigation items={items} onNavigate={() => setIsMobileMenuOpen(false)} />
           </aside>
         </div>
       )}
