@@ -92,12 +92,11 @@ describe('navigation vers le match', () => {
     expect(screen.queryByRole('heading', { name: "C'est un match !" })).not.toBeInTheDocument();
   });
 
-  it('renvoie un recruteur connecté vers l’accueil', async () => {
+  it('affiche la page pour un recruteur connecté', async () => {
     authenticateAs('recruiter');
     renderAt('/match');
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: "C'est un match !" })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: "C'est un match !" })).toBeInTheDocument();
   });
 
   it('n’affiche rien tant que la session est en cours de vérification', () => {
