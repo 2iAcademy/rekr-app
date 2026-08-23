@@ -12,7 +12,7 @@ export const chipVariants = cva('px-3 font-medium', {
   variants: {
     size: {
       sm: 'rounded-full py-1 text-xs',
-      md: 'rounded-[0.9375rem] py-1.5 text-sm break-words',
+      md: 'min-w-0 rounded-[0.9375rem] py-1.5 text-sm break-words',
     },
     tone: {
       brand: 'bg-brand-tint text-brand-strong',
@@ -24,3 +24,8 @@ export const chipVariants = cva('px-3 font-medium', {
     tone: 'brand',
   },
 });
+
+// Green on every screen, per the mock: skills are the subject's own words, not a
+// reader-side accent. The role colour is kept for what the reader filters on.
+export const SKILL_CHIP = chipVariants({ tone: 'brand' });
+export const TAG_CHIP = chipVariants({ tone: 'role' });

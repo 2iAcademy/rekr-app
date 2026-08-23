@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { useState } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { mockFeedCandidates } from '../mocks';
@@ -6,11 +7,45 @@ import { RecruiterFeedPage } from './RecruiterFeedPage';
 
 const deck = (...ids: number[]) => mockFeedCandidates.filter(({ id }) => ids.includes(id));
 
-const renderPage = (candidates?: ReturnType<typeof deck>) =>
-  render(<RecruiterFeedPage candidates={candidates} />);
+interface HarnessProps {
+  candidates?: ReturnType<typeof deck>;
+  openCandidateId?: number | null;
+  onCloseProfile?: () => void;
+}
+
+/**
+ * The three profile props are required, so every test drives them through the
+ * same small state container the route holds in production.
+ *
+ * `onCloseProfile` replaces that container's close instead of spying beside it:
+ * freezing the search param is how a test observes what the page does with a
+ * URL the route would already have cleaned.
+ */
+function FeedHarness({ candidates, openCandidateId = null, onCloseProfile }: HarnessProps) {
+  const [openId, setOpenId] = useState<number | null>(openCandidateId);
+
+  return (
+    <RecruiterFeedPage
+      candidates={candidates}
+      openCandidateId={openId}
+      onOpenProfile={setOpenId}
+      onCloseProfile={onCloseProfile ?? (() => setOpenId(null))}
+    />
+  );
+}
+
+const renderPage = (
+  candidates?: ReturnType<typeof deck>,
+  options: Omit<HarnessProps, 'candidates'> = {},
+) => render(<FeedHarness candidates={candidates} {...options} />);
 
 const heading = (name: string) => screen.getByRole('heading', { name });
 const button = (name: string) => screen.getByRole('button', { name });
+// The detail screen carries the profile as the page `h1`; the card carries the
+// same text as an `h2`, so the level is what tells the two screens apart.
+const detailHeading = (name: string) => screen.getByRole('heading', { level: 1, name });
+const feedHeading = () => screen.queryByRole('heading', { level: 1, name: 'Candidats' });
+const viewProfile = (fullName: string) => button(`Voir le profil de ${fullName}`);
 
 describe('RecruiterFeedPage', () => {
   it('ouvre le deck mocké sur le premier profil', () => {
@@ -82,37 +117,6 @@ describe('RecruiterFeedPage', () => {
     expect(screen.queryByRole('button', { name: 'Élargir la recherche' })).not.toBeInTheDocument();
   });
 
-  it('referme le détail quand le deck avance', async () => {
-    const user = userEvent.setup();
-    renderPage(deck(1, 3));
-
-    await user.click(button('Voir le profil'));
-    expect(screen.getByRole('group', { name: 'Profil de Camille Moreau' })).toBeVisible();
-
-    await user.click(button('Passer'));
-
-    expect(heading('Sofia Nguyen · 35 ans')).toBeVisible();
-    expect(screen.queryByRole('group', { name: 'Profil de Sofia Nguyen' })).not.toBeInTheDocument();
-    expect(button('Voir le profil')).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('ouvre et referme le détail depuis la carte', async () => {
-    const user = userEvent.setup();
-    renderPage(deck(1));
-
-    await user.click(button('Voir le profil'));
-
-    const panel = screen.getByRole('group', { name: 'Profil de Camille Moreau' });
-
-    expect(button('Voir le profil')).toHaveAttribute('aria-controls', panel.id);
-
-    await user.click(button('Voir le profil'));
-
-    expect(
-      screen.queryByRole('group', { name: 'Profil de Camille Moreau' }),
-    ).not.toBeInTheDocument();
-  });
-
   it('passe et like au clavier', async () => {
     const user = userEvent.setup();
     renderPage(deck(1, 3, 7));
@@ -136,34 +140,89 @@ describe('RecruiterFeedPage', () => {
   });
 });
 
-describe('RecruiterFeedPage — état partagé entre deux candidats', () => {
-  it('referme le détail quand un filtre change la tête du deck', async () => {
+describe('RecruiterFeedPage — écran de détail', () => {
+  it('ouvre le profil depuis la carte et revient au feed', async () => {
     const user = userEvent.setup();
-    renderPage();
+    renderPage(deck(1));
 
-    await user.click(button('Voir le profil'));
-    expect(screen.getByRole('group', { name: 'Profil de Camille Moreau' })).toBeVisible();
+    await user.click(viewProfile('Camille Moreau'));
 
-    await user.click(button('Freelance'));
+    expect(detailHeading('Camille Moreau · 29 ans')).toBeVisible();
+    expect(button('Retour au feed')).toBeVisible();
+    // The feed is replaced, not covered: two `h1` and a live filter bar behind
+    // the profile would both be regressions.
+    expect(feedHeading()).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'CDI' })).not.toBeInTheDocument();
 
-    expect(heading('Sofia Nguyen · 35 ans')).toBeVisible();
-    expect(screen.queryByRole('group', { name: 'Profil de Sofia Nguyen' })).not.toBeInTheDocument();
-    expect(button('Voir le profil')).toHaveAttribute('aria-expanded', 'false');
+    await user.click(button('Retour au feed'));
+
+    expect(feedHeading()).toBeVisible();
+    expect(viewProfile('Camille Moreau')).toBeVisible();
   });
 
-  it('referme le détail quand on élargit la recherche depuis l’état vide', async () => {
+  it('ouvre directement le profil ciblé par un lien profond', () => {
+    renderPage(deck(1, 3), { openCandidateId: 3 });
+
+    expect(detailHeading('Sofia Nguyen · 35 ans')).toBeVisible();
+  });
+
+  it('affiche un profil déjà décidé plutôt qu’un écran vide', async () => {
     const user = userEvent.setup();
-    renderPage();
+    renderPage(deck(1, 3), { openCandidateId: 1, onCloseProfile: () => {} });
 
-    await user.click(button('Voir le profil'));
-    await user.click(button('Stage'));
-    await user.click(button('Expert'));
-    await user.click(button('Élargir la recherche'));
+    await user.click(button('Passer'));
 
-    expect(button('Voir le profil')).toHaveAttribute('aria-expanded', 'false');
-    expect(
-      screen.queryByRole('group', { name: 'Profil de Camille Moreau' }),
-    ).not.toBeInTheDocument();
+    expect(detailHeading('Camille Moreau · 29 ans')).toBeVisible();
+  });
+
+  it('nettoie le paramètre quand le profil ciblé est introuvable', () => {
+    const onCloseProfile = vi.fn();
+    renderPage(deck(1, 3), { openCandidateId: 404, onCloseProfile });
+
+    expect(heading('Camille Moreau · 29 ans')).toBeVisible();
+    expect(onCloseProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('avance le deck et referme le profil quand la décision vient du détail', async () => {
+    const user = userEvent.setup();
+    renderPage(deck(1, 3));
+
+    await user.click(viewProfile('Camille Moreau'));
+    await user.click(button('Passer'));
+
+    expect(heading('Sofia Nguyen · 35 ans')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Retour au feed' })).not.toBeInTheDocument();
+  });
+
+  it('compte un like pris depuis le détail', async () => {
+    const user = userEvent.setup();
+    renderPage(deck(1));
+
+    await user.click(viewProfile('Camille Moreau'));
+    await user.click(button('Liker'));
+
+    expect(heading('Vous avez vu tous les profils')).toBeVisible();
+    expect(screen.getByText('1 profil liké')).toBeVisible();
+  });
+
+  it('rend le focus à la zone du deck après une décision prise depuis le détail', async () => {
+    const user = userEvent.setup();
+    renderPage(deck(1, 3));
+
+    await user.click(viewProfile('Camille Moreau'));
+    await user.click(button('Liker'));
+
+    expect(screen.getByRole('region', { name: 'Profils à parcourir' })).toHaveFocus();
+  });
+
+  it('rend le focus à la zone du deck en revenant au feed', async () => {
+    const user = userEvent.setup();
+    renderPage(deck(1, 3));
+
+    await user.click(viewProfile('Camille Moreau'));
+    await user.click(button('Retour au feed'));
+
+    expect(screen.getByRole('region', { name: 'Profils à parcourir' })).toHaveFocus();
   });
 });
 
@@ -184,6 +243,20 @@ describe('RecruiterFeedPage — périmètre du raccourci clavier', () => {
     renderPage();
 
     fireEvent.keyDown(window, { key: 'ArrowRight', repeat: true });
+
+    expect(heading('Camille Moreau · 29 ans')).toBeVisible();
+  });
+
+  it('désarme les flèches tant que le détail est ouvert', async () => {
+    const user = userEvent.setup();
+    renderPage(deck(1, 3));
+
+    await user.click(viewProfile('Camille Moreau'));
+    await user.keyboard('{ArrowRight}');
+
+    expect(detailHeading('Camille Moreau · 29 ans')).toBeVisible();
+
+    await user.click(button('Retour au feed'));
 
     expect(heading('Camille Moreau · 29 ans')).toBeVisible();
   });

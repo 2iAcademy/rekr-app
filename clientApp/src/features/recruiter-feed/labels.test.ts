@@ -6,6 +6,7 @@ import {
   experienceLabel,
   likedCountLabel,
   metaLine,
+  mobilityLabel,
   nameWithAge,
   remoteLabel,
   salaryWishLabel,
@@ -97,6 +98,42 @@ describe('availabilityLabel', () => {
     expect(
       availabilityLabel(candidate({ availability: 'SPECIFIC_DATE', availabilityDate: 'bientôt' })),
     ).toBe('Dispo à préciser');
+  });
+});
+
+describe('mobilityLabel', () => {
+  it('annonce une mobilité nationale', () => {
+    expect(mobilityLabel(candidate({ mobilityNationwide: true, mobilityRadiusKm: null }))).toBe(
+      'Mobile dans toute la France',
+    );
+  });
+
+  it('fait primer la mobilité nationale sur le rayon renseigné', () => {
+    expect(mobilityLabel(candidate({ mobilityNationwide: true, mobilityRadiusKm: 50 }))).toBe(
+      'Mobile dans toute la France',
+    );
+  });
+
+  it('chiffre le rayon quand la mobilité n’est pas nationale', () => {
+    expect(mobilityLabel(candidate({ mobilityNationwide: false, mobilityRadiusKm: 30 }))).toBe(
+      'Mobile dans un rayon de 30 km',
+    );
+    expect(mobilityLabel(candidate({ mobilityNationwide: null, mobilityRadiusKm: 100 }))).toBe(
+      'Mobile dans un rayon de 100 km',
+    );
+  });
+
+  it('ne dit rien quand aucune mobilité n’est renseignée', () => {
+    expect(
+      mobilityLabel(candidate({ mobilityNationwide: null, mobilityRadiusKm: null })),
+    ).toBeNull();
+  });
+
+  it('traite un rayon nul ou négatif comme une mobilité inconnue', () => {
+    expect(mobilityLabel(candidate({ mobilityNationwide: false, mobilityRadiusKm: 0 }))).toBeNull();
+    expect(
+      mobilityLabel(candidate({ mobilityNationwide: null, mobilityRadiusKm: -10 })),
+    ).toBeNull();
   });
 });
 
