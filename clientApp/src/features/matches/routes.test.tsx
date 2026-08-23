@@ -13,6 +13,7 @@ vi.mock('@/api/generated', () => ({
   candidateProfileControllerUpdate: vi.fn(),
   companyControllerCreate: vi.fn(),
   companyControllerUpdateMine: vi.fn(),
+  matchControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerCreate: vi.fn(),
   sectorControllerFindAll: vi.fn(),
 }));
@@ -55,6 +56,35 @@ describe('navigation vers le match', () => {
     expect(await screen.findByRole('heading', { name: "C'est un match !" })).toBeInTheDocument();
   });
 
+  it('affiche la liste des matches pour un candidat connecté', async () => {
+    authenticateAs('candidate');
+    renderAt('/matches');
+
+    expect(await screen.findByRole('heading', { name: 'Tes matches' })).toBeInTheDocument();
+  });
+
+  it('renvoie un visiteur anonyme vers la connexion depuis la liste des matches', async () => {
+    renderAt('/matches');
+
+    expect(await screen.findByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
+  });
+
+  it('affiche la liste des matches pour un recruteur connecté', async () => {
+    authenticateAs('recruiter');
+    renderAt('/matches');
+
+    expect(await screen.findByRole('heading', { name: 'Tes matches' })).toBeInTheDocument();
+  });
+
+  it('n’affiche pas la liste des matches tant que la session est en cours de vérification', () => {
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}) as Promise<Response>);
+    renderAt('/matches');
+
+    expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Se connecter' })).not.toBeInTheDocument();
+  });
+
   it('renvoie un visiteur anonyme vers la connexion', async () => {
     renderAt('/match');
 
@@ -62,12 +92,11 @@ describe('navigation vers le match', () => {
     expect(screen.queryByRole('heading', { name: "C'est un match !" })).not.toBeInTheDocument();
   });
 
-  it('renvoie un recruteur connecté vers l’accueil', async () => {
+  it('affiche la page pour un recruteur connecté', async () => {
     authenticateAs('recruiter');
     renderAt('/match');
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: "C'est un match !" })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: "C'est un match !" })).toBeInTheDocument();
   });
 
   it('n’affiche rien tant que la session est en cours de vérification', () => {

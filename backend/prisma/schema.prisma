@@ -250,6 +250,8 @@ model Offer {
   candidateLikes CandidateLikesOffer[]
   matches        Match[]
 
+  @@index([companyId])
+
   @@map("offer")
 }
 
@@ -339,5 +341,7 @@ model Match {
   recruiter User? @relation("MatchRecruiter", fields: [recruiterUserId], references: [id], onDelete: SetNull)
 
   @@unique([candidateUserId, offerId])
+  @@index([candidateUserId, matchedAt], map: "match_fk_user_candidate_matched_at_idx")
+  @@index([offerId, matchedAt], map: "match_fk_offer_matched_at_idx")
   @@map("match")
 }
