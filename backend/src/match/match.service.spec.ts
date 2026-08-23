@@ -59,8 +59,13 @@ describe('MatchService', () => {
 
     expect(prisma.match.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { candidateUserId: 7 },
+        where: {
+          candidateUserId: 7,
+          offer: { status: 'open' },
+        },
         orderBy: { matchedAt: 'desc' },
+        skip: 0,
+        take: 50,
       }),
     );
   });

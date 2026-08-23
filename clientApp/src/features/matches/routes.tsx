@@ -4,6 +4,16 @@ import { useAuth } from '@/features/auth/useAuth';
 import { MatchPage } from '@/features/matches/pages/MatchPage';
 
 export function MatchesRoute() {
+  const { status } = useAuth();
+
+  if (status === 'loading') {
+    return null;
+  }
+
+  if (status !== 'authenticated') {
+    return <Navigate to="/connexion" replace />;
+  }
+
   return <MatchesPage />;
 }
 
@@ -25,10 +35,6 @@ export function MatchRoute() {
 
   if (status !== 'authenticated') {
     return <Navigate to="/connexion" replace />;
-  }
-
-  if (user?.userType !== 'candidate') {
-    return <Navigate to="/" replace />;
   }
 
   const { matchedProfile = { name: 'Votre match', avatarUrl: null } } =

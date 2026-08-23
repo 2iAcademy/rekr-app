@@ -72,6 +72,10 @@ export interface SectorDto {
   label: string;
 }
 
+export interface Object {
+  [key: string]: unknown;
+}
+
 export interface MatchOfferDto {
   id: number;
   title: string;
@@ -125,6 +129,20 @@ export type CompanyControllerReplaceLogoBody = {
 
 export type CompanyControllerReplaceCoverImageBody = {
   file: Blob;
+};
+
+export type MatchControllerFindMineParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   */
+  page?: Object;
+  /**
+   * Nombre maximum de matchs par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: Object;
 };
 
 export type appControllerGetHelloResponse200 = {
@@ -850,15 +868,29 @@ export type matchControllerFindMineResponse200 = {
 export type matchControllerFindMineResponseSuccess = matchControllerFindMineResponse200 & {
   headers: Headers;
 };
-export const getMatchControllerFindMineUrl = () => {
-  return `/api/matches`;
+export const getMatchControllerFindMineUrl = (params?: MatchControllerFindMineParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/matches?${stringifiedParams}` : `/api/matches`;
 };
 
 export const matchControllerFindMine = async (
+  params?: MatchControllerFindMineParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<matchControllerFindMineResponseSuccess> => {
-  return customFetch<matchControllerFindMineResponseSuccess>(getMatchControllerFindMineUrl(), {
-    ...options,
-    method: 'GET',
-  });
+  return customFetch<matchControllerFindMineResponseSuccess>(
+    getMatchControllerFindMineUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };

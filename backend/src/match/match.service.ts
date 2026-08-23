@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { PrismaService } from '../prisma/prisma.service';
+import { MatchListQueryDto } from './dto/match-list-query.dto';
 
 export interface MatchListItem {
   id: number;
@@ -22,11 +23,20 @@ export interface MatchListItem {
 export class MatchService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findMine(user: AuthUser): Promise<MatchListItem[]> {
+  async findMine(
+    user: AuthUser,
+    { page = 1, limit = 50 }: MatchListQueryDto = new MatchListQueryDto(),
+  ): Promise<MatchListItem[]> {
+    const pagination = {
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
     if (user.userType === 'candidate') {
       const matches = await this.prisma.match.findMany({
-        where: { candidateUserId: user.id },
+        where: { candidateUserId: user.id, offer: { status: 'open' } },
         orderBy: { matchedAt: 'desc' },
+        ...pagination,
         select: {
           id: true,
           matchedAt: true,
@@ -72,6 +82,7 @@ export class MatchService {
         },
       },
       orderBy: { matchedAt: 'desc' },
+      ...pagination,
       select: {
         id: true,
         matchedAt: true,

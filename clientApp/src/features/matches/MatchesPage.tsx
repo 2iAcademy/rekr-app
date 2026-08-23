@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { matchControllerFindMine, type MatchListItemDto } from '@/api/generated';
+import { fileUrl } from '@/lib/fileUrl';
 import { cn, timeSince } from '@/lib/utils';
 
 type MatchTab = 'matches' | 'likes' | 'received';
@@ -70,7 +71,7 @@ function toPreview(match: MatchListItemDto): MatchPreview {
     role: counterpart?.headline ?? match.offer.title,
     time: timeSince(match.matchedAt),
     avatarClass: avatarClasses[match.id % avatarClasses.length],
-    avatarUrl: counterpart?.avatarUrl ?? null,
+    avatarUrl: fileUrl(counterpart?.avatarUrl),
     isNew: age >= 0 && age < 24 * 60 * 60 * 1000,
   };
 }
@@ -78,10 +79,7 @@ function toPreview(match: MatchListItemDto): MatchPreview {
 function MatchRow({ match }: { match: MatchPreview }) {
   return (
     <li>
-      <button
-        type="button"
-        className="flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-card px-3 py-2.5 text-left shadow-[0_8px_22px_-18px_rgba(11,27,23,0.5)] transition-transform hover:-translate-y-px hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:min-h-15 sm:px-4"
-      >
+      <div className="flex w-full items-center gap-3 rounded-2xl bg-card px-3 py-2.5 text-left shadow-[0_8px_22px_-18px_rgba(11,27,23,0.5)] sm:min-h-15 sm:px-4">
         <span
           className={cn(
             'flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full font-heading text-sm font-bold text-white shadow-sm sm:size-10',
@@ -109,7 +107,7 @@ function MatchRow({ match }: { match: MatchPreview }) {
           </span>
         </span>
         <time className="shrink-0 text-[0.55rem] text-ink-faint sm:text-xs">{match.time}</time>
-      </button>
+      </div>
     </li>
   );
 }

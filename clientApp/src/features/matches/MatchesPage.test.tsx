@@ -56,4 +56,50 @@ describe('MatchesPage', () => {
     expect(screen.getByText('Aster Studio')).toBeInTheDocument();
     expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument();
   });
+
+  it('affiche un état vide lorsque l’API ne retourne aucun match', async () => {
+    getMatches.mockResolvedValueOnce({
+      data: [],
+    } as Awaited<ReturnType<typeof matchControllerFindMine>>);
+
+    render(<MatchesPage />);
+
+    expect(await screen.findByText('Aucun match pour le moment.')).toBeInTheDocument();
+  });
+
+  it('affiche une erreur lorsque le chargement des matches échoue', async () => {
+    getMatches.mockRejectedValueOnce(new Error('API indisponible'));
+
+    render(<MatchesPage />);
+
+    expect(await screen.findByText('Impossible de charger tes matches.')).toBeInTheDocument();
+  });
+
+  it('convertit la clé de stockage de l’avatar en URL de fichier', async () => {
+    getMatches.mockResolvedValueOnce({
+      data: [
+        {
+          id: 12,
+          matchedAt: new Date().toISOString(),
+          offer: { id: 4, title: 'Développeur Full-Stack' },
+          counterpart: {
+            id: 8,
+            kind: 'company',
+            name: 'Acme Corp',
+            headline: 'Développeur Full-Stack',
+            avatarUrl: 'companies/8/logo/acme.webp',
+          },
+        },
+      ],
+    } as Awaited<ReturnType<typeof matchControllerFindMine>>);
+
+    const { container } = render(<MatchesPage />);
+
+    await screen.findByText('Acme Corp');
+
+    expect(container.querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/files/companies/8/logo/acme.webp',
+    );
+  });
 });
