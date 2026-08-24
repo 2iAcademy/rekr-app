@@ -20,14 +20,14 @@ export function SplashPage({ onCreateAccount, onSignIn, weeklyMatches = 0 }: Spl
         <div className="flex items-center gap-3 rounded-2xl bg-brand-tint px-4 py-3.5">
           <span className="size-2.5 shrink-0 rounded-full bg-brand" />
           <p className="text-sm text-ink">
-            <span className="font-semibold">Candidat</span>, trouve le job qui te ressemble.
+            <span className="font-semibold">Candidat</span>, trouvez le job qui vous ressemble.
           </p>
         </div>
 
         <div className="flex items-center gap-3 rounded-2xl bg-violet-tint px-4 py-3.5">
           <span className="size-2.5 shrink-0 rounded-full bg-violet" />
           <p className="text-sm text-ink">
-            <span className="font-semibold">Recruteur</span>, trouve le talent qui colle.
+            <span className="font-semibold">Recruteur</span>, trouvez le talent qui colle.
           </p>
         </div>
 
@@ -48,7 +48,7 @@ export function SplashPage({ onCreateAccount, onSignIn, weeklyMatches = 0 }: Spl
         </Button>
 
         <p className="mt-2 text-center text-xs leading-snug text-ink-faint">
-          En continuant, tu acceptes les CGU et la politique de confidentialité.
+          En continuant, vous acceptez les CGU et la politique de confidentialité.
         </p>
       </section>
     </main>

@@ -22,6 +22,14 @@ const DEFAULT_TTL_SECONDS = 60;
  * and `logs` are looser because legitimate bursts exist there (a shared office
  * IP onboarding a team, a client flushing a queue of buffered errors), but they
  * still cap the enumeration and flooding loops that M2 and M4 rely on.
+ *
+ * `files` is the outlier, and it is one because the unit is wrong everywhere
+ * else: the other budgets count user actions, this one counts subresources a
+ * browser fetches on its own. A single list of 30 companies is 30 requests
+ * through the same handler, so `default` would cap that page at three loads a
+ * minute — and behind a proxy with `TRUST_PROXY_HOPS=0` every visitor shares
+ * the counter. It still caps a scraper walking the key space, which is the only
+ * abuse this route allows.
  */
 const DEFAULT_LIMITS: Record<ThrottleBudgetName, number> = {
   default: 100,
@@ -29,6 +37,11 @@ const DEFAULT_LIMITS: Record<ThrottleBudgetName, number> = {
   signup: 10,
   logs: 20,
   refresh: 30,
+  // One autocompletion field sends a request per debounced keystroke, and a
+  // shared office IP multiplies that by the number of people onboarding at
+  // once. The answers are cached server-side, so the cost of a burst is low.
+  cities: 200,
+  files: 600,
 };
 
 export function buildThrottlerOptions(
@@ -82,6 +95,16 @@ function readLimits(
       configService,
       'THROTTLE_REFRESH_LIMIT',
       DEFAULT_LIMITS.refresh,
+    ),
+    cities: readPositiveInt(
+      configService,
+      'THROTTLE_CITIES_LIMIT',
+      DEFAULT_LIMITS.cities,
+    ),
+    files: readPositiveInt(
+      configService,
+      'THROTTLE_FILES_LIMIT',
+      DEFAULT_LIMITS.files,
     ),
   };
 }

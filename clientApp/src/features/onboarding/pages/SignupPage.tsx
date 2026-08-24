@@ -2,14 +2,20 @@ import { useState, type FormEvent } from 'react';
 import { Check, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/form/PasswordInput';
 import { cn } from '@/lib/utils';
-import { ApiError } from '@/api/customFetch';
 import { useAuth } from '@/features/auth/useAuth';
+import { OptionCards, type Option } from '@/components/form/OptionCards';
+import type { RoleTheme } from '@/lib/roleTheme';
+import { SIGNUP_SUCCESS, signupBusiness } from '@/features/auth/authFeedback';
+import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
 
+// Typed as `RoleTheme`: the selected value is fed straight to `data-role`, so a
+// value without a matching palette scope must not compile.
 const roleOptions = [
-  { value: 'candidate', title: 'Candidat', subtitle: 'Je cherche un poste' },
-  { value: 'recruiter', title: 'Recruteur', subtitle: 'Je recrute' },
-] as const;
+  { value: 'candidate', label: 'Candidat', description: 'Je cherche un poste' },
+  { value: 'recruiter', label: 'Recruteur', description: 'Je recrute' },
+] as const satisfies readonly Option<RoleTheme>[];
 
 type Role = (typeof roleOptions)[number]['value'];
 
@@ -39,20 +45,16 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
     }
 
     if (!acceptTerms) {
-      setError('Tu dois accepter les CGU pour continuer.');
+      setError('Vous devez accepter les CGU pour continuer.');
       return;
     }
-
     try {
       await signup(email, password, role);
       setError(null);
+      notifySuccess(SIGNUP_SUCCESS);
       onSubmit?.({ role, email, password });
     } catch (caught) {
-      setError(
-        caught instanceof ApiError && caught.status === 409
-          ? 'Un compte existe déjà pour cet email.'
-          : 'Impossible de créer le compte.',
-      );
+      notifyFailure(caught, signupBusiness);
     }
   };
 
@@ -74,40 +76,17 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
       </header>
 
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
-        <div className="flex flex-col gap-2.5">
-          <p id="role-label" className="text-xs text-ink-muted">
-            Je suis
-          </p>
-          <div role="radiogroup" aria-labelledby="role-label" className="grid grid-cols-2 gap-3">
-            {roleOptions.map((option) => {
-              const selected = role === option.value;
-              return (
-                <label
-                  key={option.value}
-                  className={cn(
-                    'flex min-h-18 cursor-pointer flex-col justify-center gap-1 rounded-2xl px-4 py-3.5 transition-all has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-role/40',
-                    selected
-                      ? 'bg-role-gradient text-white shadow-role'
-                      : 'border border-line bg-card text-ink hover:border-role/30',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="role"
-                    value={option.value}
-                    checked={selected}
-                    onChange={() => setRole(option.value)}
-                    className="sr-only"
-                  />
-                  <span className="font-heading text-sm font-semibold">{option.title}</span>
-                  <span className={cn('text-xs', selected ? 'text-white/80' : 'text-ink-muted')}>
-                    {option.subtitle}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
+        {/* `Role` is pinned rather than inferred: a bare `setRole` offers
+            `SetStateAction<Role>` as an inference candidate, which does not
+            satisfy `T extends string`, so `T` collapses to `string`. */}
+        <OptionCards<Role>
+          legend="Je suis"
+          name="role"
+          options={roleOptions}
+          value={role}
+          onChange={setRole}
+          columns={2}
+        />
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="signup-email" className="text-xs text-ink-muted">
@@ -120,7 +99,7 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="ton@email.com"
+            placeholder="nom@email.com"
           />
         </div>
 
@@ -128,9 +107,8 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
           <label htmlFor="signup-password" className="text-xs text-ink-muted">
             Mot de passe
           </label>
-          <Input
+          <PasswordInput
             id="signup-password"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}
@@ -147,9 +125,9 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
           <label htmlFor="signup-confirm-password" className="text-xs text-ink-muted">
             Confirmer le mot de passe
           </label>
-          <Input
+          <PasswordInput
             id="signup-confirm-password"
-            type="password"
+            subject="la confirmation du mot de passe"
             autoComplete="new-password"
             required
             value={confirmPassword}
@@ -157,7 +135,7 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
               setConfirmPassword(event.target.value);
               setError(null);
             }}
-            placeholder="Re-saisis le mot de passe"
+            placeholder="Ressaisissez le mot de passe"
             aria-invalid={error !== null && !passwordsMatch}
             aria-describedby={error !== null && !passwordsMatch ? 'signup-error' : undefined}
           />

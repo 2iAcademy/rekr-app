@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { authControllerSignup } from '@/api/generated';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { ApiError } from '@/api/customFetch';
+import { Toaster } from '@/components/ui/sonner';
 import { SignupPage } from './SignupPage';
 
 vi.mock('@/api/generated', () => ({
@@ -21,10 +23,14 @@ const authenticatedUser = {
   isActive: true,
 };
 
+const apiError = (status: number, data: unknown) =>
+  new ApiError({ status, statusText: '', url: '/api/auth/signup', data });
+
 const renderSignup = (props: Parameters<typeof SignupPage>[0] = {}) =>
   render(
     <AuthProvider>
       <SignupPage {...props} />
+      <Toaster />
     </AuthProvider>,
   );
 
@@ -83,6 +89,37 @@ describe('SignupPage', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ role: 'recruiter' }));
   });
 
+  it("expose le rôle sélectionné dans data-role pour l'accent de couleur", async () => {
+    const user = userEvent.setup();
+    renderSignup();
+
+    expect(screen.getByRole('main')).toHaveAttribute('data-role', 'candidate');
+
+    await user.click(screen.getByRole('radio', { name: /recruteur/i }));
+
+    expect(screen.getByRole('main')).toHaveAttribute('data-role', 'recruiter');
+  });
+
+  it('affiche chaque mot de passe indépendamment de l’autre', async () => {
+    const user = userEvent.setup();
+    renderSignup();
+
+    const password = screen.getByLabelText('Mot de passe');
+    const confirm = screen.getByLabelText('Confirmer le mot de passe');
+
+    await user.click(screen.getByRole('button', { name: 'Afficher le mot de passe' }));
+
+    expect(password).toHaveAttribute('type', 'text');
+    expect(confirm).toHaveAttribute('type', 'password');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Afficher la confirmation du mot de passe' }),
+    );
+
+    expect(password).toHaveAttribute('type', 'text');
+    expect(confirm).toHaveAttribute('type', 'text');
+  });
+
   it('bloque la soumission et affiche une erreur quand les mots de passe diffèrent', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
@@ -113,7 +150,9 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Tu dois accepter les CGU pour continuer.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Vous devez accepter les CGU pour continuer.',
+    );
 
     const confirm = screen.getByLabelText('Confirmer le mot de passe');
     expect(confirm).toHaveAttribute('aria-invalid', 'false');
@@ -161,10 +200,9 @@ describe('SignupPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it("affiche une erreur et ne notifie pas le parent quand l'API refuse la création", async () => {
+  it('confirme la création du compte par un toast de succès', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    signupRequest.mockRejectedValue(new Error('Bad Request'));
     renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
@@ -173,8 +211,104 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
+    const message = await screen.findByText('Compte créé. Bienvenue sur Rekr !');
+
+    expect(message.closest('[data-sonner-toast]')).toHaveAttribute('data-type', 'success');
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('reste génerique sur un 500 sans exposer le message technique', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    signupRequest.mockRejectedValue(
+      apiError(500, { statusCode: 500, message: 'Internal server error' }),
+    );
+    renderSignup({ onSubmit });
+
+    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    const message = await screen.findByText('Une erreur est survenue. Réessayez dans un instant.');
+
+    expect(message.closest('[data-sonner-toast]')).toHaveAttribute('data-type', 'error');
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Impossible de créer le compte.');
+    expect(screen.queryByText('Internal server error')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('annonce un email déjà utilisé sur un 409', async () => {
+    const user = userEvent.setup();
+    signupRequest.mockRejectedValue(
+      apiError(409, { statusCode: 409, message: 'An account already exists for this email.' }),
+    );
+    renderSignup();
+
+    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    expect(
+      await screen.findByText(
+        'Un compte existe déjà pour cet email. Connectez-vous ou utilisez une autre adresse.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('An account already exists for this email.')).not.toBeInTheDocument();
+  });
+
+  it('invite à patienter sur un 429', async () => {
+    const user = userEvent.setup();
+    signupRequest.mockRejectedValue(
+      apiError(429, { statusCode: 429, message: 'ThrottlerException: Too Many Requests' }),
+    );
+    renderSignup();
+
+    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    expect(
+      await screen.findByText('Trop de tentatives. Patientez une minute avant de réessayer.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/ThrottlerException/)).not.toBeInTheDocument();
+  });
+
+  it('signale un problème de connexion quand la requête n’aboutit pas', async () => {
+    const user = userEvent.setup();
+    signupRequest.mockRejectedValue(new TypeError('Failed to fetch'));
+    renderSignup();
+
+    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    expect(
+      await screen.findByText(
+        'Connexion au serveur impossible. Vérifiez votre connexion et réessayez.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('laisse la validation côté client en inline, sans aucun toast', async () => {
+    const user = userEvent.setup();
+    renderSignup({ onSubmit: vi.fn() });
+
+    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse2');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Les mots de passe ne correspondent pas.');
+    expect(document.querySelector('[data-sonner-toast]')).toBeNull();
   });
 
   it("efface le message d'erreur dès que l'utilisateur modifie le mot de passe", async () => {

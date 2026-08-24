@@ -32,8 +32,6 @@ enum UserType {
 enum CompanySize {
   TPE
   PME
-  ETI
-  GE
 
   @@map("company_size")
 }
@@ -252,18 +250,25 @@ model Offer {
   candidateLikes CandidateLikesOffer[]
   matches        Match[]
 
+  @@index([companyId])
+
   @@map("offer")
 }
 
 model Tag {
   id       Int         @id @default(autoincrement())
-  label    String      @unique @db.VarChar(100)
+  label    String      @db.VarChar(100)
   category TagCategory
 
   offerTags     OfferTag[]
   candidateTags CandidateTag[]
   companyTags   CompanyTag[]
 
+  // Unique on the pair, not on the label: « Anglais » is both a plausible skill
+  // and the canonical name of a language. With a label-wide unique index the
+  // first writer decided the category for everyone, and no later payload could
+  // ever correct it.
+  @@unique([label, category])
   @@map("tag")
 }
 
@@ -336,5 +341,7 @@ model Match {
   recruiter User? @relation("MatchRecruiter", fields: [recruiterUserId], references: [id], onDelete: SetNull)
 
   @@unique([candidateUserId, offerId])
+  @@index([candidateUserId, matchedAt], map: "match_fk_user_candidate_matched_at_idx")
+  @@index([offerId, matchedAt], map: "match_fk_offer_matched_at_idx")
   @@map("match")
 }

@@ -16,7 +16,15 @@ export function SplashRoute() {
 
 export function SignupRoute() {
   const navigate = useNavigate();
-  return <SignupPage onBack={() => navigate('/')} onSignIn={() => navigate('/connexion')} />;
+  return (
+    <SignupPage
+      onBack={() => navigate('/')}
+      onSignIn={() => navigate('/connexion')}
+      onSubmit={({ role }) => {
+        navigate(role === 'recruiter' ? '/recruteur/profil' : '/candidat/profil');
+      }}
+    />
+  );
 }
 
 export function SigninRoute() {

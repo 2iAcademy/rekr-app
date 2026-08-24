@@ -5,7 +5,9 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { configureApp } from '../src/setup-app';
 import { bearerFor } from './auth-header';
+import { stubCityReference } from './city-reference';
 import { resetDb } from './reset-db';
+import { resetCityCache } from './city-cache-reset';
 import { resetThrottler } from './throttler-reset';
 
 describe('Company (e2e)', () => {
@@ -41,6 +43,8 @@ describe('Company (e2e)', () => {
   beforeEach(async () => {
     await resetDb(prisma);
     resetThrottler(app);
+    resetCityCache(app);
+    stubCityReference();
   });
 
   afterAll(async () => {
@@ -62,6 +66,30 @@ describe('Company (e2e)', () => {
       .send({ name: 'Acme', firstName: 'R', lastName: 'D' })
       .expect(403);
   });
+
+  /**
+   * `CompanySize` was narrowed to the product's target (TPE, PME). These guard
+   * the contract in both directions: the kept values still pass, and the values
+   * dropped from the enum are refused rather than silently stored.
+   */
+  it.each(['TPE', 'PME'])('accepts %s as a company size', async (size) => {
+    const recruiter = await createUser('recruiter');
+
+    await asRecruiter(recruiter.id)
+      .send({ name: 'Acme', size, firstName: 'Rick', lastName: 'Deckard' })
+      .expect(201);
+  });
+
+  it.each(['ETI', 'GE', 'XL'])(
+    'rejects %s, outside the product scope (400)',
+    async (size) => {
+      const recruiter = await createUser('recruiter');
+
+      await asRecruiter(recruiter.id)
+        .send({ name: 'Acme', size, firstName: 'Rick', lastName: 'Deckard' })
+        .expect(400);
+    },
+  );
 
   it('creates the company, the linked recruiter profile and its benefits', async () => {
     const recruiter = await createUser('recruiter');
@@ -112,6 +140,39 @@ describe('Company (e2e)', () => {
 
     await asRecruiter(recruiter.id).send(payload).expect(201);
     await asRecruiter(recruiter.id).send(payload).expect(409);
+  });
+
+  it('rejects a city and postal code pair the reference does not know', async () => {
+    const recruiter = await createUser('recruiter');
+    (global.fetch as unknown as jest.Mock).mockResolvedValue(
+      new Response(JSON.stringify({ features: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    await asRecruiter(recruiter.id)
+      .send({
+        name: 'Acme',
+        firstName: 'R',
+        lastName: 'D',
+        city: 'Wakanda',
+        postalCode: '99999',
+      })
+      .expect(400);
+
+    const profile = await prisma.recruiterProfile.findUnique({
+      where: { userId: recruiter.id },
+    });
+    expect(profile).toBeNull();
+  });
+
+  it('rejects a company city sent without its postal code with 400', async () => {
+    const recruiter = await createUser('recruiter');
+
+    await asRecruiter(recruiter.id)
+      .send({ name: 'Acme', firstName: 'R', lastName: 'D', city: 'Marseille' })
+      .expect(400);
   });
 
   it('rejects an unauthenticated update with 401', async () => {
@@ -168,5 +229,80 @@ describe('Company (e2e)', () => {
       .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
       .send({ name: 'Nope' })
       .expect(404);
+  });
+
+  /**
+   * The onboarding wizard replays its whole payload here when the create call
+   * answers 409. Refusing the identity half would answer 400 on `firstName`
+   * (`forbidNonWhitelisted`) and leave the recruiter unable to fix their own
+   * name or job title — the create path is the only other writer.
+   */
+  it('accepts the full onboarding payload and updates both tables', async () => {
+    const recruiter = await createUser('recruiter');
+    const sector = await prisma.sector.create({ data: { label: 'Juridique' } });
+
+    await asRecruiter(recruiter.id)
+      .send({ name: 'Acme', firstName: 'Rick', lastName: 'Deckard' })
+      .expect(201);
+
+    await httpRequest(app)
+      .patch('/api/companies/mine')
+      .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
+      .send({
+        name: 'Acme Renamed',
+        firstName: 'Rachael',
+        lastName: 'Tyrell',
+        jobTitle: 'CTO',
+        sectorId: sector.id,
+        size: 'TPE',
+        benefits: ['Télétravail'],
+      })
+      .expect(200);
+
+    const profile = await prisma.recruiterProfile.findUniqueOrThrow({
+      where: { userId: recruiter.id },
+      include: {
+        company: { include: { companyTags: { include: { tag: true } } } },
+      },
+    });
+
+    expect(profile.firstName).toBe('Rachael');
+    expect(profile.lastName).toBe('Tyrell');
+    expect(profile.jobTitle).toBe('CTO');
+    expect(profile.company.name).toBe('Acme Renamed');
+    expect(profile.company.sectorId).toBe(sector.id);
+    expect(profile.company.size).toBe('TPE');
+    expect(profile.company.companyTags.map((link) => link.tag.label)).toEqual([
+      'Télétravail',
+    ]);
+  });
+
+  // A partial update must not blank the identity: Prisma skips `undefined`, and
+  // that is the only thing standing between a rename and a wiped profile.
+  it('leaves the recruiter identity untouched when the patch omits it', async () => {
+    const recruiter = await createUser('recruiter');
+
+    await asRecruiter(recruiter.id)
+      .send({
+        name: 'Acme',
+        firstName: 'Rick',
+        lastName: 'Deckard',
+        jobTitle: 'CTO',
+      })
+      .expect(201);
+
+    await httpRequest(app)
+      .patch('/api/companies/mine')
+      .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
+      .send({ name: 'Acme Renamed' })
+      .expect(200);
+
+    const profile = await prisma.recruiterProfile.findUniqueOrThrow({
+      where: { userId: recruiter.id },
+    });
+
+    expect(profile.firstName).toBe('Rick');
+    expect(profile.lastName).toBe('Deckard');
+    expect(profile.jobTitle).toBe('CTO');
   });
 });

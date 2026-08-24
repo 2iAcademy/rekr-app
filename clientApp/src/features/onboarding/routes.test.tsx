@@ -1,9 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { routes } from '@/router';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { authControllerSignup } from '@/api/generated';
+
+vi.mock('@/api/generated', () => ({
+  authControllerLogin: vi.fn(),
+  authControllerSignup: vi.fn(),
+  authControllerLogout: vi.fn(),
+}));
+
+const signupRequest = vi.mocked(authControllerSignup);
+
+const authenticatedUser = {
+  id: 1,
+  email: 'candidat@rekr.fr',
+  role: 'user',
+  userType: 'candidate',
+  isActive: true,
+};
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
@@ -24,6 +41,11 @@ describe('navigation onboarding', () => {
       status: 401,
       json: vi.fn().mockResolvedValue({}),
     } as unknown as Response);
+    signupRequest.mockResolvedValue({
+      data: { accessToken: 'test-token', user: authenticatedUser },
+      status: 201,
+      headers: new Headers(),
+    } as unknown as Awaited<ReturnType<typeof authControllerSignup>>);
   });
 
   it('affiche le Splash sur /', () => {
@@ -93,6 +115,22 @@ describe('navigation onboarding', () => {
     await user.click(screen.getByRole('button', { name: 'Retour' }));
 
     expect(screen.getByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
+  });
+
+  it('envoie le candidat sur son wizard de profil après une inscription réussie', async () => {
+    const user = userEvent.setup();
+    renderAt('/inscription');
+
+    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    await waitFor(() => expect(signupRequest).toHaveBeenCalled());
+
+    expect(await screen.findByRole('heading', { name: 'Mon identité' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Créer mon compte' })).toBeNull();
   });
 
   it('redirige toute route inconnue vers le Splash', () => {

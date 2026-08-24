@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   ParseIntPipe,
   Patch,
@@ -23,6 +24,15 @@ import { UpdateOfferDto } from './dto/update-offer.dto';
 @Roles('recruiter')
 export class OfferController {
   constructor(private readonly service: OfferService) {}
+
+  @Get(':id')
+  @Roles('candidate', 'recruiter')
+  findOneById(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.service.findOneById(user, id);
+  }
 
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateOfferDto) {

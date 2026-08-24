@@ -12,8 +12,12 @@ import { PrismaExceptionFilter } from './prisma/prisma-exception.filter';
 import { LogsModule } from './logs/logs.module';
 import { AuthModule } from './auth/auth.module';
 import { CandidateProfileModule } from './candidate-profile/candidate-profile.module';
+import { CityModule } from './city/city.module';
 import { CompanyModule } from './company/company.module';
 import { OfferModule } from './offer/offer.module';
+import { SectorModule } from './sector/sector.module';
+import { StorageModule } from './storage/storage.module';
+import { MatchModule } from './match/match.module';
 
 @Module({
   imports: [
@@ -29,8 +33,12 @@ import { OfferModule } from './offer/offer.module';
     LogsModule,
     AuthModule,
     CandidateProfileModule,
+    CityModule,
     CompanyModule,
     OfferModule,
+    SectorModule,
+    StorageModule,
+    MatchModule,
   ],
   controllers: [AppController],
   providers: [

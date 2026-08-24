@@ -52,8 +52,10 @@ describe('resolveTagIds', () => {
       data: [{ label: 'React', category: 'skill' }],
       skipDuplicates: true,
     });
+    // Scoped to the category: a label carries one row per category it is used
+    // in, so looking it up on the label alone could hand back another one's.
     expect(tx.tag.findMany).toHaveBeenCalledWith({
-      where: { label: { in: ['React'] } },
+      where: { label: { in: ['React'] }, category: 'skill' },
       select: { id: true },
     });
   });

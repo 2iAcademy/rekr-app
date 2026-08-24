@@ -2,9 +2,6 @@ name: CI Backend
 
 on:
   pull_request:
-    paths:
-      - 'backend/**'
-      - '.github/workflows/ci-backend.yml'
   push:
     branches:
       - preprod
@@ -81,7 +78,11 @@ jobs:
           --health-retries 10
 
     env:
+      # `DATABASE_URL` is what `prisma migrate deploy` reads; `TEST_DATABASE_URL`
+      # is what the e2e suite runs against. The suite ignores the former on
+      # purpose, so that an ambient application URL can never be truncated.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rekr_test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rekr_test
       JWT_SECRET: ci-test-secret
 
     steps:
@@ -114,3 +115,22 @@ jobs:
           name: backend-coverage
           path: backend/coverage/lcov.info
           if-no-files-found: warn
+
+  gate:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    needs: [build, lint, test]
+    if: always()
+
+    steps:
+      - name: Check job results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "build / lint / test : $RESULTS"
+          case "$RESULTS" in
+            *failure*|*cancelled*)
+              echo "::error::Le pipeline backend a echoue, la PR ne peut pas etre mergee."
+              exit 1
+              ;;
+          esac

@@ -1,4 +1,10 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { CompanyFieldsDto } from './company-fields.dto';
+import { CreateCompanyDto } from './create-company.dto';
 
-export class UpdateCompanyDto extends PartialType(CompanyFieldsDto) {}
+/**
+ * Derived from the create DTO, not from `CompanyFieldsDto`: the recruiter's own
+ * identity is written on creation and would otherwise have no way back. A
+ * recruiter re-running the onboarding wizard sends the whole form, and
+ * `forbidNonWhitelisted` would answer 400 on `firstName` alone.
+ */
+export class UpdateCompanyDto extends PartialType(CreateCompanyDto) {}

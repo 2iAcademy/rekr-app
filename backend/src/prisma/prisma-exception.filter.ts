@@ -22,8 +22,7 @@ import { Prisma } from '../../generated/prisma/client';
  *  - P2003, foreign key violation. Reachable on a first try: `sectorId` is an
  *    optional `Int` on the company DTO, and nothing checks the sector exists.
  *  - P2020, value out of range. Also reachable on a first try: `salaryMin`
- *    is `@IsInt() @Min(0)` with no ceiling over an `int4` column, and
- *    `latitude` / `longitude` are `@IsNumber()` over `Decimal(10, 7)`.
+ *    is `@IsInt() @Min(0)` with no ceiling over an `int4` column.
  *  - P2025, required record missing. Same race as P2002, in the other
  *    direction: the row is deleted between the pre-check and the update.
  *

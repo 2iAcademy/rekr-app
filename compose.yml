@@ -17,9 +17,18 @@ services:
       THROTTLE_LOGIN_LIMIT: ${THROTTLE_LOGIN_LIMIT:-}
       THROTTLE_SIGNUP_LIMIT: ${THROTTLE_SIGNUP_LIMIT:-}
       THROTTLE_LOGS_LIMIT: ${THROTTLE_LOGS_LIMIT:-}
+      UPLOADS_DIR: ${UPLOADS_DIR:-/var/lib/rekr/uploads}
     volumes:
       - ./backend:/app
       - /app/node_modules
+      # The uploaded files: CVs, profile pictures, company logos and covers.
+      #
+      # Named and outside /app, so it survives `docker compose down` and stays
+      # clear of the bind mount above — see the Dockerfile for why the path
+      # matters. On the VPS this volume IS the file store, which also means
+      # dumping Postgres alone does not back up this application: a restore
+      # without it leaves every row pointing at a file that no longer exists.
+      - backend_uploads:/var/lib/rekr/uploads
     ports:
       - "${PORT:-3001}:3001"
     depends_on:
@@ -87,3 +96,4 @@ services:
 volumes:
   pg18_data:
   frontend_node_modules:
+  backend_uploads:
