@@ -2,11 +2,12 @@ import type { FeedCandidate } from './types';
 
 /**
  * Demo deck: no endpoint lists swipeable candidates yet (#135). The LinkedIn
- * slugs are prefixed `exemple-` on purpose: a plausible `in/firstname-lastname`
- * would send a recruiter to a real stranger's profile. Kept
- * deterministic so the filter and deck tests can assert on real counts, and
- * spread across contract types and experience levels so every filter chip
- * visibly changes the deck.
+ * and portfolio slugs are prefixed `exemple-` on purpose: a plausible
+ * `in/firstname-lastname` would send a recruiter to a real stranger's profile.
+ * `cvUrl` holds a storage key, the shape the API stores, not a ready-made URL.
+ * Kept deterministic so the filter and deck tests can assert on real counts,
+ * and spread across contract types, experience levels and mobility cases so
+ * every filter chip and every profile line visibly changes across the deck.
  */
 export const mockFeedCandidates: readonly FeedCandidate[] = [
   {
@@ -23,12 +24,16 @@ export const mockFeedCandidates: readonly FeedCandidate[] = [
     availabilityDelayMonths: null,
     availabilityDate: null,
     remotePolicy: 'HYBRID',
+    mobilityRadiusKm: 30,
+    mobilityNationwide: false,
     salaryMin: 42000,
     salaryMax: 48000,
     skills: ['Symfony', 'PostgreSQL', 'Docker'],
     languages: ['Français', 'Anglais'],
     bio: "Sept ans sur des API de paiement, dont trois à porter la migration d'un monolithe vers des services découpés. Je cherche une équipe où la revue de code est un vrai moment d'échange.",
     linkedinUrl: 'https://www.linkedin.com/in/exemple-camille-moreau',
+    portfolioUrl: null,
+    cvUrl: 'candidates/1/cv/3f1c9a52-7b4e-4d18-9f60-2a5c8e10b7d4.pdf',
   },
   {
     id: 2,
@@ -44,12 +49,16 @@ export const mockFeedCandidates: readonly FeedCandidate[] = [
     availabilityDelayMonths: 2,
     availabilityDate: null,
     remotePolicy: 'FULL_REMOTE',
+    mobilityRadiusKm: 25,
+    mobilityNationwide: false,
     salaryMin: 32000,
     salaryMax: 36000,
     skills: ['React', 'TypeScript', 'Tailwind'],
     languages: ['Français'],
     bio: "Reconversion terminée il y a un an, deux applications en production depuis. J'apprends vite dès qu'on me laisse casser des choses sur un environnement de test.",
     linkedinUrl: null,
+    portfolioUrl: 'https://github.com/exemple-yanis-berger',
+    cvUrl: 'candidates/2/cv/8e2d4b7a-1c93-4f56-b0a8-6d31e9c4f082.pdf',
   },
   {
     id: 3,
@@ -65,12 +74,16 @@ export const mockFeedCandidates: readonly FeedCandidate[] = [
     availabilityDelayMonths: null,
     availabilityDate: '2026-11-02',
     remotePolicy: 'FULL_REMOTE',
+    mobilityRadiusKm: null,
+    mobilityNationwide: true,
     salaryMin: 58000,
     salaryMax: null,
     skills: ['Kubernetes', 'Terraform', 'GitLab CI', 'Observabilité'],
     languages: ['Français', 'Anglais', 'Vietnamien'],
     bio: 'Je construis des plateformes que les équipes produit peuvent opérer seules. Astreinte acceptée si elle est réellement outillée, pas si elle repose sur les nerfs de deux personnes.',
     linkedinUrl: 'https://www.linkedin.com/in/exemple-sofia-nguyen',
+    portfolioUrl: null,
+    cvUrl: 'candidates/3/cv/b74a0c19-5e82-4a3d-8c17-f2609b5d4a3e.pdf',
   },
   {
     id: 4,
@@ -86,12 +99,16 @@ export const mockFeedCandidates: readonly FeedCandidate[] = [
     availabilityDelayMonths: null,
     availabilityDate: null,
     remotePolicy: 'ON_SITE',
+    mobilityRadiusKm: 40,
+    mobilityNationwide: false,
     salaryMin: null,
     salaryMax: 44000,
     skills: ['SQL', 'dbt', 'Power BI'],
     languages: ['Français', 'Anglais'],
     bio: "Je passe autant de temps à discuter des définitions métier qu'à écrire des requêtes : un indicateur mal défini coûte plus cher qu'un tableau de bord lent.",
     linkedinUrl: null,
+    portfolioUrl: null,
+    cvUrl: null,
   },
   {
     id: 5,
@@ -107,12 +124,16 @@ export const mockFeedCandidates: readonly FeedCandidate[] = [
     availabilityDelayMonths: 3,
     availabilityDate: null,
     remotePolicy: 'HYBRID',
+    mobilityRadiusKm: 50,
+    mobilityNationwide: true,
     salaryMin: 75000,
     salaryMax: 85000,
     skills: ['Architecture hexagonale', 'Event sourcing', 'Java', 'Coaching'],
     languages: ['Français', 'Anglais'],
     bio: "Quinze ans de systèmes de gestion, dont cinq à sortir des équipes de l'ornière technique. Je viens pour transmettre autant que pour concevoir.",
     linkedinUrl: 'https://www.linkedin.com/in/exemple-awa-diallo',
+    portfolioUrl: null,
+    cvUrl: 'candidates/5/cv/1d6f3e84-9a07-4b25-a3ce-70f81c5d9b26.pdf',
   },
   {
     id: 6,
@@ -128,12 +149,16 @@ export const mockFeedCandidates: readonly FeedCandidate[] = [
     availabilityDelayMonths: null,
     availabilityDate: '2026-09-14',
     remotePolicy: 'ON_SITE',
+    mobilityRadiusKm: 15,
+    mobilityNationwide: false,
     salaryMin: null,
     salaryMax: null,
     skills: ['Flutter', 'Dart'],
     languages: ['Français', 'Espagnol'],
     bio: 'Deuxième année de master en alternance. Une application publiée sur les deux stores, écrite le soir, et corrigée grâce aux retours de ses trois cents utilisateurs.',
     linkedinUrl: null,
+    portfolioUrl: 'https://github.com/exemple-hugo-faure',
+    cvUrl: 'candidates/6/cv/5c09b8d3-2f41-4e7a-96b2-c4187a0e35df.pdf',
   },
   {
     id: 7,
@@ -149,12 +174,16 @@ export const mockFeedCandidates: readonly FeedCandidate[] = [
     availabilityDelayMonths: null,
     availabilityDate: null,
     remotePolicy: 'FULL_REMOTE',
+    mobilityRadiusKm: 100,
+    mobilityNationwide: false,
     salaryMin: 55000,
     salaryMax: 65000,
     skills: ['Design system', 'Recherche utilisateur', 'Figma', 'Accessibilité'],
     languages: ['Français', 'Anglais', 'Italien'],
     bio: "Je livre des maquettes que les développeurs peuvent intégrer sans deviner : états d'erreur, cas vides et contrastes compris dans le lot.",
     linkedinUrl: 'https://www.linkedin.com/in/exemple-lea-bonnet',
+    portfolioUrl: 'https://www.behance.net/exemple-lea-bonnet',
+    cvUrl: null,
   },
   {
     id: 8,
@@ -170,11 +199,15 @@ export const mockFeedCandidates: readonly FeedCandidate[] = [
     availabilityDelayMonths: null,
     availabilityDate: null,
     remotePolicy: 'ON_SITE',
+    mobilityRadiusKm: null,
+    mobilityNationwide: null,
     salaryMin: 28000,
     salaryMax: 32000,
     skills: ['Windows Server', 'Réseau', 'GLPI'],
     languages: ['Français'],
     bio: 'Vingt ans au contact des utilisateurs. Je documente chaque incident résolu, parce que le même appel revient toujours six mois plus tard.',
     linkedinUrl: null,
+    portfolioUrl: null,
+    cvUrl: 'candidates/8/cv/a2e57c60-8d34-41f9-bb05-1e947c3a20d8.pdf',
   },
 ];

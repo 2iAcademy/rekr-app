@@ -64,6 +64,29 @@ export const availabilityLabel = ({
   return date === null ? 'Dispo à préciser' : `Dispo le ${date}`;
 };
 
+/**
+ * Returns null when mobility is unknown, so the caller drops the line instead
+ * of asserting a limit the candidate never gave.
+ *
+ * A radius of zero or less is read as unknown too: it can only come from an
+ * untouched or broken field, and "rayon de 0 km" would tell a recruiter the
+ * candidate refuses to move.
+ */
+export const mobilityLabel = ({
+  mobilityNationwide,
+  mobilityRadiusKm,
+}: FeedCandidate): string | null => {
+  if (mobilityNationwide === true) {
+    return 'Mobile dans toute la France';
+  }
+
+  if (mobilityRadiusKm === null || mobilityRadiusKm <= 0) {
+    return null;
+  }
+
+  return `Mobile dans un rayon de ${mobilityRadiusKm} km`;
+};
+
 const thousands = (amount: number): number => Math.round(amount / 1000);
 
 // Returns null when neither bound is known, so the caller words that case

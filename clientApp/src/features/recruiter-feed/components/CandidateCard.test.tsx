@@ -5,34 +5,18 @@ import { mockFeedCandidates } from '../mocks';
 import type { FeedCandidate } from '../types';
 import { CandidateCard } from './CandidateCard';
 
-const PANEL_ID = 'recruiter-feed-profile-panel';
-
 const candidate = (overrides: Partial<FeedCandidate> = {}): FeedCandidate => ({
   ...mockFeedCandidates[0],
   ...overrides,
 });
 
-interface RenderOptions {
-  isProfileOpen?: boolean;
-  onToggleProfile?: () => void;
-}
+const renderCard = (overrides: Partial<FeedCandidate> = {}, onViewProfile = vi.fn()) => {
+  render(<CandidateCard candidate={candidate(overrides)} onViewProfile={onViewProfile} />);
 
-const renderCard = (overrides: Partial<FeedCandidate> = {}, options: RenderOptions = {}) => {
-  const onToggleProfile = options.onToggleProfile ?? vi.fn();
-
-  render(
-    <CandidateCard
-      candidate={candidate(overrides)}
-      isProfileOpen={options.isProfileOpen ?? false}
-      onToggleProfile={onToggleProfile}
-      profilePanelId={PANEL_ID}
-    />,
-  );
-
-  return { onToggleProfile };
+  return { onViewProfile };
 };
 
-const revealButton = () => screen.getByRole('button', { name: 'Voir le profil' });
+const profileButton = () => screen.getByRole('button', { name: /^Voir le profil/ });
 
 const itemsOf = (list: HTMLElement): (string | null)[] =>
   within(list)
@@ -134,94 +118,45 @@ describe('CandidateCard', () => {
 
     expect(screen.getByText('Prétention non communiquée')).toBeVisible();
   });
+});
 
-  it('décrit le bouton de révélation comme replié et laisse le détail hors du DOM', () => {
-    renderCard({ contractTypes: ['CDI'] }, { isProfileOpen: false });
-
-    expect(revealButton()).toHaveAttribute('aria-expanded', 'false');
-    expect(revealButton()).toHaveAttribute('aria-controls', PANEL_ID);
-    expect(screen.queryByRole('group')).not.toBeInTheDocument();
-    expect(screen.queryByText('Contrats recherchés')).not.toBeInTheDocument();
-  });
-
-  it('garde le même nom accessible sur le bouton quand le détail est déplié', () => {
-    renderCard({}, { isProfileOpen: true });
-
-    expect(revealButton()).toHaveAttribute('aria-expanded', 'true');
-  });
-
-  it('prévient le parent au clic sur « Voir le profil » sans décider de l’état', async () => {
+describe('CandidateCard — accès au détail', () => {
+  it('ouvre l’écran de détail au clic, sans se comporter en panneau dépliable', async () => {
     const user = userEvent.setup();
-    const onToggleProfile = vi.fn();
-    renderCard({}, { onToggleProfile });
+    const onViewProfile = vi.fn();
+    renderCard({}, onViewProfile);
 
-    await user.click(revealButton());
+    expect(profileButton()).not.toHaveAttribute('aria-expanded');
+    expect(profileButton()).not.toHaveAttribute('aria-controls');
 
-    expect(onToggleProfile).toHaveBeenCalledTimes(1);
-    expect(revealButton()).toHaveAttribute('aria-expanded', 'false');
+    await user.click(profileButton());
+
+    expect(onViewProfile).toHaveBeenCalledTimes(1);
   });
 
-  it('détaille contrats, télétravail et langues dans le panneau déplié', () => {
-    renderCard(
-      {
-        firstName: 'Camille',
-        lastName: 'Moreau',
-        contractTypes: ['CDI', 'ALTERNANCE'],
-        remotePolicy: 'HYBRID',
-        languages: ['Français', 'Anglais'],
-      },
-      { isProfileOpen: true },
-    );
+  it('nomme le bouton avec le candidat, le libellé seul étant ambigu entre deux cartes', () => {
+    renderCard({ firstName: 'Camille', lastName: 'Moreau' });
 
-    const panel = screen.getByRole('group', { name: 'Profil de Camille Moreau' });
-
-    expect(panel).toHaveAttribute('id', PANEL_ID);
-    expect(within(panel).getByText('Contrats recherchés')).toBeVisible();
-    expect(itemsOf(within(panel).getByRole('list', { name: 'Contrats recherchés' }))).toEqual([
-      'CDI',
-      'Alternance',
-    ]);
-    expect(within(panel).getByText('Hybride')).toBeVisible();
-    expect(within(panel).getByText('Langues')).toBeVisible();
-    expect(itemsOf(within(panel).getByRole('list', { name: 'Langues' }))).toEqual([
-      'Français',
-      'Anglais',
-    ]);
+    expect(screen.getByRole('button', { name: 'Voir le profil de Camille Moreau' })).toBeVisible();
   });
 
-  it('renvoie vers le profil LinkedIn dans un nouvel onglet, sans fuite d’origine', () => {
-    renderCard(
-      {
-        firstName: 'Camille',
-        lastName: 'Moreau',
-        linkedinUrl: 'https://www.linkedin.com/in/camille-moreau',
-      },
-      { isProfileOpen: true },
-    );
+  it('garde la bio tronquée sur la carte, la version complète revenant à l’écran de détail', () => {
+    // The clamp has no observable effect in jsdom, which does no layout: the
+    // class is the only witness. Asserted anyway because the truncation is the
+    // decision here — it used to be lifted when the in-card panel unfolded, and
+    // that panel is gone.
+    renderCard({ bio: 'Sept ans sur des API.' });
 
-    const link = screen.getByRole('link', { name: 'Profil LinkedIn de Camille Moreau' });
-
-    expect(link).toHaveAttribute('href', 'https://www.linkedin.com/in/camille-moreau');
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-  });
-
-  it('n’affiche aucun lien LinkedIn quand le candidat n’en a pas', () => {
-    renderCard({ linkedinUrl: null }, { isProfileOpen: true });
-
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('Sept ans sur des API.')).toHaveClass('line-clamp-3');
   });
 });
 
 describe('CandidateCard — profils incomplets', () => {
   it('n’affiche pas de rubrique au-dessus d’une liste vide', () => {
-    renderCard({ skills: [], contractTypes: [], languages: [] }, { isProfileOpen: true });
+    renderCard({ skills: [] });
 
     expect(screen.queryByRole('list', { name: 'Compétences' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Contrats recherchés')).not.toBeInTheDocument();
-    expect(screen.queryByRole('list', { name: 'Contrats recherchés' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Langues')).not.toBeInTheDocument();
-    expect(screen.queryByRole('list', { name: 'Langues' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Compétences')).not.toBeInTheDocument();
   });
 
   it('tient un prénom ou un poste manquant sans laisser d’espace orpheline', () => {
@@ -230,12 +165,11 @@ describe('CandidateCard — profils incomplets', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Moreau · 29 ans' })).toBeVisible();
   });
 
-  it('traite une URL vide comme une absence d’URL', () => {
-    renderCard({ avatarUrl: '', linkedinUrl: '' }, { isProfileOpen: true });
+  it('traite une photo vide comme une absence de photo', () => {
+    renderCard({ avatarUrl: '' });
 
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(screen.getByText('C')).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('supporte une compétence déclarée deux fois', () => {
