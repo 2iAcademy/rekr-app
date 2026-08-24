@@ -1,8 +1,11 @@
-export const toggleFilter = <T extends string>(
-  options: readonly { value: T }[],
-  values: readonly T[],
-  value: T,
-): T[] => {
+type FilterOption = Readonly<{ value: string }>;
+type OptionValue<TOptions extends readonly FilterOption[]> = TOptions[number]['value'];
+
+export const toggleFilter = <TOptions extends readonly FilterOption[]>(
+  options: TOptions,
+  values: readonly OptionValue<TOptions>[],
+  value: OptionValue<TOptions>,
+): OptionValue<TOptions>[] => {
   const next = values.includes(value)
     ? values.filter((kept) => kept !== value)
     : [...values, value];
