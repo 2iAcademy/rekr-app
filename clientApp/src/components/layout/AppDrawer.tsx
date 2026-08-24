@@ -8,7 +8,7 @@ import type { RoleTheme } from '@/lib/roleTheme';
 // Only the feed differs between the two roles: a recruiter browses candidates,
 // a candidate still lands on the splash until their own feed exists.
 const navigationItems = (isRecruiter: boolean) => [
-  { label: 'Feed', to: isRecruiter ? '/recruteur/candidats' : '/' },
+  { label: 'Feed', to: isRecruiter ? '/recruteur/candidats' : '/candidat/offres' },
   { label: 'Matches', to: '/matches' },
   { label: 'Profil', to: '/profil' },
 ];

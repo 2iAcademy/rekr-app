@@ -1,20 +1,24 @@
 import { SearchX, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { EmptyReason } from '../deck';
-import { emptyDeckTitle, likedCountLabel } from '../labels';
 
 interface EmptyDeckProps {
-  reason: EmptyReason;
+  reason: 'no-match' | 'exhausted';
+  title: string;
+  itemPlural: string;
   likedCount: number;
+  likedLabel: (count: number) => string;
   onResetFilters: () => void;
 }
 
-/**
- * The two ends of a deck are not the same story: filters can be widened, an
- * exhausted deck cannot, so only `no-match` offers a way out. The maquette's
- * second `Plus tard` button is left out until there is a shell to send it to.
- */
-export function EmptyDeck({ reason, likedCount, onResetFilters }: EmptyDeckProps) {
+/** Shared empty-state layout; each feed owns its domain wording and counts. */
+export const EmptyDeck = ({
+  reason,
+  title,
+  itemPlural,
+  likedCount,
+  likedLabel,
+  onResetFilters,
+}: EmptyDeckProps) => {
   const filtered = reason === 'no-match';
   const Icon = filtered ? SearchX : Sparkles;
 
@@ -25,12 +29,12 @@ export function EmptyDeck({ reason, likedCount, onResetFilters }: EmptyDeckProps
       </span>
 
       <div className="flex flex-col items-center gap-3">
-        <h2 className="font-heading text-2xl font-bold text-ink">{emptyDeckTitle(reason)}</h2>
+        <h2 className="font-heading text-2xl font-bold text-ink">{title}</h2>
 
         <p className="max-w-xs text-sm leading-relaxed text-ink-muted">
           {filtered
-            ? 'Élargissez vos critères pour revoir des candidats.'
-            : 'Revenez plus tard, de nouveaux candidats arrivent chaque jour.'}
+            ? `Élargissez vos critères pour revoir des ${itemPlural}.`
+            : `Revenez plus tard, de nouvelles ${itemPlural} arrivent chaque jour.`}
         </p>
       </div>
 
@@ -45,8 +49,8 @@ export function EmptyDeck({ reason, likedCount, onResetFilters }: EmptyDeckProps
           Élargir la recherche
         </Button>
       ) : (
-        <p className="text-sm font-semibold text-role">{likedCountLabel(likedCount)}</p>
+        <p className="text-sm font-semibold text-role">{likedLabel(likedCount)}</p>
       )}
     </section>
   );
-}
+};

@@ -5,8 +5,10 @@ export type Decision = 'passed' | 'liked';
 
 export type DeckDecisions = Readonly<Record<number, Decision>>;
 
-// Frozen: the empty state is a module singleton shared by every mount, and
-// `Readonly` alone would not stop a stray write from leaking across renders.
+interface DeckItem {
+  id: number;
+}
+
 export const noDecisions: DeckDecisions = Object.freeze({});
 
 export const recordDecision = (
@@ -15,33 +17,33 @@ export const recordDecision = (
   decision: Decision,
 ): DeckDecisions => ({ ...decisions, [id]: decision });
 
-const isUndecided = (candidate: FeedCandidate, decisions: DeckDecisions): boolean =>
-  decisions[candidate.id] === undefined;
+const isUndecided = (item: DeckItem, decisions: DeckDecisions): boolean =>
+  decisions[item.id] === undefined;
+
+export const remainingItems = <Item extends DeckItem>(
+  items: readonly Item[],
+  decisions: DeckDecisions,
+  matches: (item: Item) => boolean,
+): Item[] => items.filter((item) => isUndecided(item, decisions) && matches(item));
 
 export const remainingCandidates = (
   candidates: readonly FeedCandidate[],
   decisions: DeckDecisions,
   filters: FeedFilters,
 ): FeedCandidate[] =>
-  candidates.filter(
-    (candidate) => isUndecided(candidate, decisions) && matchesFilters(candidate, filters),
-  );
+  remainingItems(candidates, decisions, (candidate) => matchesFilters(candidate, filters));
 
 export const likedCount = (decisions: DeckDecisions): number =>
   Object.values(decisions).filter((decision) => decision === 'liked').length;
 
-const undecidedCount = (candidates: readonly FeedCandidate[], decisions: DeckDecisions): number =>
-  candidates.filter((candidate) => isUndecided(candidate, decisions)).length;
+const undecidedCount = <Item extends DeckItem>(
+  items: readonly Item[],
+  decisions: DeckDecisions,
+): number => items.filter((item) => isUndecided(item, decisions)).length;
 
 export type EmptyReason = 'no-match' | 'exhausted';
 
-/**
- * Filters are deliberately out of the picture: a profile still waiting for a
- * decision means the deck is not exhausted, so the empty screen must blame the
- * filters. When both causes hold, exhaustion wins — loosening filters would
- * bring nothing back.
- */
-export const emptyReason = (
-  candidates: readonly FeedCandidate[],
+export const emptyReason = <Item extends DeckItem>(
+  items: readonly Item[],
   decisions: DeckDecisions,
-): EmptyReason => (undecidedCount(candidates, decisions) === 0 ? 'exhausted' : 'no-match');
+): EmptyReason => (undecidedCount(items, decisions) === 0 ? 'exhausted' : 'no-match');

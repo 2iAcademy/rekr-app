@@ -134,5 +134,15 @@ export const likedCountLabel = (count: number): string => {
 
 // Shared with the deck's live region, so the announcement says the very words
 // the empty state puts on screen.
-export const emptyDeckTitle = (reason: EmptyReason): string =>
-  reason === 'no-match' ? 'Aucun profil ne passe vos filtres' : 'Vous avez vu tous les profils';
+export const emptyDeckTitle = (
+  reason: EmptyReason,
+  subject: 'profil' | 'offre' = 'profil',
+): string => {
+  if (subject === 'offre') {
+    return reason === 'no-match' ? 'Aucune offre ne passe vos filtres' : 'Tu as tout vu';
+  }
+
+  return reason === 'no-match'
+    ? 'Aucun profil ne passe vos filtres'
+    : 'Vous avez vu tous les profils';
+};

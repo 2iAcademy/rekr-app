@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { emptyFeedFilters, type FeedFilters } from '../types';
-import { FeedFilterBar } from './FeedFilterBar';
+import { RecruiterFilterBar } from './RecruiterFilterBar';
 
 const renderBar = (
   props: Partial<{
@@ -12,7 +12,7 @@ const renderBar = (
   }> = {},
 ) =>
   render(
-    <FeedFilterBar filters={emptyFeedFilters} onChange={vi.fn()} resultCount={4} {...props} />,
+    <RecruiterFilterBar filters={emptyFeedFilters} onChange={vi.fn()} resultCount={4} {...props} />,
   );
 
 const RESET = 'Réinitialiser les filtres';

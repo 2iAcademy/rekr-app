@@ -1,5 +1,5 @@
 import { Heart, X } from 'lucide-react';
-import { swipeDirection, swipeProgress } from '../swipeHint';
+import { swipeDirection, swipeProgress } from './swipeHint';
 
 interface SwipeHintProps {
   offset: number;
@@ -17,7 +17,7 @@ interface SwipeHintProps {
  * the wash behind it. Decorative only, the deck's live region is what announces
  * the outcome to assistive tech.
  */
-export function SwipeHint({ offset, threshold }: SwipeHintProps) {
+export const SwipeHint = ({ offset, threshold }: SwipeHintProps) => {
   const direction = swipeDirection(offset);
 
   if (direction === null) {
@@ -48,4 +48,4 @@ export function SwipeHint({ offset, threshold }: SwipeHintProps) {
       </span>
     </div>
   );
-}
+};

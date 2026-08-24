@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { CandidateCard } from '../components/CandidateCard';
-import { EmptyDeck } from '../components/EmptyDeck';
-import { FeedActions } from '../components/FeedActions';
-import { FeedFilterBar } from '../components/FeedFilterBar';
-import { SwipeHint } from '../components/SwipeHint';
+import { EmptyDeck } from '@/components/feed/EmptyDeck';
+import { FeedActions } from '@/components/feed/FeedActions';
+import { RecruiterFilterBar } from '../components/RecruiterFilterBar';
 import {
   emptyReason,
   likedCount,
@@ -13,11 +12,12 @@ import {
   remainingCandidates,
   type Decision,
 } from '../deck';
-import { emptyDeckTitle, nameWithAge } from '../labels';
+import { emptyDeckTitle, likedCountLabel, nameWithAge } from '../labels';
 import { mockFeedCandidates } from '../mocks';
-import { useCardSwipe } from '../useCardSwipe';
+import { useCardSwipe } from '@/hooks/useCardSwipe';
 import { emptyFeedFilters, type FeedCandidate, type FeedFilters } from '../types';
 import { CandidateDetailPage } from './CandidateDetailPage';
+import { SwipeHint } from '@/components/feed/SwipeHint';
 
 // Shared by the gesture and by the band that previews its outcome, so the
 // colour reaches full strength exactly where the decision tips over.
@@ -185,7 +185,7 @@ export function RecruiterFeedPage({
     <div className="mx-auto mt-5 flex w-full max-w-xl flex-col gap-4 md:mx-0 md:mt-0">
       <h1 className="sr-only">Candidats</h1>
 
-      <FeedFilterBar filters={filters} onChange={setFilters} resultCount={deck.length} />
+      <RecruiterFilterBar filters={filters} onChange={setFilters} resultCount={deck.length} />
 
       <section
         ref={deckRef}
@@ -235,7 +235,10 @@ export function RecruiterFeedPage({
         ) : (
           <EmptyDeck
             reason={reason}
+            title={emptyDeckTitle(reason)}
+            itemPlural="candidats"
             likedCount={liked}
+            likedLabel={likedCountLabel}
             onResetFilters={() => setFilters(emptyFeedFilters)}
           />
         )}

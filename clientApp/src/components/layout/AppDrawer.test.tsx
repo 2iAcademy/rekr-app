@@ -49,10 +49,10 @@ describe('AppDrawer', () => {
     expect(feedLinks()[0]).toHaveAttribute('href', '/recruteur/candidats');
   });
 
-  it('laisse le candidat sur l’accueil tant que son feed n’existe pas', () => {
+  it('envoie le candidat sur le feed offres', () => {
     renderDrawer('candidate');
 
-    expect(feedLinks()[0]).toHaveAttribute('href', '/');
+    expect(feedLinks()[0]).toHaveAttribute('href', '/candidat/offres');
   });
 
   it('ouvre le menu mobile sur la même destination', async () => {
