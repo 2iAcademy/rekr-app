@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AuthProvider } from '@/features/auth/AuthProvider';
@@ -156,7 +156,7 @@ describe('accès au détail d’un candidat', () => {
         await screen.findByRole('heading', { level: 1, name: 'Candidats' }),
       ).toBeInTheDocument();
       expect(profileHeading()).not.toBeInTheDocument();
-      expect(profileParam(router)).toBeNull();
+      await waitFor(() => expect(profileParam(router)).toBeNull());
     },
   );
 
@@ -165,7 +165,7 @@ describe('accès au détail d’un candidat', () => {
     const { router } = renderAt('/recruteur/candidats?profil=999');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
-    expect(profileParam(router)).toBeNull();
+    await waitFor(() => expect(profileParam(router)).toBeNull());
   });
 
   it('normalise un identifiant écrit sous une forme non canonique', async () => {
@@ -175,7 +175,7 @@ describe('accès au détail d’un candidat', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Léa Bonnet · 31 ans' }),
     ).toBeInTheDocument();
-    expect(profileParam(router)).toBe('7');
+    await waitFor(() => expect(profileParam(router)).toBe('7'));
   });
 
   it('laisse intacte l’URL d’un identifiant déjà canonique', async () => {
@@ -194,18 +194,14 @@ describe('accès au détail d’un candidat', () => {
     const { locations } = renderAt('/recruteur/candidats?profil=007');
 
     await screen.findByRole('heading', { level: 1, name: 'Léa Bonnet · 31 ans' });
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(locations).toEqual(['/recruteur/candidats?profil=7']);
+    await waitFor(() => expect(locations).toEqual(['/recruteur/candidats?profil=7']));
   });
 
   it('ne réécrit pas l’URL d’un visiteur qui est redirigé', async () => {
     const { locations } = renderAt('/recruteur/candidats?profil=abc');
 
     expect(await screen.findByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
-    expect(locations).toEqual(['/connexion']);
+    await waitFor(() => expect(locations).toEqual(['/connexion']));
   });
 
   it('ne laisse pas d’entrée d’historique en corrigeant l’URL', async () => {
