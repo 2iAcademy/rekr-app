@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from 'react-router';
+import { isCandidate } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
 import { CandidateFeedPage } from './pages/CandidateFeedPage';
 
@@ -14,7 +15,7 @@ export function CandidateFeedRoute() {
     return <Navigate to="/connexion" replace />;
   }
 
-  if (user?.userType !== 'candidate') {
+  if (!isCandidate(user?.userType)) {
     return <Navigate to="/" replace />;
   }
 

@@ -1,8 +1,8 @@
 import { createBrowserRouter, Navigate } from 'react-router';
-import { AppDrawer } from '@/components/layout/AppDrawer';
+import { AppShell } from '@/components/layout/AppShell';
 import { CandidateOnboardingRoute } from '@/features/candidate-onboarding/routes';
 import { CandidateFeedRoute } from '@/features/candidate-feed/routes';
-import { MatchesRoute } from '@/features/matches/routes';
+import { MatchRoute, MatchesRoute } from '@/features/matches/routes';
 import {
   ForgotPasswordRoute,
   SigninRoute,
@@ -10,7 +10,6 @@ import {
   SplashRoute,
 } from '@/features/onboarding/routes';
 import { OfferDetailRoute } from '@/features/offers/routes';
-import { MatchRoute } from '@/features/matches/routes';
 import { ProfileRoute } from '@/features/profile/routes';
 import { RecruiterFeedRoute } from '@/features/recruiter-feed/routes';
 import { RecruiterOnboardingRoute } from '@/features/recruiter-onboarding/routes';
@@ -20,14 +19,14 @@ export const routes = [
   { path: '/inscription', element: <SignupRoute /> },
   { path: '/connexion', element: <SigninRoute /> },
   { path: '/mot-de-passe-oublie', element: <ForgotPasswordRoute /> },
-  { path: '/profil', element: <ProfileRoute /> },
   { path: '/offres/:id', element: <OfferDetailRoute /> },
   {
-    element: <AppDrawer />,
+    element: <AppShell />,
     children: [
       { path: '/matches', element: <MatchesRoute /> },
       { path: '/recruteur/candidats', element: <RecruiterFeedRoute /> },
       { path: '/candidat/offres', element: <CandidateFeedRoute /> },
+      { path: '/profil', element: <ProfileRoute /> },
     ],
   },
   { path: '/match', element: <MatchRoute /> },

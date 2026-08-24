@@ -43,8 +43,8 @@ interface RecruiterFeedPageProps {
  * its own, so the deck survives it: the route only turns `?profil=<id>` into the
  * three props above.
  *
- * Both states are rendered inside `AppDrawer`, which owns the `main` landmark,
- * the `data-role` palette and the page padding. Neither carries a visible page
+ * Both states are rendered inside `AppShell`, which owns the `main` landmark,
+ * the page padding, and the `data-role` palette on its outermost element. Neither carries a visible page
  * header of its own: the maquette's top bar and side navigation are the shell's,
  * and the violet banner it does show belongs to the candidate card. The screen
  * reader heading below keeps the document outline intact.

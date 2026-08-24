@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
+import { isRecruiter } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
 import { RecruiterFeedPage } from '@/features/recruiter-feed/pages/RecruiterFeedPage';
 
@@ -32,7 +33,7 @@ export function RecruiterFeedRoute() {
   // absent one is already canonical since both sides are then `null`.
   const canonicalProfile = openCandidateId === null ? null : String(openCandidateId);
   const isProfileCanonical = rawProfile === canonicalProfile;
-  const isRecruiter = status === 'authenticated' && user?.userType === 'recruiter';
+  const recruiter = status === 'authenticated' && isRecruiter(user?.userType);
 
   // Declared above the redirects below so the hook is always called, and guarded
   // inside rather than around: rewriting the search params of a visitor who is
@@ -41,7 +42,7 @@ export function RecruiterFeedRoute() {
   // Writing the canonical form makes the guard true on the next run, so the
   // effect corrects the URL once and then stays idle however often it re-runs.
   useEffect(() => {
-    if (!isRecruiter || isProfileCanonical) {
+    if (!recruiter || isProfileCanonical) {
       return;
     }
 
@@ -61,7 +62,7 @@ export function RecruiterFeedRoute() {
       // should have to walk back through.
       { replace: true },
     );
-  }, [canonicalProfile, isProfileCanonical, isRecruiter, setSearchParams]);
+  }, [canonicalProfile, isProfileCanonical, recruiter, setSearchParams]);
 
   if (status === 'loading') {
     return null;
@@ -71,7 +72,7 @@ export function RecruiterFeedRoute() {
     return <Navigate to="/connexion" replace />;
   }
 
-  if (user?.userType !== 'recruiter') {
+  if (!isRecruiter(user?.userType)) {
     return <Navigate to="/" replace />;
   }
 
