@@ -7,6 +7,7 @@ import { Prisma } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
 import { resolveTagIds } from '../common/tags/tag-sync';
 import { PrismaService } from '../prisma/prisma.service';
+import { CompanyResponseDto } from './dto/company-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 
@@ -55,6 +56,71 @@ export class CompanyService {
 
       return company;
     });
+  }
+
+  /**
+   * Reads the company of the caller, resolved through their recruiter profile.
+   * No request ever names the company it reads, so there is nothing to forge —
+   * the same property `updateMine` and the file slots rely on.
+   *
+   * The columns are spelled out instead of relying on a bare `findUnique`: this
+   * is the row the account screen renders, and a column added to `company`
+   * later must not reach a client just because it was added.
+   */
+  async findMine(userId: number): Promise<CompanyResponseDto> {
+    const profile = await this.prisma.recruiterProfile.findUnique({
+      where: { userId },
+      select: {
+        firstName: true,
+        lastName: true,
+        jobTitle: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            size: true,
+            sectorId: true,
+            description: true,
+            siteUrl: true,
+            coverImage: true,
+            city: true,
+            postalCode: true,
+            latitude: true,
+            longitude: true,
+            createdAt: true,
+            updatedAt: true,
+            // Filtered on the category rather than trusting the writer:
+            // `syncBenefits` is the only writer today, but `company_tag` is a
+            // plain pivot on the shared dictionary and nothing in the schema
+            // stops another category from being linked.
+            companyTags: {
+              where: { tag: { category: 'benefit' } },
+              orderBy: { tag: { label: 'asc' } },
+              select: { tag: { select: { label: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Recruiter has no company');
+    }
+
+    const { companyTags, latitude, longitude, ...company } = profile.company;
+
+    return {
+      ...company,
+      latitude: latitude?.toString() ?? null,
+      longitude: longitude?.toString() ?? null,
+      benefits: companyTags.map((link) => link.tag.label),
+      recruiter: {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        jobTitle: profile.jobTitle,
+      },
+    };
   }
 
   async updateMine(userId: number, dto: UpdateCompanyDto) {

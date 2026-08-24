@@ -1,7 +1,9 @@
 import { Navigate } from 'react-router';
-import { userTypeLabel } from '@/domain/userType';
+import { isRecruiter, userTypeLabel } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
-import { ProfilePage } from '@/features/profile/pages/ProfilePage';
+import { AccountPage } from '@/features/profile/pages/AccountPage';
+import { CandidateAccountSection } from '@/features/profile/sections/CandidateAccountSection';
+import { RecruiterAccountSection } from '@/features/profile/sections/RecruiterAccountSection';
 
 export function ProfileRoute() {
   const { status, user } = useAuth();
@@ -16,5 +18,11 @@ export function ProfileRoute() {
     return <Navigate to="/connexion" replace />;
   }
 
-  return <ProfilePage email={user.email} roleLabel={userTypeLabel(user.userType)} />;
+  return (
+    <AccountPage email={user.email} roleLabel={userTypeLabel(user.userType)}>
+      {/* `isRecruiter` treats an unknown user type as a candidate, matching
+          `userTypeLabel`: an unrecognised session lands on the narrower half. */}
+      {isRecruiter(user.userType) ? <RecruiterAccountSection /> : <CandidateAccountSection />}
+    </AccountPage>
+  );
 }
