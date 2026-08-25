@@ -1,10 +1,8 @@
-import type { ContractType, ExperienceLevel, RemotePolicy } from '@/domain/enums';
-import {
-  CONTRACT_TYPE_OPTIONS,
-  EXPERIENCE_LEVEL_OPTIONS,
-  REMOTE_POLICY_OPTIONS,
-} from '@/domain/options';
-import type { EmptyReason } from './deck';
+import type { ExperienceLevel, RemotePolicy } from '@/domain/enums';
+import { EXPERIENCE_LEVEL_OPTIONS, REMOTE_POLICY_OPTIONS } from '@/domain/options';
+import type { EmptyReason } from '@/components/feed/deck';
+
+export { contractLabel, metaLine } from '@/components/feed/labels';
 import type { FeedCandidate } from './types';
 
 // Read from the shared option lists so a wording fixed for the forms is fixed
@@ -16,8 +14,6 @@ const labelOf = <T extends string>(
 
 export const experienceLabel = (level: ExperienceLevel): string =>
   labelOf(EXPERIENCE_LEVEL_OPTIONS, level);
-
-export const contractLabel = (type: ContractType): string => labelOf(CONTRACT_TYPE_OPTIONS, type);
 
 export const remoteLabel = (policy: RemotePolicy): string => labelOf(REMOTE_POLICY_OPTIONS, policy);
 
@@ -117,12 +113,6 @@ export const salaryWishLabel = (min: number | null, max: number | null): string 
   return `Souhaite ${amount.charAt(0).toLowerCase()}${amount.slice(1)}`;
 };
 
-export const metaLine = (parts: readonly (string | null | undefined)[]): string =>
-  parts
-    .map((part) => part?.trim())
-    .filter((part): part is string => Boolean(part))
-    .join(' · ');
-
 // Zero is a state, not a quantity: "0 profil liké" reads like a scoreboard.
 export const likedCountLabel = (count: number): string => {
   if (count === 0) {
@@ -132,7 +122,5 @@ export const likedCountLabel = (count: number): string => {
   return count === 1 ? '1 profil liké' : `${count} profils likés`;
 };
 
-// Shared with the deck's live region, so the announcement says the very words
-// the empty state puts on screen.
 export const emptyDeckTitle = (reason: EmptyReason): string =>
   reason === 'no-match' ? 'Aucun profil ne passe vos filtres' : 'Vous avez vu tous les profils';

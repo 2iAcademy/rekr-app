@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router';
 import { AppDrawer } from '@/components/layout/AppDrawer';
 import { CandidateOnboardingRoute } from '@/features/candidate-onboarding/routes';
+import { CandidateFeedRoute } from '@/features/candidate-feed/routes';
 import { MatchesRoute } from '@/features/matches/routes';
 import {
   ForgotPasswordRoute,
@@ -26,6 +27,7 @@ export const routes = [
     children: [
       { path: '/matches', element: <MatchesRoute /> },
       { path: '/recruteur/candidats', element: <RecruiterFeedRoute /> },
+      { path: '/candidat/offres', element: <CandidateFeedRoute /> },
     ],
   },
   { path: '/match', element: <MatchRoute /> },

@@ -1,23 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { CandidateCard } from '../components/CandidateCard';
-import { EmptyDeck } from '../components/EmptyDeck';
-import { FeedActions } from '../components/FeedActions';
-import { FeedFilterBar } from '../components/FeedFilterBar';
-import { SwipeHint } from '../components/SwipeHint';
+import { EmptyDeck } from '@/components/feed/EmptyDeck';
+import { FeedActions } from '@/components/feed/FeedActions';
+import { RecruiterFilterBar } from '../components/RecruiterFilterBar';
 import {
   emptyReason,
   likedCount,
   noDecisions,
   recordDecision,
-  remainingCandidates,
   type Decision,
-} from '../deck';
-import { emptyDeckTitle, nameWithAge } from '../labels';
+} from '@/components/feed/deck';
+import { remainingCandidates } from '../deck';
+import { emptyDeckTitle, likedCountLabel, nameWithAge } from '../labels';
 import { mockFeedCandidates } from '../mocks';
-import { useCardSwipe } from '../useCardSwipe';
+import { useCardSwipe } from '@/hooks/useCardSwipe';
+import { useDeckKeyboard } from '@/hooks/useDeckKeyboard';
 import { emptyFeedFilters, type FeedCandidate, type FeedFilters } from '../types';
 import { CandidateDetailPage } from './CandidateDetailPage';
+import { SwipeHint } from '@/components/feed/SwipeHint';
 
 // Shared by the gesture and by the band that previews its outcome, so the
 // colour reaches full strength exactly where the decision tips over.
@@ -96,6 +97,12 @@ export function RecruiterFeedPage({
     disabled: !current,
   });
 
+  useDeckKeyboard({
+    deckRef,
+    onDecision: decide,
+    disabled: isDetailOpen || !current,
+  });
+
   // An identifier pointing at nobody would otherwise leave the URL claiming a
   // screen the recruiter cannot see.
   useEffect(() => {
@@ -117,54 +124,6 @@ export function RecruiterFeedPage({
     wasDetailOpen.current = isDetailOpen;
   }, [isDetailOpen]);
 
-  /**
-   * Arrow keys are bound on the window so the shortcut works without tabbing
-   * into the deck first. They only fire while no control holds the focus,
-   * otherwise a recruiter walking the filter chips would decide a profile
-   * without seeing it.
-   *
-   * They are disarmed entirely while the detail screen is up: the deck is
-   * unmounted there, so the guard below would read the focus as idle and decide
-   * the head of the deck — which is not necessarily the profile on screen.
-   */
-  useEffect(() => {
-    if (isDetailOpen) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (
-        event.defaultPrevented ||
-        event.repeat ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey
-      ) {
-        return;
-      }
-
-      const target = event.target;
-      const focusIsIdle = target === document.body || target === document.documentElement;
-      const focusIsInDeck = target instanceof Node && deckRef.current?.contains(target) === true;
-
-      if (!focusIsIdle && !focusIsInDeck) {
-        return;
-      }
-
-      if (event.key === 'ArrowLeft') {
-        decide('passed');
-      }
-
-      if (event.key === 'ArrowRight') {
-        decide('liked');
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [decide, isDetailOpen]);
-
   if (openCandidate !== null) {
     const decideAndClose = (decision: Decision): void => {
       decide(decision, openCandidate);
@@ -185,7 +144,7 @@ export function RecruiterFeedPage({
     <div className="mx-auto mt-5 flex w-full max-w-xl flex-col gap-4 md:mx-0 md:mt-0">
       <h1 className="sr-only">Candidats</h1>
 
-      <FeedFilterBar filters={filters} onChange={setFilters} resultCount={deck.length} />
+      <RecruiterFilterBar filters={filters} onChange={setFilters} resultCount={deck.length} />
 
       <section
         ref={deckRef}
@@ -235,7 +194,10 @@ export function RecruiterFeedPage({
         ) : (
           <EmptyDeck
             reason={reason}
+            title={emptyDeckTitle(reason)}
+            itemPlural="candidats"
             likedCount={liked}
+            likedLabel={likedCountLabel}
             onResetFilters={() => setFilters(emptyFeedFilters)}
           />
         )}

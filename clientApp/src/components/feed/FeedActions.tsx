@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 interface FeedActionsProps {
   onPass: () => void;
   onLike: () => void;
+  subject?: 'profil' | 'offre';
 }
 
 const circle =
@@ -11,23 +12,13 @@ const circle =
 
 const caption = 'text-xs text-ink-muted';
 
-/**
- * Both circles share one diameter: the maquette's 56/48/64 hierarchy only held
- * with the detail button between them, and the coral fill carries the emphasis
- * on its own.
- *
- * Each circle carries its name on `aria-label` and repeats it in lowercase
- * underneath, hidden from assistive tech: the visible word stays a substring of
- * the accessible name, so voice control still reaches the button (WCAG 2.5.3).
- *
- * There is no third circle for the detail: the card already exposes it through
- * `Voir le profil`, and two controls for one panel is one too many.
- */
-export function FeedActions({ onPass, onLike }: FeedActionsProps) {
+export function FeedActions({ onPass, onLike, subject = 'profil' }: FeedActionsProps) {
+  const groupLabel = subject === 'offre' ? "Décision sur l'offre" : 'Décision sur le profil';
+
   return (
     <div
       role="group"
-      aria-label="Décision sur le profil"
+      aria-label={groupLabel}
       className="flex items-center justify-center gap-10 sm:gap-12"
     >
       <span className="flex flex-col items-center gap-1.5">
