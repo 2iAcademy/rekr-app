@@ -1,5 +1,5 @@
 import { SKILL_CHIP } from '@/components/ui/chip-variants';
-import { contractLabel, metaLine } from '@/features/recruiter-feed/labels';
+import { contractLabel, metaLine } from '@/components/feed/labels';
 import { FeedCard } from '@/components/feed/FeedCard';
 import { offerSalaryLabel } from '../labels';
 import type { FeedOffer } from '../types';

@@ -150,22 +150,26 @@ describe('accès au détail d’un candidat', () => {
     'ignore un paramètre de profil invalide et le retire de l’URL (%j)',
     async (raw) => {
       authenticateAs('recruiter');
-      const { router } = renderAt(`/recruteur/candidats?profil=${encodeURIComponent(raw)}`);
+      const { router, locations } = renderAt(
+        `/recruteur/candidats?profil=${encodeURIComponent(raw)}`,
+      );
 
       expect(
         await screen.findByRole('heading', { level: 1, name: 'Candidats' }),
       ).toBeInTheDocument();
       expect(profileHeading()).not.toBeInTheDocument();
-      await waitFor(() => expect(profileParam(router)).toBeNull());
+      await waitFor(() => expect(locations).toEqual(['/recruteur/candidats']));
+      expect(profileParam(router)).toBeNull();
     },
   );
 
   it('retire de l’URL un identifiant bien formé mais inconnu', async () => {
     authenticateAs('recruiter');
-    const { router } = renderAt('/recruteur/candidats?profil=999');
+    const { router, locations } = renderAt('/recruteur/candidats?profil=999');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
-    await waitFor(() => expect(profileParam(router)).toBeNull());
+    await waitFor(() => expect(locations).toEqual(['/recruteur/candidats']));
+    expect(profileParam(router)).toBeNull();
   });
 
   it('normalise un identifiant écrit sous une forme non canonique', async () => {

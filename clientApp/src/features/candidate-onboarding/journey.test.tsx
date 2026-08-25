@@ -152,7 +152,7 @@ describe('parcours candidat de bout en bout', () => {
       languages: ['Anglais'],
       bio: 'Je construis des interfaces qui respectent leurs utilisateurs.',
     });
-  }, 30_000);
+  });
 
   // The profile was created by the first attempt, so the replayed call gets the
   // 409 the real backend raises. The wizard has to fall back to the update —

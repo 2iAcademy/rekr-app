@@ -34,7 +34,7 @@ export const EmptyDeck = ({
         <p className="max-w-xs text-sm leading-relaxed text-ink-muted">
           {filtered
             ? `Élargissez vos critères pour revoir des ${itemPlural}.`
-            : `Revenez plus tard, de nouvelles ${itemPlural} arrivent chaque jour.`}
+            : `Revenez plus tard, la liste des ${itemPlural} se met à jour chaque jour.`}
         </p>
       </div>
 

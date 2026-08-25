@@ -1,5 +1,5 @@
 import { Heart, X } from 'lucide-react';
-import { swipeDirection, swipeProgress } from './swipeHint';
+import { swipeDirection, swipeProgress } from './swipeGesture';
 
 interface SwipeHintProps {
   offset: number;

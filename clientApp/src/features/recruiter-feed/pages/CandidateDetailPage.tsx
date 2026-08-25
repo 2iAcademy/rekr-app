@@ -5,11 +5,10 @@ import { SKILL_CHIP, TAG_CHIP } from '@/components/ui/chip-variants';
 import { fileUrl } from '@/lib/fileUrl';
 import { CandidateAvatar } from '../components/CandidateAvatar';
 import { ChipList } from '@/components/feed/ChipList';
+import { contractLabel, metaLine } from '@/components/feed/labels';
 import {
   availabilityLabel,
-  contractLabel,
   experienceLabel,
-  metaLine,
   mobilityLabel,
   nameWithAge,
   remoteLabel,

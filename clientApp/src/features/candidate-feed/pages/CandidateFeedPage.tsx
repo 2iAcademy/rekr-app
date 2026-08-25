@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { EmptyDeck } from '@/components/feed/EmptyDeck';
 import { FeedActions } from '@/components/feed/FeedActions';
@@ -10,8 +10,9 @@ import {
   recordDecision,
   remainingItems,
   type Decision,
-} from '@/features/recruiter-feed/deck';
+} from '@/components/feed/deck';
 import { useCardSwipe } from '@/hooks/useCardSwipe';
+import { useDeckKeyboard } from '@/hooks/useDeckKeyboard';
 import { matchesOfferFilters } from '../filters';
 import { likedOfferCountLabel, offerDeckTitle } from '../labels';
 import { mockFeedOffers } from '../mocks';
@@ -62,39 +63,11 @@ export function CandidateFeedPage({
     disabled: !current,
   });
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (
-        event.defaultPrevented ||
-        event.repeat ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey
-      ) {
-        return;
-      }
-
-      const target = event.target;
-      const focusIsIdle = target === document.body || target === document.documentElement;
-      const focusIsInDeck = target instanceof Node && deckRef.current?.contains(target) === true;
-
-      if (!focusIsIdle && !focusIsInDeck) {
-        return;
-      }
-
-      if (event.key === 'ArrowLeft') {
-        decide('passed');
-      }
-
-      if (event.key === 'ArrowRight') {
-        decide('liked');
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [decide]);
+  useDeckKeyboard({
+    deckRef,
+    onDecision: decide,
+    disabled: !current,
+  });
 
   return (
     <div className="mx-auto mt-5 flex w-full max-w-xl flex-col gap-4 md:mx-0 md:mt-0">

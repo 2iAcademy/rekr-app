@@ -1,4 +1,4 @@
-import type { EmptyReason } from '@/features/recruiter-feed/deck';
+import type { EmptyReason } from '@/components/feed/deck';
 
 const thousands = (amount: number): number => Math.round(amount / 1000);
 

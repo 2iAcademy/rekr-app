@@ -5,7 +5,6 @@ export interface FeedOffer {
   title: string;
   companyName: string;
   companyLogoUrl: string | null;
-  companySize: string | null;
   city: string | null;
   contractType: ContractType;
   remotePolicy: RemotePolicy;

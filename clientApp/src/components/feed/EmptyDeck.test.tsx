@@ -47,6 +47,9 @@ describe('EmptyDeck', () => {
       screen.getByRole('heading', { level: 2, name: 'Vous avez vu tous les profils' }),
     ).toBeInTheDocument();
     expect(screen.getByText('3 profils likés')).toBeInTheDocument();
+    expect(
+      screen.getByText('Revenez plus tard, la liste des candidats se met à jour chaque jour.'),
+    ).toBeInTheDocument();
   });
 
   it('n’offre pas de réinitialisation sur un deck épuisé', () => {

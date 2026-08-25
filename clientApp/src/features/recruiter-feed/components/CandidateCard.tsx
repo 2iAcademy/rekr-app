@@ -1,11 +1,6 @@
+import { metaLine } from '@/components/feed/labels';
 import { SKILL_CHIP } from '@/components/ui/chip-variants';
-import {
-  availabilityLabel,
-  experienceLabel,
-  metaLine,
-  nameWithAge,
-  salaryWishLabel,
-} from '../labels';
+import { availabilityLabel, experienceLabel, nameWithAge, salaryWishLabel } from '../labels';
 import type { FeedCandidate } from '../types';
 import { FeedCard } from '@/components/feed/FeedCard';
 

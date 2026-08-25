@@ -9,12 +9,13 @@ import {
   likedCount,
   noDecisions,
   recordDecision,
-  remainingCandidates,
   type Decision,
-} from '../deck';
+} from '@/components/feed/deck';
+import { remainingCandidates } from '../deck';
 import { emptyDeckTitle, likedCountLabel, nameWithAge } from '../labels';
 import { mockFeedCandidates } from '../mocks';
 import { useCardSwipe } from '@/hooks/useCardSwipe';
+import { useDeckKeyboard } from '@/hooks/useDeckKeyboard';
 import { emptyFeedFilters, type FeedCandidate, type FeedFilters } from '../types';
 import { CandidateDetailPage } from './CandidateDetailPage';
 import { SwipeHint } from '@/components/feed/SwipeHint';
@@ -96,6 +97,12 @@ export function RecruiterFeedPage({
     disabled: !current,
   });
 
+  useDeckKeyboard({
+    deckRef,
+    onDecision: decide,
+    disabled: isDetailOpen || !current,
+  });
+
   // An identifier pointing at nobody would otherwise leave the URL claiming a
   // screen the recruiter cannot see.
   useEffect(() => {
@@ -116,54 +123,6 @@ export function RecruiterFeedPage({
 
     wasDetailOpen.current = isDetailOpen;
   }, [isDetailOpen]);
-
-  /**
-   * Arrow keys are bound on the window so the shortcut works without tabbing
-   * into the deck first. They only fire while no control holds the focus,
-   * otherwise a recruiter walking the filter chips would decide a profile
-   * without seeing it.
-   *
-   * They are disarmed entirely while the detail screen is up: the deck is
-   * unmounted there, so the guard below would read the focus as idle and decide
-   * the head of the deck — which is not necessarily the profile on screen.
-   */
-  useEffect(() => {
-    if (isDetailOpen) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (
-        event.defaultPrevented ||
-        event.repeat ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey
-      ) {
-        return;
-      }
-
-      const target = event.target;
-      const focusIsIdle = target === document.body || target === document.documentElement;
-      const focusIsInDeck = target instanceof Node && deckRef.current?.contains(target) === true;
-
-      if (!focusIsIdle && !focusIsInDeck) {
-        return;
-      }
-
-      if (event.key === 'ArrowLeft') {
-        decide('passed');
-      }
-
-      if (event.key === 'ArrowRight') {
-        decide('liked');
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [decide, isDetailOpen]);
 
   if (openCandidate !== null) {
     const decideAndClose = (decision: Decision): void => {

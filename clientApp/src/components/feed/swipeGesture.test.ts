@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { swipeDirection, swipeProgress } from './swipeHint';
+import { swipeDirection, swipeProgress } from './swipeGesture';
 
 describe('swipeDirection', () => {
   it('associe la droite au like et la gauche au rejet', () => {

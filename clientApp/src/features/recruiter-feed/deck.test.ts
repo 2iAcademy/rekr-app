@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { emptyReason, likedCount, noDecisions, recordDecision, remainingCandidates } from './deck';
-import type { DeckDecisions } from './deck';
+import {
+  emptyReason,
+  likedCount,
+  noDecisions,
+  recordDecision,
+  type DeckDecisions,
+} from '@/components/feed/deck';
+import { remainingCandidates } from './deck';
 import { mockFeedCandidates } from './mocks';
 import { emptyFeedFilters } from './types';
 import type { FeedFilters } from './types';
