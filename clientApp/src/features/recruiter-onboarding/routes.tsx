@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from 'react-router';
+import { isRecruiter } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
 import { RecruiterOnboardingPage } from './RecruiterOnboardingPage';
 
@@ -16,7 +17,7 @@ export function RecruiterOnboardingRoute() {
     return <Navigate to="/connexion" replace />;
   }
 
-  if (user?.userType !== 'recruiter') {
+  if (!isRecruiter(user?.userType)) {
     return <Navigate to="/" replace />;
   }
 

@@ -1,16 +1,20 @@
 import { Navigate } from 'react-router';
+import { userTypeLabel } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
+import { ProfilePage } from '@/features/profile/pages/ProfilePage';
 
 export function ProfileRoute() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
 
   if (status === 'loading') {
     return null;
   }
 
-  if (status !== 'authenticated') {
+  // A session without a user is no session: folding it into the guard narrows
+  // `user` for the page below without a non-null assertion.
+  if (status !== 'authenticated' || user === null) {
     return <Navigate to="/connexion" replace />;
   }
-  //To be developed in the future, for now we redirect to matches page
-  return <Navigate to={'/matches'} replace />;
+
+  return <ProfilePage email={user.email} roleLabel={userTypeLabel(user.userType)} />;
 }

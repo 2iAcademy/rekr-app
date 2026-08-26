@@ -97,7 +97,7 @@ describe('CandidateDetailPage — identité', () => {
     expect(screen.getByText('C')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  // La palette et le landmark `main` appartiennent à `AppDrawer`, qui enveloppe
+  // La palette et le landmark `main` appartiennent à `AppShell`, qui enveloppe
   // le feed : un `main` ici en imbriquerait deux.
   it('s’insère dans le shell sans réclamer le landmark principal', () => {
     renderPage();

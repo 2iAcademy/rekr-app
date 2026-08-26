@@ -111,8 +111,8 @@ export function CandidateDetailPage({
   const bio = candidate.bio.trim();
   const jobTitle = candidate.desiredJobTitle.trim();
 
-  // A named `section` rather than a `main`: `AppDrawer` already owns the page's
-  // `main` landmark and its `data-role` palette. Named, it is still a landmark,
+  // A named `section` rather than a `main`: `AppShell` already owns the page's
+  // `main` landmark and the `data-role` palette that scopes it. Named, it is still a landmark,
   // so focusing it announces whose profile is on screen.
   return (
     <section
