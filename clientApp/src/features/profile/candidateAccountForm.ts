@@ -184,7 +184,7 @@ export const buildCandidateAccountPayload = (form: CandidateAccountForm): Candid
     linkedinUrl: form.linkedinUrl.trim(),
   });
 
-export type CandidateAccountField = 'firstName' | 'lastName' | 'city';
+export type CandidateAccountField = 'firstName' | 'lastName' | 'city' | 'contractTypes';
 
 export interface CandidateAccountInvalidField {
   field: CandidateAccountField;
@@ -211,6 +211,19 @@ export const firstInvalidCandidateField = (
 
   if (form.city.trim() === '' || form.postalCode.trim() === '') {
     return { field: 'city', message: 'Choisissez votre commune dans la liste.' };
+  }
+
+  /**
+   * Required here as it is in the onboarding wizard, which the account screen
+   * had let drift: a candidate could empty the list from this form alone. It
+   * decides which offers reach their deck, and an empty list would leave them
+   * with a feed shaped by nothing.
+   */
+  if (form.contractTypes.length === 0) {
+    return {
+      field: 'contractTypes',
+      message: 'Choisissez au moins un type de contrat.',
+    };
   }
 
   return null;

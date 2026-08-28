@@ -93,9 +93,22 @@ const renderSection = () =>
     </MemoryRouter>,
   );
 
+/**
+ * The screen is folded into sections, and a folded panel is inert — its fields
+ * are out of reach for a screen reader and for these specs alike. Most cases
+ * are about the form, not about the folding, so they start with everything
+ * open; the folding itself is asserted on its own below.
+ */
+const openEverySection = async (user: ReturnType<typeof userEvent.setup>) => {
+  for (const section of screen.getAllByRole('button', { expanded: false })) {
+    await user.click(section);
+  }
+};
+
 const renderLoaded = async () => {
   const rendered = renderSection();
   await screen.findByLabelText('Nom de la société');
+  await openEverySection(userEvent.setup());
 
   return rendered;
 };
@@ -141,6 +154,25 @@ describe('RecruiterAccountSection', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Chargement de vos informations…');
 
     await screen.findByLabelText('Nom de la société');
+  });
+
+  /**
+   * Le formulaire faisait onze champs à la suite : il fallait le parcourir en
+   * entier pour atteindre le bouton d'enregistrement. Replié, il s'ouvre sur
+   * l'identité et laisse le reste de côté.
+   */
+  it('n’ouvre que la première section à l’arrivée', async () => {
+    renderSection();
+    await screen.findByLabelText('Nom de la société');
+
+    expect(screen.getByRole('button', { name: 'Mon identité' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Ma société' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
   });
 
   it('affiche l’identité du recruteur et les informations de la société', async () => {

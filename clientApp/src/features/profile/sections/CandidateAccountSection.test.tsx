@@ -103,11 +103,26 @@ const renderSection = () =>
     </>,
   );
 
+/**
+ * The screen is folded into sections, and a folded panel is inert — its fields
+ * are out of reach for a screen reader and for these specs alike. Most cases
+ * are about the form, not about the folding, so they start with everything
+ * open; the folding itself is asserted on its own below.
+ */
+const openEverySection = async () => {
+  const user = userEvent.setup();
+
+  for (const section of screen.getAllByRole('button', { expanded: false })) {
+    await user.click(section);
+  }
+};
+
 const renderLoaded = async (dto: CandidateProfileResponseDto = profile()) => {
   findMine.mockResolvedValue(found(dto));
   renderSection();
 
   await screen.findByLabelText('Prénom');
+  await openEverySection();
 };
 
 const saveButton = () => screen.getByRole('button', { name: 'Enregistrer' });
@@ -142,6 +157,27 @@ describe('CandidateAccountSection', () => {
   });
 
   describe('chargement', () => {
+    /**
+     * Le formulaire faisait dix-neuf blocs à la suite. Replié en quatre sections,
+     * il s'ouvre sur l'identité et laisse le reste de côté.
+     */
+    it('n’ouvre que la première section à l’arrivée', async () => {
+      findMine.mockResolvedValue(found(profile()));
+      renderSection();
+      await screen.findByLabelText('Prénom');
+
+      expect(screen.getByRole('button', { name: 'Identité et documents' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+      for (const title of ['Mon projet', 'Mes préférences', 'Ma vitrine']) {
+        expect(screen.getByRole('button', { name: title })).toHaveAttribute(
+          'aria-expanded',
+          'false',
+        );
+      }
+    });
+
     it('annonce le chargement au lieu d’un écran vide', () => {
       findMine.mockReturnValue(pending());
       renderSection();
@@ -756,5 +792,25 @@ describe('CandidateAccountSection', () => {
     await renderLoaded();
 
     expect(screen.queryByRole('main')).not.toBeInTheDocument();
+  });
+  /**
+   * Exigé à l'inscription, la fiche de compte l'avait laissé filer : on pouvait
+   * vider la liste depuis ce formulaire seul. Elle décide des offres qui
+   * arrivent dans le deck, donc une liste vide laisserait un feed façonné par
+   * rien.
+   */
+  it('refuse d’enregistrer sans aucun type de contrat', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    for (const chip of screen.getAllByRole('checkbox', { checked: true })) {
+      await user.click(chip);
+    }
+    await user.click(saveButton());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Choisissez au moins un type de contrat.',
+    );
+    expect(update).not.toHaveBeenCalled();
   });
 });
