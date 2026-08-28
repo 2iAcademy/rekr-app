@@ -16,15 +16,14 @@ export function SplashRoute() {
 
 export function SignupRoute() {
   const navigate = useNavigate();
-  return (
-    <SignupPage
-      onBack={() => navigate('/')}
-      onSignIn={() => navigate('/connexion')}
-      onSubmit={({ role }) => {
-        navigate(role === 'recruiter' ? '/recruteur/profil' : '/candidat/profil');
-      }}
-    />
-  );
+
+  /*
+   * No navigation on success: creating the account settles the session, and the
+   * `AnonymousOnly` layout above sends it wherever it belongs — the matching
+   * wizard for a brand-new account. Steering from here would mean deciding the
+   * destination from the radio button rather than from what the server answered.
+   */
+  return <SignupPage onBack={() => navigate('/')} onSignIn={() => navigate('/connexion')} />;
 }
 
 export function SigninRoute() {
@@ -34,7 +33,6 @@ export function SigninRoute() {
       onBack={() => navigate('/')}
       onSignUp={() => navigate('/inscription')}
       onForgotPassword={() => navigate('/mot-de-passe-oublie')}
-      onSubmit={() => navigate('/')}
     />
   );
 }

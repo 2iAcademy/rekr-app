@@ -218,7 +218,7 @@ export function CandidateAccountSection() {
         {/* A plain anchor: the onboarding wizard lives outside the shell this
             section is mounted in, so there is no in-place navigation to keep. */}
         <a
-          href="/candidat/profil"
+          href="/candidat/onboarding"
           className="flex min-h-11 items-center rounded-xl bg-role-gradient px-5 text-sm font-semibold text-white focus-visible:ring-3 focus-visible:ring-role/40 focus-visible:outline-none"
         >
           Compléter mon profil

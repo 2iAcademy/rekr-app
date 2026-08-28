@@ -1,5 +1,8 @@
-import { createBrowserRouter, Navigate } from 'react-router';
+import { createBrowserRouter } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
+import { AnonymousOnly } from '@/features/auth/AnonymousOnly';
+import { HomeRedirect } from '@/features/auth/HomeRedirect';
+import { RequireOnboarding } from '@/features/auth/RequireOnboarding';
 import { CandidateOnboardingRoute } from '@/features/candidate-onboarding/routes';
 import { CandidateFeedRoute } from '@/features/candidate-feed/routes';
 import { MatchRoute, MatchesRoute } from '@/features/matches/routes';
@@ -16,30 +19,41 @@ import { OfferFormRoute, RecruiterOffersRoute } from '@/features/recruiter-offer
 import { RecruiterOnboardingRoute } from '@/features/recruiter-onboarding/routes';
 
 export const routes = [
-  { path: '/', element: <SplashRoute /> },
-  { path: '/inscription', element: <SignupRoute /> },
-  { path: '/connexion', element: <SigninRoute /> },
-  { path: '/mot-de-passe-oublie', element: <ForgotPasswordRoute /> },
-  { path: '/offres/:id', element: <OfferDetailRoute /> },
   {
-    element: <AppShell />,
+    element: <AnonymousOnly />,
     children: [
-      { path: '/matches', element: <MatchesRoute /> },
-      { path: '/recruteur/candidats', element: <RecruiterFeedRoute /> },
-      { path: '/recruteur/offres', element: <RecruiterOffersRoute /> },
-      // Declared before the dynamic sibling, which is where a reader looks
-      // for the answer; react-router ranks by specificity, so the order is a
-      // convention here rather than the thing that keeps them apart.
-      { path: '/recruteur/offres/nouvelle', element: <OfferFormRoute /> },
-      { path: '/recruteur/offres/:id/edition', element: <OfferFormRoute /> },
-      { path: '/candidat/offres', element: <CandidateFeedRoute /> },
-      { path: '/profil', element: <ProfileRoute /> },
+      { path: '/', element: <SplashRoute /> },
+      { path: '/inscription', element: <SignupRoute /> },
+      { path: '/connexion', element: <SigninRoute /> },
+      { path: '/mot-de-passe-oublie', element: <ForgotPasswordRoute /> },
     ],
   },
-  { path: '/match', element: <MatchRoute /> },
-  { path: '/candidat/profil', element: <CandidateOnboardingRoute /> },
-  { path: '/recruteur/profil', element: <RecruiterOnboardingRoute /> },
-  { path: '*', element: <Navigate to="/" replace /> },
+
+  /*
+   * Outside `RequireOnboarding`: these are the screens that resolve it. Inside,
+   * the gate would redirect to the wizard from the wizard.
+   */
+  { path: '/candidat/onboarding', element: <CandidateOnboardingRoute /> },
+  { path: '/recruteur/onboarding', element: <RecruiterOnboardingRoute /> },
+
+  {
+    element: <RequireOnboarding />,
+    children: [
+      { path: '/offres/:id', element: <OfferDetailRoute /> },
+      { path: '/match', element: <MatchRoute /> },
+      {
+        element: <AppShell />,
+        children: [
+          { path: '/matches', element: <MatchesRoute /> },
+          { path: '/recruteur/candidats', element: <RecruiterFeedRoute /> },
+          { path: '/candidat/offres', element: <CandidateFeedRoute /> },
+          { path: '/profil', element: <ProfileRoute /> },
+        ],
+      },
+    ],
+  },
+
+  { path: '*', element: <HomeRedirect /> },
 ];
 
 export const router = createBrowserRouter(routes);

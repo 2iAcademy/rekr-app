@@ -7,7 +7,12 @@ import { AppShell } from './AppShell';
 
 type UserType = 'candidate' | 'recruiter';
 
-const callbacks = () => ({ login: vi.fn(), signup: vi.fn(), logout: vi.fn() });
+const callbacks = () => ({
+  login: vi.fn(),
+  signup: vi.fn(),
+  logout: vi.fn(),
+  markProfileCompleted: vi.fn(),
+});
 
 /**
  * The session is injected through the context rather than `AuthProvider`: the
@@ -16,7 +21,14 @@ const callbacks = () => ({ login: vi.fn(), signup: vi.fn(), logout: vi.fn() });
  */
 const session = (userType: UserType): AuthContextValue => ({
   status: 'authenticated',
-  user: { id: 1, email: 'sacha@rekr.fr', role: 'user', userType, isActive: true },
+  user: {
+    id: 1,
+    email: 'sacha@rekr.fr',
+    role: 'user',
+    userType,
+    isActive: true,
+    hasProfile: true,
+  },
   ...callbacks(),
 });
 

@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from 'react-router';
+import { homePathFor } from '@/domain/homeRoute';
 import { isCandidate } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
 import { CandidateFeedPage } from './pages/CandidateFeedPage';
@@ -16,7 +17,7 @@ export function CandidateFeedRoute() {
   }
 
   if (!isCandidate(user?.userType)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={homePathFor(user)} replace />;
   }
 
   return <CandidateFeedPage onOpenOffer={(id) => navigate(`/offres/${id}`)} />;

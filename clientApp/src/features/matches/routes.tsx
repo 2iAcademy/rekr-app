@@ -1,5 +1,6 @@
 import { MatchesPage } from '@/features/matches/MatchesPage';
 import { Navigate, useLocation, useNavigate } from 'react-router';
+import { homePathFor } from '@/domain/homeRoute';
 import { useAuth } from '@/features/auth/useAuth';
 import { MatchPage } from '@/features/matches/pages/MatchPage';
 
@@ -45,8 +46,8 @@ export function MatchRoute() {
     <MatchPage
       currentUser={{ name: currentUserName }}
       matchedProfile={matchedProfile}
-      onContinue={() => navigate('/')}
-      onWriteMessage={() => navigate('/')}
+      onContinue={() => navigate(homePathFor(user))}
+      onWriteMessage={() => navigate(homePathFor(user))}
     />
   );
 }

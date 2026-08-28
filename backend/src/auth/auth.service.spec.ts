@@ -359,3 +359,151 @@ describe('AuthService.logout', () => {
     expect(refreshTokens.revokeById).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The session has to answer "where does this user belong?" on its own. Without
+ * it the client either sends everyone to the same screen — which is how a
+ * recruiter ends up on the public splash right after signing in — or pays an
+ * extra round trip on every boot to ask whether the onboarding is behind them.
+ */
+describe('AuthService — profile completion in the session', () => {
+  let service: AuthService;
+  let prisma: TestContext['prisma'];
+
+  const CANDIDATE = {
+    id: 42,
+    email: 'camille@rekr.fr',
+    passwordHash: 'hashed',
+    userType: 'candidate',
+    role: 'user',
+    isActive: true,
+  };
+
+  const RECRUITER = { ...CANDIDATE, id: 43, userType: 'recruiter' };
+
+  beforeEach(async () => {
+    compareMock.mockClear();
+    compareMock.mockResolvedValue(true);
+    ({ service, prisma } = await createTestContext());
+  });
+
+  it('reports a candidate who never finished the onboarding as profile-less', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...CANDIDATE,
+      candidateProfile: null,
+      recruiterProfile: null,
+    });
+
+    const session = await service.login(
+      { email: CANDIDATE.email, password: 'whatever' },
+      {},
+    );
+
+    expect(session.user.hasProfile).toBe(false);
+  });
+
+  it('reports a candidate who owns a profile as onboarded', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...CANDIDATE,
+      candidateProfile: { id: 7 },
+      recruiterProfile: null,
+    });
+
+    const session = await service.login(
+      { email: CANDIDATE.email, password: 'whatever' },
+      {},
+    );
+
+    expect(session.user.hasProfile).toBe(true);
+  });
+
+  it('reports a recruiter who owns a profile as onboarded', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...RECRUITER,
+      candidateProfile: null,
+      recruiterProfile: { id: 9 },
+    });
+
+    const session = await service.login(
+      { email: RECRUITER.email, password: 'whatever' },
+      {},
+    );
+
+    expect(session.user.hasProfile).toBe(true);
+  });
+
+  /**
+   * The two profile tables are unrelated, and nothing in the schema forbids a
+   * row in the wrong one. Reading whichever exists would let a candidate row
+   * hanging off a recruiter account pass the onboarding gate, so the answer has
+   * to follow the account's own type.
+   */
+  it('ignores a profile that does not belong to the account type', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...RECRUITER,
+      candidateProfile: { id: 7 },
+      recruiterProfile: null,
+    });
+
+    const session = await service.login(
+      { email: RECRUITER.email, password: 'whatever' },
+      {},
+    );
+
+    expect(session.user.hasProfile).toBe(false);
+  });
+
+  /** A brand-new account has nothing behind it by construction. */
+  it('reports a fresh signup as profile-less', async () => {
+    prisma.user.create.mockResolvedValue(CANDIDATE);
+
+    const session = await service.signup(
+      { email: CANDIDATE.email, password: 'whatever', userType: 'candidate' },
+      {},
+    );
+
+    expect(session.user.hasProfile).toBe(false);
+  });
+
+  /**
+   * A reload goes through `refresh`, and completing the onboarding in another
+   * tab has to be visible after it — otherwise the gate would send an onboarded
+   * user back to the wizard for the rest of the session.
+   */
+  it('reports completion through a refresh', async () => {
+    const {
+      service: refreshService,
+      prisma: refreshPrisma,
+      refreshTokens,
+    } = await createTestContext();
+
+    refreshTokens.findByToken.mockResolvedValue({
+      id: 7,
+      userId: CANDIDATE.id,
+      familyId: '11111111-1111-4111-8111-111111111111',
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    refreshPrisma.user.findUnique.mockResolvedValue({
+      ...CANDIDATE,
+      candidateProfile: { id: 7 },
+      recruiterProfile: null,
+    });
+
+    const session = await refreshService.refresh('valid', {});
+
+    expect(session.user.hasProfile).toBe(true);
+  });
+
+  it('reports completion through /me', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...CANDIDATE,
+      candidateProfile: { id: 7 },
+      recruiterProfile: null,
+    });
+
+    await expect(service.me(CANDIDATE.id)).resolves.toMatchObject({
+      hasProfile: true,
+    });
+  });
+});

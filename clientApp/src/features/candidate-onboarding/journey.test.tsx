@@ -26,6 +26,7 @@ const candidate = {
   role: 'user',
   userType: 'candidate',
   isActive: true,
+  hasProfile: false,
 };
 
 const fetchMock = vi.fn();
@@ -66,8 +67,8 @@ const callTo = (path: string) => {
 };
 
 const signUpAsCandidate = async (user: User) => {
-  await user.click(screen.getByRole('radio', { name: /Candidat/ }));
-  await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+  await user.click(await screen.findByRole('radio', { name: /Candidat/ }));
+  await user.type(await screen.findByLabelText('Email'), 'candidat@rekr.fr');
   await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
   await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
   await user.click(screen.getByRole('checkbox'));
@@ -84,13 +85,13 @@ const completeWizard = async (user: User) => {
   await user.type(screen.getByLabelText('Poste recherché'), 'Développeuse Front React');
   await user.click(screen.getByRole('checkbox', { name: 'CDI' }));
   await user.click(screen.getByRole('checkbox', { name: 'Freelance' }));
-  await user.click(screen.getByRole('radio', { name: 'Confirmé' }));
-  await user.click(screen.getByRole('radio', { name: 'Sous quelques mois' }));
+  await user.click(await screen.findByRole('radio', { name: 'Confirmé' }));
+  await user.click(await screen.findByRole('radio', { name: 'Sous quelques mois' }));
   await user.type(screen.getByLabelText('Disponible dans (mois)'), '3');
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 
-  await user.click(screen.getByRole('radio', { name: 'Hybride' }));
-  await user.click(screen.getByRole('radio', { name: 'Autour de ma ville' }));
+  await user.click(await screen.findByRole('radio', { name: 'Hybride' }));
+  await user.click(await screen.findByRole('radio', { name: 'Autour de ma ville' }));
   await user.type(screen.getByLabelText('Rayon de mobilité (km)'), '30');
   await user.type(screen.getByLabelText('Salaire minimum (€ brut / an)'), '45000');
   await user.type(screen.getByLabelText('Salaire maximum (€ brut / an)'), '55000');
@@ -127,8 +128,11 @@ describe('parcours candidat de bout en bout', () => {
 
     await completeWizard(user);
 
-    // Back on the splash: the journey completed.
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    /*
+     * On the feed, not on the splash: completing the wizard is what makes the
+     * account whole, so it is where the journey lands.
+     */
+    expect(await screen.findByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
 
     const profile = callTo('/api/candidate-profiles');
     expect(profile.method).toBe('POST');
@@ -185,7 +189,7 @@ describe('parcours candidat de bout en bout', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Publier mon profil' }));
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
 
     const update = callTo('/api/candidate-profiles/me');
     expect(update.method).toBe('PATCH');

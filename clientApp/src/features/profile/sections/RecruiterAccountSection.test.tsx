@@ -212,7 +212,7 @@ describe('RecruiterAccountSection', () => {
     ).toBeVisible();
     expect(screen.getByRole('link', { name: 'Compléter ma fiche société' })).toHaveAttribute(
       'href',
-      '/recruteur/profil',
+      '/recruteur/onboarding',
     );
     expect(screen.queryByLabelText('Nom de la société')).not.toBeInTheDocument();
     expect(screen.queryByText('Recruiter has no company')).not.toBeInTheDocument();

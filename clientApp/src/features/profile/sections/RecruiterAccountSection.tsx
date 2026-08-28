@@ -212,7 +212,7 @@ export function RecruiterAccountSection() {
       <div className="mt-6 flex flex-col items-start gap-3 rounded-2xl border border-line bg-card p-5">
         <p className="text-sm text-ink">Vous n’avez pas encore renseigné votre société.</p>
         <Link
-          to="/recruteur/profil"
+          to="/recruteur/onboarding"
           className={cn(buttonVariants({ variant: 'role', size: 'lg' }))}
         >
           Compléter ma fiche société

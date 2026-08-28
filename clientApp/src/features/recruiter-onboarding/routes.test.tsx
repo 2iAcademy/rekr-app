@@ -21,13 +21,20 @@ vi.mock('@/api/generated', () => ({
 const signupRequest = vi.mocked(authControllerSignup);
 
 /** Makes the provider's boot refresh succeed, which is what authenticates the session. */
-const authenticateAs = (userType: 'recruiter' | 'candidate') => {
+const authenticateAs = (userType: 'recruiter' | 'candidate', hasProfile = true) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({
       accessToken: 'test-token',
-      user: { id: 1, email: 'a@rekr.fr', role: 'user', userType, isActive: true },
+      user: {
+        id: 1,
+        email: 'a@rekr.fr',
+        role: 'user',
+        userType,
+        isActive: true,
+        hasProfile,
+      },
     }),
   } as unknown as Response);
 };
@@ -42,8 +49,8 @@ function renderAt(path: string) {
 }
 
 const signUpAsRecruiter = async (user: ReturnType<typeof userEvent.setup>) => {
-  await user.click(screen.getByRole('radio', { name: /recruteur/i }));
-  await user.type(screen.getByLabelText('Email'), 'recruteur@rekr.fr');
+  await user.click(await screen.findByRole('radio', { name: /recruteur/i }));
+  await user.type(await screen.findByLabelText('Email'), 'recruteur@rekr.fr');
   await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
   await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
   await user.click(screen.getByRole('checkbox'));
@@ -67,6 +74,7 @@ describe('navigation création de profil recruteur', () => {
           role: 'user',
           userType: 'recruiter',
           isActive: true,
+          hasProfile: false,
         },
       },
       status: 201,
@@ -74,9 +82,9 @@ describe('navigation création de profil recruteur', () => {
     } as unknown as Awaited<ReturnType<typeof authControllerSignup>>);
   });
 
-  it('affiche le wizard sur /recruteur/profil pour un recruteur connecté', async () => {
-    authenticateAs('recruiter');
-    renderAt('/recruteur/profil');
+  it('affiche le wizard sur /recruteur/onboarding pour un recruteur connecté', async () => {
+    authenticateAs('recruiter', false);
+    renderAt('/recruteur/onboarding');
 
     expect(await screen.findByRole('heading', { name: 'Mon identité' })).toBeInTheDocument();
     expect(screen.getByText('Étape 1 sur 5')).toBeInTheDocument();
@@ -85,24 +93,28 @@ describe('navigation création de profil recruteur', () => {
   // Without this, a visitor could fill five steps and lose everything on the
   // 401 raised by the very last click.
   it('renvoie un visiteur anonyme vers la connexion', async () => {
-    renderAt('/recruteur/profil');
+    renderAt('/recruteur/onboarding');
 
     expect(await screen.findByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Mon identité' })).not.toBeInTheDocument();
   });
 
-  it('renvoie un candidat connecté vers l’accueil', async () => {
+  /*
+   * Vers son propre feed : être sur le mauvais wizard ne justifie pas de
+   * renvoyer un utilisateur connecté à la porte d'entrée publique.
+   */
+  it('renvoie un candidat connecté vers son propre feed', async () => {
     authenticateAs('candidate');
-    renderAt('/recruteur/profil');
+    renderAt('/recruteur/onboarding');
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Mon identité' })).not.toBeInTheDocument();
   });
 
   it('n’affiche pas le formulaire tant que la session n’est pas tranchée', () => {
     // The boot refresh never settles here, so the guard stays in its loading state.
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}) as Promise<Response>);
-    renderAt('/recruteur/profil');
+    renderAt('/recruteur/onboarding');
 
     expect(screen.queryByRole('heading', { name: 'Mon identité' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Se connecter' })).not.toBeInTheDocument();
@@ -129,6 +141,7 @@ describe('navigation création de profil recruteur', () => {
           role: 'user',
           userType: 'candidate',
           isActive: true,
+          hasProfile: false,
         },
       },
       status: 201,
@@ -136,7 +149,7 @@ describe('navigation création de profil recruteur', () => {
     } as unknown as Awaited<ReturnType<typeof authControllerSignup>>);
     renderAt('/inscription');
 
-    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(await screen.findByLabelText('Email'), 'candidat@rekr.fr');
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
     await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
     await user.click(screen.getByRole('checkbox'));

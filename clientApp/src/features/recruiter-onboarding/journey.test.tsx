@@ -29,6 +29,7 @@ const recruiter = {
   role: 'user',
   userType: 'recruiter',
   isActive: true,
+  hasProfile: false,
 };
 
 const fetchMock = vi.fn();
@@ -77,8 +78,8 @@ const callTo = (path: string) => {
 };
 
 const signUpAsRecruiter = async (user: User) => {
-  await user.click(screen.getByRole('radio', { name: /Recruteur/ }));
-  await user.type(screen.getByLabelText('Email'), 'recruteur@rekr.fr');
+  await user.click(await screen.findByRole('radio', { name: /Recruteur/ }));
+  await user.type(await screen.findByLabelText('Email'), 'recruteur@rekr.fr');
   await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
   await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
   await user.click(screen.getByRole('checkbox'));
@@ -94,7 +95,7 @@ const completeWizard = async (user: User) => {
   await user.type(screen.getByLabelText('Nom de la société'), 'Rekr');
   await waitFor(() => expect(screen.getByLabelText('Secteur')).toBeEnabled());
   await user.selectOptions(screen.getByLabelText('Secteur'), '4');
-  await user.click(screen.getByRole('radio', { name: 'PME' }));
+  await user.click(await screen.findByRole('radio', { name: 'PME' }));
   await user.type(screen.getByRole('combobox', { name: 'Ville' }), 'lyon');
   await user.click(await screen.findByRole('option', { name: 'Lyon (69003)' }));
   await user.type(screen.getByLabelText('Site web (optionnel)'), 'https://rekr.fr');
@@ -112,9 +113,9 @@ const completeWizard = async (user: User) => {
   await user.type(screen.getByLabelText('Compétences recherchées'), 'React, TypeScript{Enter}');
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 
-  await user.click(screen.getByRole('radio', { name: 'CDI' }));
-  await user.click(screen.getByRole('radio', { name: 'Confirmé' }));
-  await user.click(screen.getByRole('radio', { name: 'Hybride' }));
+  await user.click(await screen.findByRole('radio', { name: 'CDI' }));
+  await user.click(await screen.findByRole('radio', { name: 'Confirmé' }));
+  await user.click(await screen.findByRole('radio', { name: 'Hybride' }));
   await user.type(screen.getByLabelText('Salaire minimum (€ brut / an)'), '45000');
   await user.type(screen.getByLabelText('Salaire maximum (€ brut / an)'), '55000');
   await user.click(screen.getByRole('button', { name: 'Publier mon offre' }));
@@ -142,8 +143,11 @@ describe('parcours recruteur de bout en bout', () => {
 
     await completeWizard(user);
 
-    // Back on the splash: the journey completed.
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    /*
+     * On the feed, not on the splash: completing the wizard is what makes the
+     * account whole, so it is where the journey lands.
+     */
+    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
 
     const company = callTo('/api/companies');
     expect(company.method).toBe('POST');
@@ -211,7 +215,7 @@ describe('parcours recruteur de bout en bout', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Publier mon offre' }));
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
     const offerCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/offers'));
     expect(offerCalls).toHaveLength(2);
 

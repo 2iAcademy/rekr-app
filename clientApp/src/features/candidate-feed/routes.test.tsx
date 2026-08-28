@@ -17,13 +17,20 @@ vi.mock('@/api/generated', () => ({
   sectorControllerFindAll: vi.fn(),
 }));
 
-const authenticateAs = (userType: 'candidate' | 'recruiter') => {
+const authenticateAs = (userType: 'candidate' | 'recruiter', hasProfile = true) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({
       accessToken: 'test-token',
-      user: { id: 1, email: 'a@rekr.fr', role: 'user', userType, isActive: true },
+      user: {
+        id: 1,
+        email: 'a@rekr.fr',
+        role: 'user',
+        userType,
+        isActive: true,
+        hasProfile,
+      },
     }),
   } as unknown as Response);
 };
@@ -64,11 +71,15 @@ describe('navigation vers le feed candidat', () => {
     expect(feedHeading()).not.toBeInTheDocument();
   });
 
-  it('renvoie un recruteur connecté vers l’accueil', async () => {
+  /*
+   * Vers son propre feed, pas vers le Splash : se tromper d'écran n'est pas une
+   * raison de renvoyer un utilisateur connecté à la porte d'entrée publique.
+   */
+  it('renvoie un recruteur connecté vers son propre feed', async () => {
     authenticateAs('recruiter');
     renderAt('/candidat/offres');
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
     expect(feedHeading()).not.toBeInTheDocument();
   });
 

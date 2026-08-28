@@ -14,6 +14,22 @@ import { SignupDto } from './dto/signup.dto';
 import { RefreshTokenService } from './refresh-token.service';
 import type { PublicUser, Session, SessionContext } from './session.interface';
 
+/**
+ * Existence of the two profile tables, joined onto the account rather than
+ * counted separately: the session needs the answer on every login, refresh and
+ * boot, and a second query per call would be paid on the hottest path there is.
+ * `id` alone is selected — nothing here reads the profile itself.
+ */
+const WITH_PROFILES = {
+  candidateProfile: { select: { id: true } },
+  recruiterProfile: { select: { id: true } },
+} as const;
+
+type UserWithProfiles = User & {
+  candidateProfile?: { id: number } | null;
+  recruiterProfile?: { id: number } | null;
+};
+
 @Injectable()
 export class AuthService {
   private static readonly PASSWORD_SALT_ROUNDS = 12;
@@ -87,6 +103,7 @@ export class AuthService {
   async login(loginDto: LoginDto, context: SessionContext): Promise<Session> {
     const user = await this.prismaService.user.findUnique({
       where: { email: loginDto.email },
+      include: WITH_PROFILES,
     });
 
     if (!user) {
@@ -146,6 +163,7 @@ export class AuthService {
 
     const user = await this.prismaService.user.findUnique({
       where: { id: stored.userId },
+      include: WITH_PROFILES,
     });
 
     if (!user) {
@@ -197,6 +215,7 @@ export class AuthService {
   async me(userId: number) {
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
+      include: WITH_PROFILES,
     });
 
     if (!user) {
@@ -211,7 +230,7 @@ export class AuthService {
   }
 
   private async buildSession(
-    user: User,
+    user: UserWithProfiles,
     context: SessionContext,
   ): Promise<Session> {
     return {
@@ -228,13 +247,33 @@ export class AuthService {
     );
   }
 
-  private toPublicUser(user: User): PublicUser {
+  private toPublicUser(user: UserWithProfiles): PublicUser {
     return {
       id: user.id,
       email: user.email,
       role: user.role,
       userType: user.userType,
       isActive: user.isActive,
+      hasProfile: AuthService.hasProfile(user),
     };
+  }
+
+  /**
+   * Read through the account type, never "whichever row exists": the two
+   * profile tables are unrelated and a row in the wrong one would otherwise
+   * open the onboarding gate for an account that has no usable profile. An
+   * account type owning neither table — `admin` — has no profile to complete
+   * and is reported as such.
+   */
+  private static hasProfile(user: UserWithProfiles): boolean {
+    if (user.userType === 'candidate') {
+      return Boolean(user.candidateProfile);
+    }
+
+    if (user.userType === 'recruiter') {
+      return Boolean(user.recruiterProfile);
+    }
+
+    return false;
   }
 }

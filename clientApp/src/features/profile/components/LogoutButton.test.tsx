@@ -20,10 +20,12 @@ const renderLogout = (logout: AuthContextValue['logout']) => {
           role: 'user',
           userType: 'candidate',
           isActive: true,
+          hasProfile: true,
         },
         login: vi.fn(),
         signup: vi.fn(),
         logout,
+        markProfileCompleted: vi.fn(),
       }}
     >
       <LogoutButton />

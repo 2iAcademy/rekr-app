@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
+import { homePathFor } from '@/domain/homeRoute';
 import { isRecruiter } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
 import { RecruiterFeedPage } from '@/features/recruiter-feed/pages/RecruiterFeedPage';
@@ -73,7 +74,7 @@ export function RecruiterFeedRoute() {
   }
 
   if (!isRecruiter(user?.userType)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={homePathFor(user)} replace />;
   }
 
   const openProfile = (id: number): void => {
