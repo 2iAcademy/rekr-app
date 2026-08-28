@@ -6,15 +6,18 @@ import {
 import { Test } from '@nestjs/testing';
 import { Prisma } from '../../generated/prisma/client';
 import { CandidateProfileService } from './candidate-profile.service';
+import { CandidateFeedQueryDto } from './dto/candidate-feed-query.dto';
 import { CityService } from '../city/city.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type PrismaMock = {
   candidateProfile: {
     create: jest.Mock;
+    findMany: jest.Mock;
     findUnique: jest.Mock;
     update: jest.Mock;
   };
+  recruiterProfile: { findUnique: jest.Mock };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
   candidateTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   $transaction: jest.Mock;
@@ -24,8 +27,12 @@ const buildPrismaMock = (): PrismaMock => {
   const mock: PrismaMock = {
     candidateProfile: {
       create: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
       update: jest.fn(),
+    },
+    recruiterProfile: {
+      findUnique: jest.fn().mockResolvedValue({ userId: 7, companyId: 10 }),
     },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     candidateTag: { deleteMany: jest.fn(), createMany: jest.fn() },
@@ -400,6 +407,167 @@ describe('CandidateProfileService', () => {
       const result = await service.findMine(42);
 
       expect(result).not.toHaveProperty('user');
+    });
+  });
+
+  describe('findFeed', () => {
+    const RECRUITER_ID = 7;
+
+    interface FeedFindManyArgs {
+      where: Record<string, unknown>;
+      orderBy: unknown;
+      take: number;
+      select: Record<string, unknown>;
+    }
+
+    const buildQuery = (
+      overrides: Partial<CandidateFeedQueryDto>,
+    ): CandidateFeedQueryDto =>
+      Object.assign(new CandidateFeedQueryDto(), overrides);
+
+    const feedRow = (overrides: Record<string, unknown> = {}) => ({
+      userId: 42,
+      firstName: 'Ada',
+      picture: null,
+      bio: null,
+      city: 'Lyon',
+      desiredJobTitle: null,
+      contractTypes: ['CDI'],
+      experienceLevel: 'SENIOR',
+      availability: 'IMMEDIATE',
+      remotePolicy: 'HYBRID',
+      user: {
+        candidateTags: [
+          { tag: { label: 'Ada Lang' } },
+          { tag: { label: 'COBOL' } },
+        ],
+      },
+      ...overrides,
+    });
+
+    const argsOf = (): FeedFindManyArgs => {
+      const [[args]] = prisma.candidateProfile.findMany.mock.calls as [
+        [FeedFindManyArgs],
+      ];
+      return args;
+    };
+
+    it('excludes the deactivated accounts and everyone this recruiter already answered', async () => {
+      await service.findFeed(RECRUITER_ID, new CandidateFeedQueryDto());
+
+      expect(argsOf().where.user).toEqual({
+        isActive: true,
+        likesReceived: { none: { recruiterUserId: RECRUITER_ID } },
+        passesReceived: { none: { recruiterUserId: RECRUITER_ID } },
+      });
+    });
+
+    // `createdAt` is not unique, so the `userId` break is what keeps two reads
+    // of the deck in the same order.
+    it('orders on the creation date then the user id', async () => {
+      await service.findFeed(RECRUITER_ID, new CandidateFeedQueryDto());
+
+      expect(argsOf().orderBy).toEqual([
+        { createdAt: 'desc' },
+        { userId: 'desc' },
+      ]);
+    });
+
+    it('takes the deck from the top, with no offset', async () => {
+      await service.findFeed(RECRUITER_ID, new CandidateFeedQueryDto());
+
+      expect(argsOf()).toMatchObject({ take: 20 });
+      expect(argsOf()).not.toHaveProperty('skip');
+    });
+
+    it('caps the deck at the requested limit', async () => {
+      await service.findFeed(RECRUITER_ID, buildQuery({ limit: 5 }));
+
+      expect(argsOf()).toMatchObject({ take: 5 });
+    });
+
+    // Same answer as `OfferService.create`: signup is self-service and
+    // unverified, so the company is what stands between a fresh address and
+    // the whole pool of candidates.
+    it('reads nothing when the recruiter is attached to no company', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.findFeed(RECRUITER_ID, new CandidateFeedQueryDto()),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(prisma.candidateProfile.findMany).not.toHaveBeenCalled();
+    });
+
+    it('matches a contract type against the whole list, not on equality', async () => {
+      await service.findFeed(
+        RECRUITER_ID,
+        buildQuery({ contractType: 'FREELANCE' }),
+      );
+
+      expect(argsOf().where.contractTypes).toEqual({ has: 'FREELANCE' });
+    });
+
+    it('compares the city without regard to its case', async () => {
+      await service.findFeed(RECRUITER_ID, buildQuery({ city: 'lYoN' }));
+
+      expect(argsOf().where.city).toEqual({
+        equals: 'lYoN',
+        mode: 'insensitive',
+      });
+    });
+
+    it('maps the remaining filters onto their own column', async () => {
+      await service.findFeed(
+        RECRUITER_ID,
+        buildQuery({
+          experienceLevel: 'SENIOR',
+          availability: 'IMMEDIATE',
+          remotePolicy: 'HYBRID',
+        }),
+      );
+
+      expect(argsOf().where).toMatchObject({
+        experienceLevel: 'SENIOR',
+        availability: 'IMMEDIATE',
+        remotePolicy: 'HYBRID',
+      });
+    });
+
+    it('leaves out the filters the caller did not send', async () => {
+      await service.findFeed(RECRUITER_ID, new CandidateFeedQueryDto());
+
+      expect(Object.keys(argsOf().where)).toEqual(['user']);
+    });
+
+    it('flattens the tag labels and drops the relation it read them through', async () => {
+      prisma.candidateProfile.findMany.mockResolvedValue([feedRow()]);
+
+      const [item] = await service.findFeed(
+        RECRUITER_ID,
+        new CandidateFeedQueryDto(),
+      );
+
+      expect(item.tags).toEqual(['Ada Lang', 'COBOL']);
+      expect(item).not.toHaveProperty('user');
+    });
+
+    it('selects the showcase columns only', async () => {
+      await service.findFeed(RECRUITER_ID, new CandidateFeedQueryDto());
+
+      expect(Object.keys(argsOf().select).sort()).toEqual([
+        'availability',
+        'bio',
+        'city',
+        'contractTypes',
+        'desiredJobTitle',
+        'experienceLevel',
+        'firstName',
+        'picture',
+        'remotePolicy',
+        'user',
+        'userId',
+      ]);
     });
   });
 });

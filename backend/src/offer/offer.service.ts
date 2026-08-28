@@ -5,6 +5,8 @@ import { resolveTagIds } from '../common/tags/tag-sync';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
+import { OfferFeedItemDto } from './dto/offer-feed-item.dto';
+import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
 import { OfferListItemDto } from './dto/offer-list-item.dto';
 import { OfferListQueryDto } from './dto/offer-list-query.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
@@ -123,6 +125,58 @@ export class OfferService {
       take: limit,
       select: LIST_ITEM_COLUMNS,
     });
+  }
+
+  async findFeed(
+    user: AuthUser,
+    query: OfferFeedQueryDto,
+  ): Promise<OfferFeedItemDto[]> {
+    const { limit, contractType, experienceLevel, remotePolicy, city } = query;
+
+    const offers = await this.prisma.offer.findMany({
+      where: {
+        status: 'open',
+        ...(contractType ? { contractType } : {}),
+        ...(experienceLevel ? { minExperienceLevel: experienceLevel } : {}),
+        ...(remotePolicy ? { remotePolicy } : {}),
+        ...(city ? { city: { equals: city, mode: 'insensitive' } } : {}),
+        candidateLikes: { none: { candidateUserId: user.id } },
+        candidatePasses: { none: { candidateUserId: user.id } },
+      },
+      // `createdAt` alone is not unique, so it cannot order the deck on its
+      // own: two offers written in the same instant would swap places from one
+      // read to the next. The id break is what makes the order stable.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        city: true,
+        contractType: true,
+        minExperienceLevel: true,
+        remotePolicy: true,
+        salaryMin: true,
+        salaryMax: true,
+        createdAt: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+          },
+        },
+        offerTags: {
+          orderBy: { tag: { label: 'asc' } },
+          select: { tag: { select: { label: true } } },
+        },
+      },
+    });
+
+    return offers.map(({ offerTags, ...offer }) => ({
+      ...offer,
+      tags: offerTags.map((link) => link.tag.label),
+    }));
   }
 
   async findOneById(user: AuthUser, id: number) {

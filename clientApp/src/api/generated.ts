@@ -53,6 +53,14 @@ export const ExperienceLevel = {
   EXPERT: 'EXPERT',
 } as const;
 
+export type RemotePolicy = (typeof RemotePolicy)[keyof typeof RemotePolicy];
+
+export const RemotePolicy = {
+  ON_SITE: 'ON_SITE',
+  HYBRID: 'HYBRID',
+  FULL_REMOTE: 'FULL_REMOTE',
+} as const;
+
 export type Availability = (typeof Availability)[keyof typeof Availability];
 
 export const Availability = {
@@ -61,13 +69,24 @@ export const Availability = {
   SPECIFIC_DATE: 'SPECIFIC_DATE',
 } as const;
 
-export type RemotePolicy = (typeof RemotePolicy)[keyof typeof RemotePolicy];
-
-export const RemotePolicy = {
-  ON_SITE: 'ON_SITE',
-  HYBRID: 'HYBRID',
-  FULL_REMOTE: 'FULL_REMOTE',
-} as const;
+export interface CandidateFeedItemDto {
+  userId: number;
+  /** @maxLength 100 */
+  firstName: string;
+  /** @nullable */
+  picture: string | null;
+  /** @nullable */
+  bio: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  desiredJobTitle: string | null;
+  contractTypes: ContractType[];
+  experienceLevel: ExperienceLevel | null;
+  availability: Availability | null;
+  remotePolicy: RemotePolicy | null;
+  tags: string[];
+}
 
 export interface CandidateProfileResponseDto {
   id: number;
@@ -217,6 +236,32 @@ export interface OfferListItemDto {
   salaryMax: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface OfferFeedCompanyDto {
+  id: number;
+  name: string;
+  /** @nullable */
+  logo: string | null;
+}
+
+export interface OfferFeedItemDto {
+  id: number;
+  title: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  city: string | null;
+  contractType: ContractType | null;
+  minExperienceLevel: ExperienceLevel | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  createdAt: string;
+  company: OfferFeedCompanyDto;
+  tags: string[];
 }
 
 export interface OfferDetailCompanyDto {
@@ -416,6 +461,36 @@ export interface MatchListItemDto {
   counterpart?: MatchCounterpartDto | null;
 }
 
+export type CandidateProfileControllerFindFeedParams = {
+  /**
+   * Nombre maximum de cartes renvoyées.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * Ne garder que les résultats de ce type de contrat.
+   */
+  contractType?: ContractType;
+  /**
+   * Ne garder que les résultats de ce niveau d'expérience.
+   */
+  experienceLevel?: ExperienceLevel;
+  /**
+   * Ne garder que les résultats de ce mode de télétravail.
+   */
+  remotePolicy?: RemotePolicy;
+  /**
+   * Ne garder que les résultats situés dans cette commune.
+   * @maxLength 100
+   */
+  city?: string;
+  /**
+   * Ne garder que les candidats de cette disponibilité.
+   */
+  availability?: Availability;
+};
+
 export type CandidateProfileControllerReplacePictureBody = {
   file: Blob;
 };
@@ -444,6 +519,7 @@ export type OfferControllerFindMineParams = {
   /**
    * Numéro de page, à partir de 1.
    * @minimum 1
+   * @maximum 2147483647
    */
   page?: number;
   /**
@@ -456,6 +532,32 @@ export type OfferControllerFindMineParams = {
    * Ne renvoie que les offres de ce statut.
    */
   status?: OfferStatus;
+};
+
+export type OfferControllerFindFeedParams = {
+  /**
+   * Nombre maximum de cartes renvoyées.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * Ne garder que les résultats de ce type de contrat.
+   */
+  contractType?: ContractType;
+  /**
+   * Ne garder que les résultats de ce niveau d'expérience.
+   */
+  experienceLevel?: ExperienceLevel;
+  /**
+   * Ne garder que les résultats de ce mode de télétravail.
+   */
+  remotePolicy?: RemotePolicy;
+  /**
+   * Ne garder que les résultats situés dans cette commune.
+   * @maxLength 100
+   */
+  city?: string;
 };
 
 export type MatchControllerFindMineParams = {
@@ -554,12 +656,18 @@ export const logsControllerPublishError = async (
   publishErrorLogDto: PublishErrorLogDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<logsControllerPublishErrorResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<logsControllerPublishErrorResponseSuccess>(
     getLogsControllerPublishErrorUrl(),
     {
       ...options,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(publishErrorLogDto),
     },
   );
@@ -581,10 +689,16 @@ export const authControllerSignup = async (
   signupDto: SignupDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerSignupResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<authControllerSignupResponseSuccess>(getAuthControllerSignupUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(signupDto),
   });
 };
@@ -605,10 +719,16 @@ export const authControllerLogin = async (
   loginDto: LoginDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerLoginResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<authControllerLoginResponseSuccess>(getAuthControllerLoginUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(loginDto),
   });
 };
@@ -676,6 +796,46 @@ export const authControllerMe = async (
   });
 };
 
+export type candidateProfileControllerFindFeedResponse200 = {
+  data: CandidateFeedItemDto[];
+  status: 200;
+};
+
+export type candidateProfileControllerFindFeedResponseSuccess =
+  candidateProfileControllerFindFeedResponse200 & {
+    headers: Headers;
+  };
+export const getCandidateProfileControllerFindFeedUrl = (
+  params?: CandidateProfileControllerFindFeedParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/candidate-profiles/feed?${stringifiedParams}`
+    : `/api/candidate-profiles/feed`;
+};
+
+export const candidateProfileControllerFindFeed = async (
+  params?: CandidateProfileControllerFindFeedParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<candidateProfileControllerFindFeedResponseSuccess> => {
+  return customFetch<candidateProfileControllerFindFeedResponseSuccess>(
+    getCandidateProfileControllerFindFeedUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
 export type candidateProfileControllerFindMineResponse200 = {
   data: CandidateProfileResponseDto;
   status: 200;
@@ -718,12 +878,18 @@ export const candidateProfileControllerUpdate = async (
   updateCandidateProfileDto: UpdateCandidateProfileDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<candidateProfileControllerUpdateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<candidateProfileControllerUpdateResponseSuccess>(
     getCandidateProfileControllerUpdateUrl(),
     {
       ...options,
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(updateCandidateProfileDto),
     },
   );
@@ -746,12 +912,18 @@ export const candidateProfileControllerCreate = async (
   createCandidateProfileDto: CreateCandidateProfileDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<candidateProfileControllerCreateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<candidateProfileControllerCreateResponseSuccess>(
     getCandidateProfileControllerCreateUrl(),
     {
       ...options,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(createCandidateProfileDto),
     },
   );
@@ -994,12 +1166,18 @@ export const companyControllerUpdateMine = async (
   updateCompanyDto: UpdateCompanyDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<companyControllerUpdateMineResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<companyControllerUpdateMineResponseSuccess>(
     getCompanyControllerUpdateMineUrl(),
     {
       ...options,
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(updateCompanyDto),
     },
   );
@@ -1021,10 +1199,16 @@ export const companyControllerCreate = async (
   createCompanyDto: CreateCompanyDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<companyControllerCreateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<companyControllerCreateResponseSuccess>(getCompanyControllerCreateUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createCompanyDto),
   });
 };
@@ -1235,12 +1419,71 @@ export const offerControllerCreate = async (
   createOfferDto: CreateOfferDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<offerControllerCreateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<offerControllerCreateResponseSuccess>(getOfferControllerCreateUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createOfferDto),
   });
+};
+
+export type offerControllerFindFeedResponse200 = {
+  data: OfferFeedItemDto[];
+  status: 200;
+};
+
+export type offerControllerFindFeedResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindFeedResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindFeedResponseSuccess = offerControllerFindFeedResponse200 & {
+  headers: Headers;
+};
+export type offerControllerFindFeedResponseError = (
+  offerControllerFindFeedResponse401 | offerControllerFindFeedResponse403
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerFindFeedUrl = (params?: OfferControllerFindFeedParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/offers/feed?${stringifiedParams}`
+    : `/api/offers/feed`;
+};
+
+export const offerControllerFindFeed = async (
+  params?: OfferControllerFindFeedParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerFindFeedResponseSuccess> => {
+  return customFetch<offerControllerFindFeedResponseSuccess>(
+    getOfferControllerFindFeedUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type offerControllerFindOneByIdResponse200 = {
@@ -1331,10 +1574,16 @@ export const offerControllerUpdate = async (
   updateOfferDto: UpdateOfferDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<offerControllerUpdateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<offerControllerUpdateResponseSuccess>(getOfferControllerUpdateUrl(id), {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateOfferDto),
   });
 };
