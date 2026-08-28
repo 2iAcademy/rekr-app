@@ -1,15 +1,22 @@
-interface ProfilePageProps {
+import type { ReactNode } from 'react';
+import { LogoutButton } from '@/features/profile/components/LogoutButton';
+
+interface AccountPageProps {
   email: string;
   // Display label ('Candidat' / 'Recruteur'), not the session `role` field,
   // which carries the permission level ('user' / 'admin').
   roleLabel: string;
+  // The role-specific half of the screen. Passing it in keeps this page
+  // presentational: it never has to know which sections exist.
+  children?: ReactNode;
 }
 
-/** Placeholder screen: the real profile lands with #67 (candidat) and #68 (recruteur). */
-export function ProfilePage({ email, roleLabel }: ProfilePageProps) {
+export function AccountPage({ email, roleLabel, children }: AccountPageProps) {
   return (
     <div className="mx-auto max-w-3xl md:mx-0 lg:max-w-4xl xl:max-w-5xl">
-      <h1 className="mt-5 font-heading text-xl font-bold text-ink md:mt-0 md:text-2xl">Profil</h1>
+      <h1 className="mt-5 font-heading text-xl font-bold text-ink md:mt-0 md:text-2xl">
+        Mon compte
+      </h1>
 
       <dl className="mt-6 flex flex-col gap-4 rounded-2xl border border-line bg-card p-5">
         <div className="flex flex-col gap-0.5">
@@ -26,9 +33,11 @@ export function ProfilePage({ email, roleLabel }: ProfilePageProps) {
         </div>
       </dl>
 
-      <p className="mt-6 text-sm leading-relaxed text-ink-muted">
-        Le reste de ton profil arrive bientôt.
-      </p>
+      {children}
+
+      <div className="mt-8 flex justify-start border-t border-line pt-6">
+        <LogoutButton />
+      </div>
     </div>
   );
 }

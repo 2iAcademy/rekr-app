@@ -1,14 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
+import {
+  authControllerLogout,
+  candidateProfileControllerFindMine,
+  companyControllerFindMine,
+} from '@/api/generated';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { ProfileRoute } from './routes';
 
+// The role sections load their own data, so their reads are stubbed here too:
+// this spec is about which one gets mounted, not about what they display.
 vi.mock('@/api/generated', () => ({
   authControllerLogin: vi.fn(),
   authControllerLogout: vi.fn(),
   authControllerSignup: vi.fn(),
+  candidateProfileControllerFindMine: vi.fn(),
+  candidateProfileControllerUpdate: vi.fn(),
+  candidateProfileControllerReplacePicture: vi.fn(),
+  candidateProfileControllerRemovePicture: vi.fn(),
+  candidateProfileControllerReplaceCv: vi.fn(),
+  candidateProfileControllerRemoveCv: vi.fn(),
+  companyControllerFindMine: vi.fn(),
+  companyControllerUpdateMine: vi.fn(),
+  companyControllerReplaceLogo: vi.fn(),
+  companyControllerRemoveLogo: vi.fn(),
+  companyControllerReplaceCoverImage: vi.fn(),
+  companyControllerRemoveCoverImage: vi.fn(),
+  sectorControllerFindAll: vi.fn(),
+  cityControllerSearch: vi.fn(),
 }));
+
+const findCandidateProfile = vi.mocked(candidateProfileControllerFindMine);
+const findCompany = vi.mocked(companyControllerFindMine);
+const logoutRequest = vi.mocked(authControllerLogout);
+
+// A pending read parks each section on its loading state: enough to tell which
+// one was mounted without rebuilding either section's fixture here.
+const pendingReads = () => {
+  findCandidateProfile.mockReturnValue(new Promise(() => {}));
+  findCompany.mockReturnValue(new Promise(() => {}));
+};
 
 const authenticateAs = (userType: 'candidate' | 'recruiter', email = 'camille@rekr.fr') => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
@@ -44,12 +77,13 @@ const renderProfile = () => {
   return router;
 };
 
-const profileHeading = () => screen.queryByRole('heading', { level: 1, name: 'Profil' });
+const profileHeading = () => screen.queryByRole('heading', { level: 1, name: 'Mon compte' });
 
 describe('ProfileRoute', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+    pendingReads();
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       status: 401,
@@ -61,7 +95,9 @@ describe('ProfileRoute', () => {
     authenticateAs('candidate');
     renderProfile();
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Profil' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Mon compte' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('camille@rekr.fr')).toBeInTheDocument();
     expect(screen.getByText('Candidat')).toBeInTheDocument();
   });
@@ -70,7 +106,9 @@ describe('ProfileRoute', () => {
     authenticateAs('recruiter', 'sacha@acme.fr');
     renderProfile();
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Profil' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Mon compte' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('sacha@acme.fr')).toBeInTheDocument();
     expect(screen.getByText('Recruteur')).toBeInTheDocument();
   });
@@ -79,9 +117,61 @@ describe('ProfileRoute', () => {
     authenticateAs('candidate');
     const router = renderProfile();
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Profil' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Mon compte' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Ailleurs' })).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/profil');
+  });
+
+  it('monte la section du candidat pour un candidat', async () => {
+    authenticateAs('candidate');
+    renderProfile();
+
+    await screen.findByRole('heading', { level: 1, name: 'Mon compte' });
+
+    expect(findCandidateProfile).toHaveBeenCalled();
+    expect(findCompany).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Ma société' })).not.toBeInTheDocument();
+  });
+
+  it('monte la section du recruteur pour un recruteur', async () => {
+    authenticateAs('recruiter', 'sacha@acme.fr');
+    renderProfile();
+
+    await screen.findByRole('heading', { level: 1, name: 'Mon compte' });
+
+    expect(findCompany).toHaveBeenCalled();
+    expect(findCandidateProfile).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Mon profil' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * The join the two halves leave open: `LogoutButton` is tested against a
+   * mocked `logout`, and the anonymous redirect is tested at boot. Neither says
+   * that clicking the button lands on /connexion, which is the acceptance
+   * criterion. Here the real AuthProvider runs, so `abandon()` flipping the
+   * status to anonymous is what drives the guard.
+   */
+  it('renvoie vers la connexion après une déconnexion', async () => {
+    const user = userEvent.setup();
+    logoutRequest.mockResolvedValue({} as Awaited<ReturnType<typeof authControllerLogout>>);
+    authenticateAs('candidate');
+    renderProfile();
+
+    await user.click(await screen.findByRole('button', { name: 'Se déconnecter' }));
+
+    expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument();
+    expect(profileHeading()).not.toBeInTheDocument();
+  });
+
+  it('ne charge aucun profil tant que la session est anonyme', async () => {
+    renderProfile();
+
+    await screen.findByRole('heading', { name: 'Connexion' });
+
+    expect(findCandidateProfile).not.toHaveBeenCalled();
+    expect(findCompany).not.toHaveBeenCalled();
   });
 
   it('renvoie un visiteur anonyme vers la connexion', async () => {

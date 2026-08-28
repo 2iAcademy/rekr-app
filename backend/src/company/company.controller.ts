@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Patch,
   Post,
   Put,
@@ -9,7 +10,12 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -20,6 +26,7 @@ import { UploadedFileInterceptor } from '../storage/upload-interceptor';
 import type { UploadedFile as UploadedFileContent } from '../storage/uploaded-file.interface';
 import { CompanyFileService } from './company-file.service';
 import { CompanyService } from './company.service';
+import { CompanyResponseDto } from './dto/company-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 
@@ -32,6 +39,12 @@ export class CompanyController {
     private readonly service: CompanyService,
     private readonly files: CompanyFileService,
   ) {}
+
+  @Get('mine')
+  @ApiOkResponse({ type: CompanyResponseDto })
+  findMine(@CurrentUser() user: AuthUser): Promise<CompanyResponseDto> {
+    return this.service.findMine(user.id);
+  }
 
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateCompanyDto) {

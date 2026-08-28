@@ -11,7 +11,12 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -22,6 +27,7 @@ import { UploadedFileInterceptor } from '../storage/upload-interceptor';
 import type { UploadedFile as UploadedFileContent } from '../storage/uploaded-file.interface';
 import { CandidateProfileFileService } from './candidate-profile-file.service';
 import { CandidateProfileService } from './candidate-profile.service';
+import { CandidateProfileResponseDto } from './dto/candidate-profile-response.dto';
 import { CreateCandidateProfileDto } from './dto/create-candidate-profile.dto';
 import { UpdateCandidateProfileDto } from './dto/update-candidate-profile.dto';
 
@@ -34,6 +40,14 @@ export class CandidateProfileController {
     private readonly service: CandidateProfileService,
     private readonly files: CandidateProfileFileService,
   ) {}
+
+  @Get('me')
+  @ApiOkResponse({ type: CandidateProfileResponseDto })
+  findMine(
+    @CurrentUser() user: AuthUser,
+  ): Promise<CandidateProfileResponseDto> {
+    return this.service.findMine(user.id);
+  }
 
   @Post()
   create(

@@ -33,6 +33,89 @@ export interface LoginDto {
   password: string;
 }
 
+export type ContractType = (typeof ContractType)[keyof typeof ContractType];
+
+export const ContractType = {
+  CDI: 'CDI',
+  CDD: 'CDD',
+  ALTERNANCE: 'ALTERNANCE',
+  STAGE: 'STAGE',
+  FREELANCE: 'FREELANCE',
+  INTERIM: 'INTERIM',
+} as const;
+
+export type ExperienceLevel = (typeof ExperienceLevel)[keyof typeof ExperienceLevel];
+
+export const ExperienceLevel = {
+  JUNIOR: 'JUNIOR',
+  CONFIRME: 'CONFIRME',
+  SENIOR: 'SENIOR',
+  EXPERT: 'EXPERT',
+} as const;
+
+export type Availability = (typeof Availability)[keyof typeof Availability];
+
+export const Availability = {
+  IMMEDIATE: 'IMMEDIATE',
+  WITHIN_DELAY: 'WITHIN_DELAY',
+  SPECIFIC_DATE: 'SPECIFIC_DATE',
+} as const;
+
+export type RemotePolicy = (typeof RemotePolicy)[keyof typeof RemotePolicy];
+
+export const RemotePolicy = {
+  ON_SITE: 'ON_SITE',
+  HYBRID: 'HYBRID',
+  FULL_REMOTE: 'FULL_REMOTE',
+} as const;
+
+export interface CandidateProfileResponseDto {
+  id: number;
+  userId: number;
+  /** @maxLength 100 */
+  firstName: string;
+  /** @maxLength 100 */
+  lastName: string;
+  /** @nullable */
+  picture: string | null;
+  /** @nullable */
+  bio: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  postalCode: string | null;
+  /** @nullable */
+  latitude: string | null;
+  /** @nullable */
+  longitude: string | null;
+  /** @nullable */
+  desiredJobTitle: string | null;
+  contractTypes: ContractType[];
+  experienceLevel: ExperienceLevel | null;
+  availability: Availability | null;
+  /** @nullable */
+  availabilityDelayMonths: number | null;
+  /** @nullable */
+  availabilityDate: string | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  mobilityRadiusKm: number | null;
+  /** @nullable */
+  mobilityNationwide: boolean | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  /** @nullable */
+  linkedinUrl: string | null;
+  /** @nullable */
+  cvUrl: string | null;
+  skills: string[];
+  languages: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateCandidateProfileDto {
   [key: string]: unknown;
 }
@@ -48,6 +131,54 @@ export interface CityDto {
   postalCode: string;
   latitude: number;
   longitude: number;
+}
+
+export type CompanySize = (typeof CompanySize)[keyof typeof CompanySize];
+
+export const CompanySize = {
+  TPE: 'TPE',
+  PME: 'PME',
+} as const;
+
+export interface CompanyRecruiterDto {
+  /** @maxLength 100 */
+  firstName: string;
+  /** @maxLength 100 */
+  lastName: string;
+  /**
+   * @maxLength 150
+   * @nullable
+   */
+  jobTitle: string | null;
+}
+
+export interface CompanyResponseDto {
+  id: number;
+  /** @maxLength 255 */
+  name: string;
+  /** @nullable */
+  logo: string | null;
+  size: CompanySize | null;
+  /** @nullable */
+  sectorId: number | null;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  siteUrl: string | null;
+  /** @nullable */
+  coverImage: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  postalCode: string | null;
+  /** @nullable */
+  latitude: string | null;
+  /** @nullable */
+  longitude: string | null;
+  benefits: string[];
+  recruiter: CompanyRecruiterDto;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateCompanyDto {
@@ -349,30 +480,27 @@ export const authControllerMe = async (
   });
 };
 
-export type candidateProfileControllerCreateResponse201 = {
-  data: void;
-  status: 201;
+export type candidateProfileControllerFindMineResponse200 = {
+  data: CandidateProfileResponseDto;
+  status: 200;
 };
 
-export type candidateProfileControllerCreateResponseSuccess =
-  candidateProfileControllerCreateResponse201 & {
+export type candidateProfileControllerFindMineResponseSuccess =
+  candidateProfileControllerFindMineResponse200 & {
     headers: Headers;
   };
-export const getCandidateProfileControllerCreateUrl = () => {
-  return `/api/candidate-profiles`;
+export const getCandidateProfileControllerFindMineUrl = () => {
+  return `/api/candidate-profiles/me`;
 };
 
-export const candidateProfileControllerCreate = async (
-  createCandidateProfileDto: CreateCandidateProfileDto,
+export const candidateProfileControllerFindMine = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<candidateProfileControllerCreateResponseSuccess> => {
-  return customFetch<candidateProfileControllerCreateResponseSuccess>(
-    getCandidateProfileControllerCreateUrl(),
+): Promise<candidateProfileControllerFindMineResponseSuccess> => {
+  return customFetch<candidateProfileControllerFindMineResponseSuccess>(
+    getCandidateProfileControllerFindMineUrl(),
     {
       ...options,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
-      body: JSON.stringify(createCandidateProfileDto),
+      method: 'GET',
     },
   );
 };
@@ -401,6 +529,34 @@ export const candidateProfileControllerUpdate = async (
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...options?.headers },
       body: JSON.stringify(updateCandidateProfileDto),
+    },
+  );
+};
+
+export type candidateProfileControllerCreateResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type candidateProfileControllerCreateResponseSuccess =
+  candidateProfileControllerCreateResponse201 & {
+    headers: Headers;
+  };
+export const getCandidateProfileControllerCreateUrl = () => {
+  return `/api/candidate-profiles`;
+};
+
+export const candidateProfileControllerCreate = async (
+  createCandidateProfileDto: CreateCandidateProfileDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<candidateProfileControllerCreateResponseSuccess> => {
+  return customFetch<candidateProfileControllerCreateResponseSuccess>(
+    getCandidateProfileControllerCreateUrl(),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      body: JSON.stringify(createCandidateProfileDto),
     },
   );
 };
@@ -605,27 +761,24 @@ export const filesControllerRead = async (
   );
 };
 
-export type companyControllerCreateResponse201 = {
-  data: void;
-  status: 201;
+export type companyControllerFindMineResponse200 = {
+  data: CompanyResponseDto;
+  status: 200;
 };
 
-export type companyControllerCreateResponseSuccess = companyControllerCreateResponse201 & {
+export type companyControllerFindMineResponseSuccess = companyControllerFindMineResponse200 & {
   headers: Headers;
 };
-export const getCompanyControllerCreateUrl = () => {
-  return `/api/companies`;
+export const getCompanyControllerFindMineUrl = () => {
+  return `/api/companies/mine`;
 };
 
-export const companyControllerCreate = async (
-  createCompanyDto: CreateCompanyDto,
+export const companyControllerFindMine = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<companyControllerCreateResponseSuccess> => {
-  return customFetch<companyControllerCreateResponseSuccess>(getCompanyControllerCreateUrl(), {
+): Promise<companyControllerFindMineResponseSuccess> => {
+  return customFetch<companyControllerFindMineResponseSuccess>(getCompanyControllerFindMineUrl(), {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(createCompanyDto),
+    method: 'GET',
   });
 };
 
@@ -654,6 +807,30 @@ export const companyControllerUpdateMine = async (
       body: JSON.stringify(updateCompanyDto),
     },
   );
+};
+
+export type companyControllerCreateResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type companyControllerCreateResponseSuccess = companyControllerCreateResponse201 & {
+  headers: Headers;
+};
+export const getCompanyControllerCreateUrl = () => {
+  return `/api/companies`;
+};
+
+export const companyControllerCreate = async (
+  createCompanyDto: CreateCompanyDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<companyControllerCreateResponseSuccess> => {
+  return customFetch<companyControllerCreateResponseSuccess>(getCompanyControllerCreateUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createCompanyDto),
+  });
 };
 
 export type companyControllerReplaceLogoResponse200 = {

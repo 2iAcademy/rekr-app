@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import type { Prisma } from '../generated/prisma/client';
 import { httpRequest } from './http-client';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -304,5 +305,215 @@ describe('Company (e2e)', () => {
     expect(profile.firstName).toBe('Rick');
     expect(profile.lastName).toBe('Deckard');
     expect(profile.jobTitle).toBe('CTO');
+  });
+
+  describe('GET /api/companies/mine', () => {
+    const readMine = (userId: number) =>
+      httpRequest(app)
+        .get('/api/companies/mine')
+        .set('Authorization', bearerFor(app, userId, 'recruiter'));
+
+    const linkTag = async (
+      companyId: number,
+      label: string,
+      category: 'benefit' | 'skill',
+    ) => {
+      const tag = await prisma.tag.create({ data: { label, category } });
+      await prisma.companyTag.create({ data: { companyId, tagId: tag.id } });
+    };
+
+    const createRecruiterWithCompany = async (options?: {
+      company?: Prisma.CompanyUncheckedCreateInput;
+      firstName?: string;
+      lastName?: string;
+      jobTitle?: string | null;
+    }) => {
+      const user = await createUser('recruiter');
+      const company = await prisma.company.create({
+        data: options?.company ?? { name: 'Acme' },
+      });
+      await prisma.recruiterProfile.create({
+        data: {
+          userId: user.id,
+          companyId: company.id,
+          firstName: options?.firstName ?? 'Rick',
+          lastName: options?.lastName ?? 'Deckard',
+          jobTitle: options?.jobTitle ?? null,
+        },
+      });
+
+      return { user, company };
+    };
+
+    it('rejects an unauthenticated read with 401', async () => {
+      await httpRequest(app).get('/api/companies/mine').expect(401);
+    });
+
+    it('forbids a candidate from reading a company (403)', async () => {
+      const candidate = await createUser('candidate');
+
+      await httpRequest(app)
+        .get('/api/companies/mine')
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(403);
+    });
+
+    it('refuses an inactive recruiter with 403', async () => {
+      const { user } = await createRecruiterWithCompany();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { isActive: false },
+      });
+
+      await readMine(user.id).expect(403);
+    });
+
+    // Same wording as the PATCH on the same resource: one missing company, one
+    // message, whichever verb the client used.
+    it('answers 404 for a recruiter without a company', async () => {
+      const user = await createUser('recruiter');
+
+      const res = await readMine(user.id).expect(404);
+
+      expect((res.body as { message?: string }).message).toBe(
+        'Recruiter has no company',
+      );
+    });
+
+    it('returns the whole company plus the recruiter identity', async () => {
+      const sector = await prisma.sector.create({
+        data: { label: 'Informatique' },
+      });
+      const { user, company } = await createRecruiterWithCompany({
+        company: {
+          name: 'Acme',
+          logo: 'companies/1/logo/acme.webp',
+          size: 'PME',
+          sectorId: sector.id,
+          description: 'Une belle boîte.',
+          siteUrl: 'https://acme.dev',
+          coverImage: 'companies/1/cover-image/acme.webp',
+          city: 'Lyon',
+          postalCode: '69002',
+          latitude: '45.7578125',
+          longitude: '4.8320114',
+        },
+        jobTitle: 'CTO',
+      });
+      await linkTag(company.id, 'Mutuelle', 'benefit');
+
+      const res = await readMine(user.id).expect(200);
+
+      // Exhaustive on purpose: `toEqual` fails on an extra key, so a column
+      // added to `company` later cannot reach a client unnoticed.
+      expect(res.body).toEqual({
+        id: company.id,
+        name: 'Acme',
+        logo: 'companies/1/logo/acme.webp',
+        size: 'PME',
+        sectorId: sector.id,
+        description: 'Une belle boîte.',
+        siteUrl: 'https://acme.dev',
+        coverImage: 'companies/1/cover-image/acme.webp',
+        city: 'Lyon',
+        postalCode: '69002',
+        latitude: expect.any(String) as string,
+        longitude: expect.any(String) as string,
+        benefits: ['Mutuelle'],
+        recruiter: {
+          firstName: 'Rick',
+          lastName: 'Deckard',
+          jobTitle: 'CTO',
+        },
+        createdAt: expect.any(String) as string,
+        updatedAt: expect.any(String) as string,
+      });
+
+      // Decimal(10, 7) travels as a string, verbatim. The fixture carries all
+      // seven decimals and the assertion compares the string, so a rounding
+      // anywhere on the way out fails here — which a numeric tolerance would
+      // have swallowed.
+      const body = res.body as { latitude: string; longitude: string };
+      expect(body.latitude).toBe('45.7578125');
+      expect(body.longitude).toBe('4.8320114');
+    });
+
+    /**
+     * `company_tag` is only ever written with benefits today, but it is a plain
+     * pivot on the shared `tag` dictionary: nothing in the schema stops another
+     * category from being linked. The read filters on the category rather than
+     * trusting the writer.
+     */
+    it('returns benefits only, sorted by label', async () => {
+      const { user, company } = await createRecruiterWithCompany();
+      await linkTag(company.id, 'Mutuelle', 'benefit');
+      await linkTag(company.id, 'Conciergerie', 'benefit');
+      await linkTag(company.id, 'React', 'skill');
+
+      const res = await readMine(user.id).expect(200);
+
+      expect(res.body).toMatchObject({
+        benefits: ['Conciergerie', 'Mutuelle'],
+      });
+    });
+
+    it("never returns another recruiter's company", async () => {
+      const alice = await createRecruiterWithCompany({
+        company: { name: 'Alice Corp', description: 'desc-alice' },
+        firstName: 'Alice',
+      });
+      const bob = await createRecruiterWithCompany({
+        company: { name: 'Bob Corp', description: 'desc-bob' },
+        firstName: 'Bob',
+      });
+      await linkTag(alice.company.id, 'Mutuelle', 'benefit');
+      await linkTag(bob.company.id, 'Voiture de fonction', 'benefit');
+
+      const res = await readMine(alice.user.id).expect(200);
+
+      expect(res.body).toMatchObject({
+        id: alice.company.id,
+        name: 'Alice Corp',
+        benefits: ['Mutuelle'],
+        recruiter: { firstName: 'Alice' },
+      });
+      expect(JSON.stringify(res.body)).not.toContain('Bob');
+      expect(JSON.stringify(res.body)).not.toContain('desc-bob');
+      expect(JSON.stringify(res.body)).not.toContain('Voiture de fonction');
+    });
+
+    /**
+     * `toEqual` treats a missing key as `undefined` but not as `null`, so this
+     * locks the keys being present and empty. The edit form binds to all of
+     * them; an absent key would render as an uncontrolled input.
+     */
+    it('answers null and empty lists for a company with nothing filled in', async () => {
+      const { user, company } = await createRecruiterWithCompany();
+
+      const res = await readMine(user.id).expect(200);
+
+      expect(res.body).toEqual({
+        id: company.id,
+        name: 'Acme',
+        logo: null,
+        size: null,
+        sectorId: null,
+        description: null,
+        siteUrl: null,
+        coverImage: null,
+        city: null,
+        postalCode: null,
+        latitude: null,
+        longitude: null,
+        benefits: [],
+        recruiter: {
+          firstName: 'Rick',
+          lastName: 'Deckard',
+          jobTitle: null,
+        },
+        createdAt: expect.any(String) as string,
+        updatedAt: expect.any(String) as string,
+      });
+    });
   });
 });
