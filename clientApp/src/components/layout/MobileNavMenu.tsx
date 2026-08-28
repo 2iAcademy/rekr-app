@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { NavLink } from 'react-router';
@@ -7,9 +8,15 @@ import type { NavigationItem } from './navigation';
 interface MobileNavMenuProps {
   items: NavigationItem[];
   onClose: () => void;
+  /**
+   * The way out of the session, handed down rather than reached for: this
+   * chrome is presentational, and calling `useAuth` here would tie it — and its
+   * specs — to a provider it otherwise never needs.
+   */
+  logout?: ReactNode;
 }
 
-export function MobileNavMenu({ items, onClose }: MobileNavMenuProps) {
+export function MobileNavMenu({ items, onClose, logout }: MobileNavMenuProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -84,6 +91,10 @@ export function MobileNavMenu({ items, onClose }: MobileNavMenuProps) {
             ))}
           </ul>
         </nav>
+
+        {/* Below the navigation, separated: it ends the session rather than
+            leading somewhere, so it does not belong among the destinations. */}
+        <div className="mt-6 border-t border-line pt-4">{logout}</div>
       </div>
     </dialog>
   );

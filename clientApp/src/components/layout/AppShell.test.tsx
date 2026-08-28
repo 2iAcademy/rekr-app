@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AuthContext, type AuthContextValue, type AuthStatus } from '@/features/auth/auth-context';
 import { ROLE_THEMES } from '@/lib/roleTheme';
+import { installDialogDouble } from '@/test/dialog';
 import { AppShell } from './AppShell';
+
+// jsdom 29 livre `HTMLDialogElement` sans `showModal`.
+installDialogDouble();
 
 type UserType = 'candidate' | 'recruiter';
 
@@ -112,6 +117,55 @@ describe('AppShell', () => {
     renderShell('recruiter');
 
     expect(screen.getAllByRole('main')).toHaveLength(1);
+  });
+
+  /**
+   * La déconnexion vit dans le chrome, à côté de l'identité qu'elle termine.
+   * Elle attendait au bas de la fiche de compte, après un formulaire qu'il
+   * fallait dérouler en entier pour la trouver.
+   *
+   * Trois paliers, trois porteurs : la barre latérale au-dessus de 1440, le
+   * menu burger en dessous de 768, et l'en-tête entre les deux — c'est la seule
+   * largeur que ni l'une ni l'autre ne sert.
+   */
+  describe('déconnexion', () => {
+    it('la propose depuis la barre latérale, à côté du bloc profil', () => {
+      renderShell('candidate');
+
+      expect(within(sidebar()).getByRole('button', { name: 'Se déconnecter' })).toBeInTheDocument();
+    });
+
+    it('la propose dans l’en-tête, pour la largeur que les deux autres ne servent pas', () => {
+      renderShell('candidate');
+
+      expect(
+        within(screen.getByRole('banner')).getByRole('button', { name: 'Se déconnecter' }),
+      ).toBeInTheDocument();
+    });
+
+    it('la propose dans le menu mobile', async () => {
+      const user = userEvent.setup();
+      renderShell('candidate');
+
+      await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+
+      expect(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Se déconnecter' }),
+      ).toBeInTheDocument();
+    });
+
+    // La chaîne complète : le clic termine la session, et c'est la garde du
+    // shell qui renvoie vers la connexion.
+    it('termine la session et renvoie vers la connexion', async () => {
+      const user = userEvent.setup();
+      const logout = vi.fn().mockResolvedValue(undefined);
+      const { router } = renderWith({ ...session('candidate'), logout });
+
+      await user.click(within(sidebar()).getByRole('button', { name: 'Se déconnecter' }));
+
+      await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
+      expect(router.state.location.pathname).toBe('/');
+    });
   });
 
   it('monte les deux chromes du shell', () => {

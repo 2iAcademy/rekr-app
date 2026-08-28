@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { LogoutButton } from '@/features/profile/components/LogoutButton';
 
 interface AccountPageProps {
   email: string;
@@ -34,10 +33,6 @@ export function AccountPage({ email, roleLabel, children }: AccountPageProps) {
       </dl>
 
       {children}
-
-      <div className="mt-8 flex justify-start border-t border-line pt-6">
-        <LogoutButton />
-      </div>
     </div>
   );
 }

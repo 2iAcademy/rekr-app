@@ -2,6 +2,7 @@ import { Navigate, Outlet } from 'react-router';
 import { isRecruiter, userTypeLabel } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
 import type { RoleTheme } from '@/lib/roleTheme';
+import { LogoutButton } from '@/features/profile/components/LogoutButton';
 import { AppHeader } from './AppHeader';
 import { AppShellSkeleton } from './AppShellSkeleton';
 import { AppSidebar } from './AppSidebar';
@@ -49,13 +50,21 @@ export function AppShell() {
     // are `sticky bottom-0` and would anchor here instead of the viewport.
     // `overflow: clip` still forbids the horizontal scroll without that.
     <div data-role={roleTheme} className="flex min-h-dvh w-full overflow-x-clip bg-background">
-      <AppSidebar items={items} user={shellUser} profileTo={PROFILE_TO} />
+      <AppSidebar items={items} user={shellUser} profileTo={PROFILE_TO} logout={<LogoutButton />} />
 
       {/* `min-w-0` lets the column shrink below the intrinsic width of its
           content: without it a wide child pushes the layout and brings back the
           horizontal scroll the ticket forbids. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <AppHeader items={items} user={shellUser} profileTo={PROFILE_TO} />
+        <AppHeader
+          items={items}
+          user={shellUser}
+          profileTo={PROFILE_TO}
+          // Tablet only: below `md` the burger menu carries it, above `desktop`
+          // the sidebar does. This is the one width served by neither.
+          logoutIcon={<LogoutButton appearance="icon" className="hidden md:flex desktop:hidden" />}
+          logoutEntry={<LogoutButton className="w-full" />}
+        />
 
         <main className="flex-1 px-4 pt-4 pb-8 sm:px-6 sm:pt-6 md:px-12 md:pt-12 desktop:px-16 desktop:pt-16">
           <Outlet />

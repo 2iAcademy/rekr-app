@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Link, NavLink } from 'react-router';
@@ -16,9 +17,16 @@ interface AppHeaderProps {
   items: NavigationItem[];
   user: ShellUser;
   profileTo: string;
+  /**
+   * The way out of the session, handed down rather than reached for: this
+   * chrome is presentational, and calling `useAuth` here would tie it — and its
+   * specs — to a provider it otherwise never needs.
+   */
+  logoutIcon?: ReactNode;
+  logoutEntry?: ReactNode;
 }
 
-export function AppHeader({ items, user, profileTo }: AppHeaderProps) {
+export function AppHeader({ items, user, profileTo, logoutIcon, logoutEntry }: AppHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const burgerRef = useRef<HTMLButtonElement>(null);
 
@@ -96,18 +104,25 @@ export function AppHeader({ items, user, profileTo }: AppHeaderProps) {
           </ul>
         </nav>
 
-        <Link
-          to={profileTo}
-          aria-label="Mon profil"
-          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink hover:bg-brand-tint"
-        >
-          <span className="flex size-8 items-center justify-center rounded-full bg-violet font-heading text-xs font-bold text-white shadow-violet">
-            {user.name.charAt(0).toUpperCase()}
-          </span>
-        </Link>
+        <div className="flex shrink-0 items-center gap-1">
+          <Link
+            to={profileTo}
+            aria-label="Mon profil"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink hover:bg-brand-tint"
+          >
+            <span className="flex size-8 items-center justify-center rounded-full bg-violet font-heading text-xs font-bold text-white shadow-violet">
+              {user.name.charAt(0).toUpperCase()}
+            </span>
+          </Link>
+
+          {/* Tablet only: below `md` the burger menu carries it, above
+              `desktop` the sidebar does. This is the one width served by
+              neither, and without it the session could not be ended there. */}
+          {logoutIcon}
+        </div>
       </header>
 
-      {isMenuOpen && <MobileNavMenu items={items} onClose={closeMenu} />}
+      {isMenuOpen && <MobileNavMenu items={items} onClose={closeMenu} logout={logoutEntry} />}
     </>
   );
 }
