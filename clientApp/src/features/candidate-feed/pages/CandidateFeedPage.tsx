@@ -38,6 +38,17 @@ export function CandidateFeedPage({ onOpenOffer }: CandidateFeedPageProps) {
   const liked = likedCount(decisions);
 
   /**
+   * « Tu as tout vu » est faux sur un deck vide à l'arrivée : le candidat n'a
+   * rien vu du tout, ses critères n'ont simplement rien laissé passer. Aucune
+   * décision prise sur un paquet vide, c'est exactement ce cas.
+   */
+  const untouched = Object.keys(decisions).length === 0;
+  const deckEndTitle =
+    offers.length === 0 && untouched
+      ? 'Aucune offre ne correspond à tes critères'
+      : 'Tu as tout vu';
+
+  /**
    * The card leaves the deck the moment it is answered, before the server has
    * agreed. That is deliberate: a swipe that waited on the network would stall
    * the deck, and a like nobody sees fail is a worse outcome than a like that
@@ -84,7 +95,11 @@ export function CandidateFeedPage({ onOpenOffer }: CandidateFeedPageProps) {
     <div className="mx-auto mt-5 flex w-full max-w-xl flex-col gap-4 md:mx-0 md:mt-0">
       <h1 className="sr-only">Offres</h1>
 
-      {status === 'loading' && <p className="text-sm text-ink-muted">Chargement…</p>}
+      {status === 'loading' && (
+        <p role="status" className="text-sm text-ink-muted">
+          Chargement…
+        </p>
+      )}
 
       {status === 'failed' && (
         <p role="alert" className="text-sm text-destructive">
@@ -101,9 +116,14 @@ export function CandidateFeedPage({ onOpenOffer }: CandidateFeedPageProps) {
         aria-label="Offres à parcourir"
         className="flex flex-1 flex-col gap-5 outline-none"
       >
-        <p role="status" className="sr-only">
-          {current ? `Offre ${current.title} chez ${current.company.name}` : 'Tu as tout vu'}
-        </p>
+        {/* Announced only once the answer is in: `offers` starts empty, so
+            saying « tu as tout vu » before that — or on a failed load, next to
+            the alert that says the opposite — would be a lie read aloud. */}
+        {status === 'ready' && (
+          <p role="status" className="sr-only">
+            {current ? `Offre ${current.title} chez ${current.company.name}` : deckEndTitle}
+          </p>
+        )}
 
         {current ? (
           <>
@@ -139,7 +159,7 @@ export function CandidateFeedPage({ onOpenOffer }: CandidateFeedPageProps) {
         ) : (
           status === 'ready' && (
             <EmptyDeck
-              title="Tu as tout vu"
+              title={deckEndTitle}
               itemPlural="offres"
               likedCount={liked}
               likedLabel={likedOfferCountLabel}

@@ -466,39 +466,6 @@ describe('OfferService', () => {
       expect(where).not.toHaveProperty('city');
     });
 
-    it('maps the experience filter onto the minimum level of the offer', async () => {
-      await service.findFeed(candidate, {
-        ...new OfferFeedQueryDto(),
-        experienceLevel: 'SENIOR',
-      });
-
-      expect(whereOf()).toMatchObject({ minExperienceLevel: 'SENIOR' });
-    });
-
-    it('carries the contract and remote filters straight through', async () => {
-      await service.findFeed(candidate, {
-        ...new OfferFeedQueryDto(),
-        contractType: 'CDI',
-        remotePolicy: 'FULL_REMOTE',
-      });
-
-      expect(whereOf()).toMatchObject({
-        contractType: 'CDI',
-        remotePolicy: 'FULL_REMOTE',
-      });
-    });
-
-    it('compares the city without regard to case', async () => {
-      await service.findFeed(candidate, {
-        ...new OfferFeedQueryDto(),
-        city: 'lYoN',
-      });
-
-      expect(whereOf()).toMatchObject({
-        city: { equals: 'lYoN', mode: 'insensitive' },
-      });
-    });
-
     // `createdAt` is not unique, so the id break is what keeps two reads of
     // the deck in the same order.
     it('orders by creation date then id, and takes the deck from the top', async () => {

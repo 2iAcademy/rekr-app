@@ -9,18 +9,34 @@ describe('OfferCard', () => {
     render(<OfferCard offer={anOffer} onViewOffer={vi.fn()} />);
 
     expect(screen.getByRole('heading', { name: 'Développeur Frontend React' })).toBeInTheDocument();
-    expect(screen.getByText('Studio Lumen · CDI · Lyon')).toBeInTheDocument();
+    expect(screen.getByText('Studio Lumen · CDI · Hybride · Lyon')).toBeInTheDocument();
     expect(screen.getByText('45 - 55 k€')).toBeInTheDocument();
   });
 
-  // Le type de contrat reste une information sur l'offre — ce n'est plus un
-  // filtre, mais le candidat doit toujours pouvoir le lire sur la carte.
-  it('écarte de la ligne de contexte ce que l’offre n’a pas renseigné', () => {
+  /**
+   * Une offre qui n'a rien renseigné entre dans le deck de tout le monde : le
+   * filtrage par profil la laisse passer plutôt que de la traiter comme un
+   * refus. Le taire reviendrait à faire lire un accord là où il n'y a qu'un
+   * silence — un candidat qui a demandé du télétravail complet croirait que
+   * l'offre le propose.
+   */
+  it('dit explicitement ce que l’offre n’a pas renseigné', () => {
     render(
-      <OfferCard offer={{ ...anOffer, contractType: null, city: null }} onViewOffer={vi.fn()} />,
+      <OfferCard
+        offer={{ ...anOffer, contractType: null, remotePolicy: null }}
+        onViewOffer={vi.fn()}
+      />,
     );
 
-    expect(screen.getByText('Studio Lumen')).toBeInTheDocument();
+    expect(
+      screen.getByText('Studio Lumen · Contrat non précisé · Télétravail non précisé · Lyon'),
+    ).toBeInTheDocument();
+  });
+
+  it('écarte de la ligne de contexte la ville absente, qui n’engage rien', () => {
+    render(<OfferCard offer={{ ...anOffer, city: null }} onViewOffer={vi.fn()} />);
+
+    expect(screen.getByText('Studio Lumen · CDI · Hybride')).toBeInTheDocument();
   });
 
   it('délègue l’ouverture du détail', async () => {

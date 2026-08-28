@@ -158,11 +158,50 @@ describe('CandidateFeedPage', () => {
     await waitFor(() => expect(findFeed).toHaveBeenCalledTimes(2));
   });
 
-  // Un paquet vide au chargement n'est pas une fin de paquet : l'écran ne doit
-  // pas annoncer « tu as tout vu » avant d'avoir reçu la réponse.
-  it('n’annonce pas la fin du deck pendant le chargement', () => {
+  /**
+   * `queryByRole('heading')` ne verrait que le titre de `EmptyDeck` et
+   * laisserait passer la région live, qui est justement l'endroit où la phrase
+   * s'échappait. C'est le texte entier qui doit être absent.
+   */
+  it('n’annonce nulle part la fin du deck pendant le chargement', () => {
     renderPage();
 
-    expect(screen.queryByRole('heading', { name: 'Tu as tout vu' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/tu as tout vu/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/aucune offre ne correspond/i)).not.toBeInTheDocument();
+  });
+
+  // Deux messages contradictoires à la fois : un lecteur d'écran recevait
+  // l'alerte d'échec ET l'annonce de fin de deck.
+  it('n’annonce pas la fin du deck quand le chargement a échoué', async () => {
+    findFeed.mockRejectedValueOnce(new Error('réseau'));
+    renderPage();
+
+    await screen.findByRole('alert');
+
+    expect(screen.queryByText(/tu as tout vu/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * « Tu as tout vu » est faux quand le deck arrive vide : le candidat n'a rien
+   * vu, ses critères n'ont rien laissé passer. Le message doit le renvoyer à
+   * son profil, pas le féliciter.
+   */
+  it('distingue un deck vide à l’arrivée d’un deck épuisé', async () => {
+    findFeed.mockResolvedValue(answer([]));
+    renderPage();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Aucune offre ne correspond à tes critères' }),
+    ).toBeInTheDocument();
+  });
+
+  it('annonce la fin du deck une fois toutes les offres répondues', async () => {
+    const user = userEvent.setup();
+    findFeed.mockResolvedValue(answer([anOffer]));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Passer' }));
+
+    expect(screen.getByRole('heading', { name: 'Tu as tout vu' })).toBeInTheDocument();
   });
 });

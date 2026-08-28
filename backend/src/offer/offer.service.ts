@@ -211,10 +211,14 @@ export class OfferService {
    *
    * The preferences are read here from the stored profile rather than taken
    * from the query: they are already recorded, so asking the client to resend
-   * them would give one fact two sources — and let a caller widen their own
-   * deck past what they told the product they were looking for. The screen has
-   * no filter bar for the same reason: those two axes are edited on the
-   * profile, and nowhere else.
+   * them would give one fact two sources, and let the deck drift from the
+   * profile the candidate is shown. The screen has no filter bar for the same
+   * reason — those two axes are edited on the profile, and nowhere else.
+   *
+   * This is curation, NOT an access boundary, and nothing here should be read
+   * as one: `GET /offers/:id` and `POST /offers/:id/like` both serve any `open`
+   * offer to any candidate, preferences or not. A narrower deck hides nothing
+   * that iterating over the ids would not reveal.
    *
    * An unset preference narrows nothing: the candidate did not say, which is
    * not the same as wanting nothing. Symmetrically, an offer that left the
@@ -224,7 +228,7 @@ export class OfferService {
     user: AuthUser,
     query: OfferFeedQueryDto,
   ): Promise<OfferFeedItemDto[]> {
-    const { limit, contractType, experienceLevel, remotePolicy, city } = query;
+    const { limit } = query;
 
     const profile = await this.prisma.candidateProfile.findUnique({
       where: { userId: user.id },
@@ -264,10 +268,6 @@ export class OfferService {
       where: {
         status: 'open',
         ...(preferences.length > 0 ? { AND: preferences } : {}),
-        ...(contractType ? { contractType } : {}),
-        ...(experienceLevel ? { minExperienceLevel: experienceLevel } : {}),
-        ...(remotePolicy ? { remotePolicy } : {}),
-        ...(city ? { city: { equals: city, mode: 'insensitive' } } : {}),
         candidateLikes: { none: { candidateUserId: user.id } },
         candidatePasses: { none: { candidateUserId: user.id } },
       },

@@ -412,68 +412,24 @@ describe('Offer feed (e2e)', () => {
     });
   });
 
-  describe('filters', () => {
-    it('filters on the contract type', async () => {
-      const cdi = await seedOffer({ contractType: 'CDI' });
-      await seedOffer({ contractType: 'FREELANCE' });
+  /**
+   * The deck no longer takes filters. The two axes it used to accept — contract
+   * type and remote policy — are read from the candidate's profile instead
+   * (`shaped by the candidate profile` above), and keeping the query parameters
+   * would advertise a second way to say the same thing, with a different
+   * meaning: a query filter drops the offers whose column is null where a
+   * preference keeps them.
+   */
+  describe('the retired query filters', () => {
+    it.each([
+      'contractType=CDI',
+      'experienceLevel=JUNIOR',
+      'remotePolicy=HYBRID',
+      'city=Lyon',
+    ])('refuses %s as an unknown parameter (400)', async (query) => {
+      await seedOffer();
 
-      const res = await getFeed('?contractType=CDI').expect(200);
-
-      expect(idsOf(res)).toEqual([cdi.id]);
-    });
-
-    it('filters on the minimum experience level', async () => {
-      const senior = await seedOffer({ minExperienceLevel: 'SENIOR' });
-      await seedOffer({ minExperienceLevel: 'JUNIOR' });
-
-      const res = await getFeed('?experienceLevel=SENIOR').expect(200);
-
-      expect(idsOf(res)).toEqual([senior.id]);
-    });
-
-    it('filters on the remote policy', async () => {
-      const remote = await seedOffer({ remotePolicy: 'FULL_REMOTE' });
-      await seedOffer({ remotePolicy: 'ON_SITE' });
-
-      const res = await getFeed('?remotePolicy=FULL_REMOTE').expect(200);
-
-      expect(idsOf(res)).toEqual([remote.id]);
-    });
-
-    it('filters on the city', async () => {
-      const lyon = await seedOffer({ city: 'Lyon' });
-      await seedOffer({ city: 'Marseille' });
-
-      const res = await getFeed('?city=Lyon').expect(200);
-
-      expect(idsOf(res)).toEqual([lyon.id]);
-    });
-
-    it('matches the city whatever the case', async () => {
-      const lyon = await seedOffer({ city: 'Lyon' });
-      await seedOffer({ city: 'Marseille' });
-
-      const res = await getFeed('?city=lYoN').expect(200);
-
-      expect(idsOf(res)).toEqual([lyon.id]);
-    });
-
-    it('combines two filters', async () => {
-      const wanted = await seedOffer({
-        contractType: 'CDI',
-        remotePolicy: 'FULL_REMOTE',
-      });
-      await seedOffer({ contractType: 'CDI', remotePolicy: 'ON_SITE' });
-      await seedOffer({
-        contractType: 'FREELANCE',
-        remotePolicy: 'FULL_REMOTE',
-      });
-
-      const res = await getFeed(
-        '?contractType=CDI&remotePolicy=FULL_REMOTE',
-      ).expect(200);
-
-      expect(idsOf(res)).toEqual([wanted.id]);
+      await getFeed(`?${query}`).expect(400);
     });
   });
 

@@ -514,23 +514,6 @@ export type OfferControllerFindFeedParams = {
    * @maximum 100
    */
   limit?: number;
-  /**
-   * Ne garder que les résultats de ce type de contrat.
-   */
-  contractType?: ContractType;
-  /**
-   * Ne garder que les résultats de ce niveau d'expérience.
-   */
-  experienceLevel?: ExperienceLevel;
-  /**
-   * Ne garder que les résultats de ce mode de télétravail.
-   */
-  remotePolicy?: RemotePolicy;
-  /**
-   * Ne garder que les résultats situés dans cette commune.
-   * @maxLength 100
-   */
-  city?: string;
 };
 
 export type OfferControllerFindLikedParams = {
