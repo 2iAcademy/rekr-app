@@ -1,21 +1,15 @@
 import { MatchesPage } from '@/features/matches/MatchesPage';
-import { Navigate, useLocation, useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { homePathFor } from '@/domain/homeRoute';
-import { useAuth } from '@/features/auth/useAuth';
+import { RouteGuard } from '@/features/auth/RouteGuard';
 import { MatchPage } from '@/features/matches/pages/MatchPage';
 
 export function MatchesRoute() {
-  const { status } = useAuth();
-
-  if (status === 'loading') {
-    return null;
-  }
-
-  if (status !== 'authenticated') {
-    return <Navigate to="/connexion" replace />;
-  }
-
-  return <MatchesPage />;
+  return (
+    <RouteGuard>
+      <MatchesPage />
+    </RouteGuard>
+  );
 }
 
 interface MatchRouteState {
@@ -28,26 +22,23 @@ interface MatchRouteState {
 export function MatchRoute() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { status, user } = useAuth();
-
-  if (status === 'loading') {
-    return null;
-  }
-
-  if (status !== 'authenticated') {
-    return <Navigate to="/connexion" replace />;
-  }
-
   const { matchedProfile = { name: 'Votre match', avatarUrl: null } } =
     (location.state as MatchRouteState | null) ?? {};
-  const currentUserName = user?.email.split('@')[0] || 'Toi';
 
   return (
-    <MatchPage
-      currentUser={{ name: currentUserName }}
-      matchedProfile={matchedProfile}
-      onContinue={() => navigate(homePathFor(user))}
-      onWriteMessage={() => navigate(homePathFor(user))}
-    />
+    <RouteGuard>
+      {(user) => {
+        const currentUserName = user.email.split('@')[0] || 'Toi';
+
+        return (
+          <MatchPage
+            currentUser={{ name: currentUserName }}
+            matchedProfile={matchedProfile}
+            onContinue={() => navigate(homePathFor(user))}
+            onWriteMessage={() => navigate(homePathFor(user))}
+          />
+        );
+      }}
+    </RouteGuard>
   );
 }

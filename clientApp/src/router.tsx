@@ -2,7 +2,7 @@ import { createBrowserRouter } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
 import { AnonymousOnly } from '@/features/auth/AnonymousOnly';
 import { HomeRedirect } from '@/features/auth/HomeRedirect';
-import { RequireOnboarding } from '@/features/auth/RequireOnboarding';
+import { RouteGuard } from '@/features/auth/RouteGuard';
 import { CandidateOnboardingRoute } from '@/features/candidate-onboarding/routes';
 import { CandidateFeedRoute } from '@/features/candidate-feed/routes';
 import { MatchRoute, MatchesRoute } from '@/features/matches/routes';
@@ -29,15 +29,10 @@ export const routes = [
     ],
   },
 
-  /*
-   * Outside `RequireOnboarding`: these are the screens that resolve it. Inside,
-   * the gate would redirect to the wizard from the wizard.
-   */
   { path: '/candidat/onboarding', element: <CandidateOnboardingRoute /> },
   { path: '/recruteur/onboarding', element: <RecruiterOnboardingRoute /> },
-
   {
-    element: <RequireOnboarding />,
+    element: <RouteGuard profile="complete" />,
     children: [
       { path: '/offres/:id', element: <OfferDetailRoute /> },
       { path: '/match', element: <MatchRoute /> },
@@ -46,6 +41,12 @@ export const routes = [
         children: [
           { path: '/matches', element: <MatchesRoute /> },
           { path: '/recruteur/candidats', element: <RecruiterFeedRoute /> },
+          { path: '/recruteur/offres', element: <RecruiterOffersRoute /> },
+          // Declared before the dynamic sibling, which is where a reader looks
+          // for the answer; react-router ranks by specificity, so the order is a
+          // convention here rather than the thing that keeps them apart.
+          { path: '/recruteur/offres/nouvelle', element: <OfferFormRoute /> },
+          { path: '/recruteur/offres/:id/edition', element: <OfferFormRoute /> },
           { path: '/candidat/offres', element: <CandidateFeedRoute /> },
           { path: '/profil', element: <ProfileRoute /> },
         ],

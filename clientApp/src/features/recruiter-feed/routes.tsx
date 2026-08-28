@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
-import { Navigate, useSearchParams } from 'react-router';
-import { homePathFor } from '@/domain/homeRoute';
-import { isRecruiter } from '@/domain/userType';
-import { useAuth } from '@/features/auth/useAuth';
+import { useSearchParams } from 'react-router';
+import { RouteGuard } from '@/features/auth/RouteGuard';
 import { RecruiterFeedPage } from '@/features/recruiter-feed/pages/RecruiterFeedPage';
 
 // The detail screen is a state of the feed, not a route: the deck lives in the
@@ -22,7 +20,14 @@ const parseCandidateId = (raw: string | null): number | null => {
 };
 
 export function RecruiterFeedRoute() {
-  const { status, user } = useAuth();
+  return (
+    <RouteGuard allowedUserTypes={['recruiter']}>
+      <RecruiterFeedContent />
+    </RouteGuard>
+  );
+}
+
+function RecruiterFeedContent() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const rawProfile = searchParams.get(PROFILE_PARAM);
@@ -34,16 +39,12 @@ export function RecruiterFeedRoute() {
   // absent one is already canonical since both sides are then `null`.
   const canonicalProfile = openCandidateId === null ? null : String(openCandidateId);
   const isProfileCanonical = rawProfile === canonicalProfile;
-  const recruiter = status === 'authenticated' && isRecruiter(user?.userType);
 
-  // Declared above the redirects below so the hook is always called, and guarded
-  // inside rather than around: rewriting the search params of a visitor who is
-  // being sent elsewhere would only add a navigation before the redirect.
-  //
-  // Writing the canonical form makes the guard true on the next run, so the
-  // effect corrects the URL once and then stays idle however often it re-runs.
+  // This content only mounts once `RouteGuard` has admitted a recruiter. Keeping
+  // the URL effect below that boundary means a rejected visitor's URL is never
+  // rewritten before their redirect.
   useEffect(() => {
-    if (!recruiter || isProfileCanonical) {
+    if (isProfileCanonical) {
       return;
     }
 
@@ -63,19 +64,7 @@ export function RecruiterFeedRoute() {
       // should have to walk back through.
       { replace: true },
     );
-  }, [canonicalProfile, isProfileCanonical, recruiter, setSearchParams]);
-
-  if (status === 'loading') {
-    return null;
-  }
-
-  if (status !== 'authenticated') {
-    return <Navigate to="/connexion" replace />;
-  }
-
-  if (!isRecruiter(user?.userType)) {
-    return <Navigate to={homePathFor(user)} replace />;
-  }
+  }, [canonicalProfile, isProfileCanonical, setSearchParams]);
 
   const openProfile = (id: number): void => {
     const next = new URLSearchParams(searchParams);
