@@ -77,6 +77,12 @@ export default defineConfig({
           functions: 80,
           lines: 80,
         },
+        'src/features/recruiter-offers/**': {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
         'src/features/profile/**': {
           statements: 80,
           branches: 80,

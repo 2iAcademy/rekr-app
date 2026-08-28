@@ -5,7 +5,24 @@ import { resolveTagIds } from '../common/tags/tag-sync';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
+import { OfferListItemDto } from './dto/offer-list-item.dto';
+import { OfferListQueryDto } from './dto/offer-list-query.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
+
+const LIST_ITEM_COLUMNS = {
+  id: true,
+  title: true,
+  status: true,
+  city: true,
+  postalCode: true,
+  contractType: true,
+  minExperienceLevel: true,
+  remotePolicy: true,
+  salaryMin: true,
+  salaryMax: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 @Injectable()
 export class OfferService {
@@ -75,6 +92,36 @@ export class OfferService {
       }
 
       return updated;
+    });
+  }
+
+  /**
+   * The recruiter's own offers, every status included — this is the screen
+   * where a draft gets published and a closed offer reopened, not the candidate
+   * feed. Scoping on the company rather than on `createdById` is what lets a
+   * second recruiter of the same company take over an offer they did not write.
+   */
+  async findMine(
+    userId: number,
+    { page = 1, limit = 50, status }: OfferListQueryDto,
+  ): Promise<OfferListItemDto[]> {
+    const profile = await this.prisma.recruiterProfile.findUnique({
+      where: { userId },
+      select: { companyId: true },
+    });
+    if (!profile) {
+      throw new NotFoundException('Recruiter has no company');
+    }
+
+    return this.prisma.offer.findMany({
+      where: {
+        companyId: profile.companyId,
+        ...(status ? { status } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: LIST_ITEM_COLUMNS,
     });
   }
 

@@ -3,9 +3,15 @@ import { Test } from '@nestjs/testing';
 import { OfferService } from './offer.service';
 import { CityService } from '../city/city.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { OfferListQueryDto } from './dto/offer-list-query.dto';
 
 type PrismaMock = {
-  offer: { create: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+  offer: {
+    create: jest.Mock;
+    findUnique: jest.Mock;
+    findMany: jest.Mock;
+    update: jest.Mock;
+  };
   recruiterProfile: { findUnique: jest.Mock };
   offerTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
@@ -14,7 +20,12 @@ type PrismaMock = {
 
 const buildPrismaMock = (): PrismaMock => {
   const mock: PrismaMock = {
-    offer: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    offer: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      update: jest.fn(),
+    },
     recruiterProfile: { findUnique: jest.fn() },
     offerTag: { deleteMany: jest.fn(), createMany: jest.fn() },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
@@ -213,6 +224,70 @@ describe('OfferService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(prisma.offer.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findMine', () => {
+    const listQuery = (
+      overrides: Partial<OfferListQueryDto> = {},
+    ): OfferListQueryDto => Object.assign(new OfferListQueryDto(), overrides);
+
+    it("lists the offers of the recruiter's company, newest first", async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      prisma.offer.findMany.mockResolvedValue([{ id: 50 }, { id: 49 }]);
+
+      const result = await service.findMine(7, listQuery());
+
+      expect(prisma.offer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { companyId: 10 },
+          orderBy: { createdAt: 'desc' },
+        }),
+      );
+      expect(result).toEqual([{ id: 50 }, { id: 49 }]);
+    });
+
+    it('turns page and limit into skip and take', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+
+      await service.findMine(7, listQuery({ page: 3, limit: 20 }));
+
+      expect(prisma.offer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 40, take: 20 }),
+      );
+    });
+
+    it('narrows the list to one status when one is asked for', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+
+      await service.findMine(7, listQuery({ status: 'open' }));
+
+      expect(prisma.offer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { companyId: 10, status: 'open' } }),
+      );
+    });
+
+    // The recruiter management screen is the one place every status shows,
+    // draft and closed included, so an absent filter must not silently become
+    // one.
+    it('leaves every status in when no status is asked for', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+
+      await service.findMine(7, listQuery());
+
+      expect(prisma.offer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { companyId: 10 } }),
+      );
+    });
+
+    it('rejects the list when the recruiter has no company (404)', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(null);
+
+      await expect(service.findMine(7, listQuery())).rejects.toThrow(
+        new NotFoundException('Recruiter has no company'),
+      );
+
+      expect(prisma.offer.findMany).not.toHaveBeenCalled();
     });
   });
 });

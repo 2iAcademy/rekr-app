@@ -133,6 +133,27 @@ describe('AppShell', () => {
     }
   });
 
+  // The offers screen is reserved to recruiters, so an entry offered to a
+  // candidate would only bounce them back to the home page. The shell is the
+  // one place that knows the role, hence the case here rather than in the
+  // chromes, which render whatever list they are handed.
+  it('ouvre la gestion des offres au recruteur dans les deux chromes', () => {
+    renderShell('recruiter');
+
+    const offerLinks = screen.getAllByRole('link', { name: 'Mes offres' });
+
+    expect(offerLinks).toHaveLength(2);
+    for (const link of offerLinks) {
+      expect(link).toHaveAttribute('href', '/recruteur/offres');
+    }
+  });
+
+  it('ne propose pas la gestion des offres à un candidat', () => {
+    renderShell('candidate');
+
+    expect(screen.queryByRole('link', { name: 'Mes offres' })).not.toBeInTheDocument();
+  });
+
   it('pointe le bloc profil des deux chromes sur l’écran profil', () => {
     renderShell('recruiter');
 

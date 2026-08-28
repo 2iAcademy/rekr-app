@@ -6,9 +6,12 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { installDialogDouble } from '@/test/dialog';
 import { MobileNavMenu } from './MobileNavMenu';
 
+// The recruiter's own list: it is the longest one the chromes are handed, so a
+// spec built on it also answers for the candidate's.
 const items = [
   { label: 'Feed', to: '/recruteur/candidats' },
   { label: 'Matches', to: '/matches' },
+  { label: 'Mes offres', to: '/recruteur/offres' },
   { label: 'Profil', to: '/profil' },
 ];
 
@@ -44,10 +47,16 @@ describe('MobileNavMenu', () => {
     const links = screen.getAllByRole('link');
 
     expect(navigation).toBeInTheDocument();
-    expect(links.map((link) => link.textContent)).toEqual(['Feed', 'Matches', 'Profil']);
+    expect(links.map((link) => link.textContent)).toEqual([
+      'Feed',
+      'Matches',
+      'Mes offres',
+      'Profil',
+    ]);
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/recruteur/candidats',
       '/matches',
+      '/recruteur/offres',
       '/profil',
     ]);
   });

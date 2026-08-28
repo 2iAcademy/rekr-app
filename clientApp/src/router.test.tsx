@@ -16,6 +16,9 @@ vi.mock('@/api/generated', () => ({
   companyControllerCreate: vi.fn(),
   companyControllerUpdateMine: vi.fn(),
   offerControllerCreate: vi.fn(),
+  offerControllerFindMine: vi.fn(),
+  offerControllerFindOneById: vi.fn(),
+  offerControllerUpdate: vi.fn(),
   sectorControllerFindAll: vi.fn(),
 }));
 
@@ -55,6 +58,9 @@ const ALLOWED_USER_TYPES: Record<string, readonly UserType[]> = {
   '/profil': USER_TYPES,
   '/recruteur/candidats': ['recruiter'],
   '/candidat/offres': ['candidate'],
+  '/recruteur/offres': ['recruiter'],
+  '/recruteur/offres/nouvelle': ['recruiter'],
+  '/recruteur/offres/:id/edition': ['recruiter'],
 };
 
 // One case per screen and per user type it is *not* meant for.
@@ -111,6 +117,9 @@ describe('table de routage', () => {
       '/matches',
       '/profil',
       '/recruteur/candidats',
+      '/recruteur/offres',
+      '/recruteur/offres/:id/edition',
+      '/recruteur/offres/nouvelle',
     ]);
   });
 
