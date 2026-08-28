@@ -206,15 +206,64 @@ export class OfferService {
     }));
   }
 
+  /**
+   * The deck a candidate swipes, shaped by their own profile.
+   *
+   * The preferences are read here from the stored profile rather than taken
+   * from the query: they are already recorded, so asking the client to resend
+   * them would give one fact two sources — and let a caller widen their own
+   * deck past what they told the product they were looking for. The screen has
+   * no filter bar for the same reason: those two axes are edited on the
+   * profile, and nowhere else.
+   *
+   * An unset preference narrows nothing: the candidate did not say, which is
+   * not the same as wanting nothing. Symmetrically, an offer that left the
+   * field empty is kept — a post that never said is not a post that says no.
+   */
   async findFeed(
     user: AuthUser,
     query: OfferFeedQueryDto,
   ): Promise<OfferFeedItemDto[]> {
     const { limit, contractType, experienceLevel, remotePolicy, city } = query;
 
+    const profile = await this.prisma.candidateProfile.findUnique({
+      where: { userId: user.id },
+      select: { contractTypes: true, remotePolicy: true },
+    });
+
+    const wantedContracts = profile?.contractTypes ?? [];
+    const wantedRemote = profile?.remotePolicy ?? null;
+
+    // Collected in an `AND` rather than spread as two `OR` keys: a second `OR`
+    // at the same level would overwrite the first, silently dropping one of the
+    // two preferences. `null` cannot ride in an `in` either, hence the pairs.
+    const preferences: Prisma.OfferWhereInput[] = [
+      ...(wantedContracts.length > 0
+        ? [
+            {
+              OR: [
+                { contractType: { in: wantedContracts } },
+                { contractType: { equals: null } },
+              ],
+            },
+          ]
+        : []),
+      ...(wantedRemote
+        ? [
+            {
+              OR: [
+                { remotePolicy: { equals: wantedRemote } },
+                { remotePolicy: { equals: null } },
+              ],
+            },
+          ]
+        : []),
+    ];
+
     const offers = await this.prisma.offer.findMany({
       where: {
         status: 'open',
+        ...(preferences.length > 0 ? { AND: preferences } : {}),
         ...(contractType ? { contractType } : {}),
         ...(experienceLevel ? { minExperienceLevel: experienceLevel } : {}),
         ...(remotePolicy ? { remotePolicy } : {}),

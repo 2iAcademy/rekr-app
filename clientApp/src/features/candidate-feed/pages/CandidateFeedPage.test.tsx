@@ -1,36 +1,37 @@
-import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { offerControllerLike } from '@/api/generated';
-import { mockFeedOffers } from '../mocks';
+import { MemoryRouter } from 'react-router';
+import {
+  offerControllerFindFeed,
+  offerControllerLike,
+  type OfferFeedItemDto,
+} from '@/api/generated';
+import { anOffer, anotherOffer } from '../fixtures';
 import { CandidateFeedPage } from './CandidateFeedPage';
 
-vi.mock('@/api/generated', () => ({ offerControllerLike: vi.fn() }));
+vi.mock('@/api/generated', () => ({
+  offerControllerFindFeed: vi.fn(),
+  offerControllerLike: vi.fn(),
+}));
 
+const findFeed = vi.mocked(offerControllerFindFeed);
 const like = vi.mocked(offerControllerLike);
 
-const deck = (...ids: number[]) => mockFeedOffers.filter(({ id }) => ids.includes(id));
+const answer = (data: OfferFeedItemDto[]) =>
+  ({ data, status: 200, headers: new Headers() }) as unknown as Awaited<
+    ReturnType<typeof offerControllerFindFeed>
+  >;
 
-function FeedHarness({ offers = mockFeedOffers, onOpenOffer = vi.fn() }) {
-  const [openedOffer, setOpenedOffer] = useState<number | null>(null);
-
-  return (
-    <>
-      <CandidateFeedPage
-        offers={offers}
-        onOpenOffer={(id) => {
-          setOpenedOffer(id);
-          onOpenOffer(id);
-        }}
-      />
-      <output>{openedOffer}</output>
-    </>
+const renderPage = (onOpenOffer = vi.fn()) => {
+  render(
+    <MemoryRouter>
+      <CandidateFeedPage onOpenOffer={onOpenOffer} />
+    </MemoryRouter>,
   );
-}
 
-const renderPage = (offers = mockFeedOffers, onOpenOffer = vi.fn()) =>
-  render(<FeedHarness offers={offers} onOpenOffer={onOpenOffer} />);
+  return { onOpenOffer };
+};
 
 const heading = (name: string) => screen.getByRole('heading', { name });
 const button = (name: string) => screen.getByRole('button', { name });
@@ -38,10 +39,10 @@ const button = (name: string) => screen.getByRole('button', { name });
 const dragCard = (distance: number) => {
   const card = screen.getByRole('article').parentElement;
   if (!card) {
-    throw new Error('la carte doit être enveloppée par la zone de glissement');
+    throw new Error('carte introuvable');
   }
 
-  fireEvent.pointerDown(card, { clientX: 0, clientY: 0, pointerId: 1, button: 0 });
+  fireEvent.pointerDown(card, { clientX: 0, clientY: 0, pointerId: 1 });
   fireEvent.pointerMove(window, { clientX: distance, clientY: 0, pointerId: 1 });
   fireEvent.pointerUp(window, { pointerId: 1 });
 };
@@ -49,22 +50,45 @@ const dragCard = (distance: number) => {
 describe('CandidateFeedPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    findFeed.mockResolvedValue(answer([anOffer, anotherOffer]));
     like.mockResolvedValue(undefined as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
   });
 
-  it('ouvre le deck mocké sur la première offre', () => {
+  it('ouvre le deck sur la première offre servie par l’API', async () => {
     renderPage();
 
+    expect(
+      await screen.findByRole('heading', { name: 'Développeur Frontend React' }),
+    ).toBeVisible();
     expect(screen.getByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
-    expect(heading('Développeur Frontend React')).toBeVisible();
-    expect(screen.getByText('8 offres correspondent')).toBeInTheDocument();
+  });
+
+  /**
+   * Aucun filtre n'est envoyé : le paquet est constitué côté serveur à partir
+   * du profil. C'est toute la raison pour laquelle l'écran n'a plus de barre de
+   * filtres.
+   */
+  it('ne demande aucun filtre à l’API', async () => {
+    renderPage();
+
+    await waitFor(() => expect(findFeed).toHaveBeenCalledTimes(1));
+    const [query] = findFeed.mock.calls[0];
+    expect(Object.keys(query ?? {})).toEqual(['limit']);
+  });
+
+  it('n’affiche plus de barre de filtres', async () => {
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Développeur Frontend React' });
+    expect(screen.queryByRole('group', { name: 'Type de contrat' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/offres correspondent/)).not.toBeInTheDocument();
   });
 
   it('avance dans le deck après un passage ou un like', async () => {
     const user = userEvent.setup();
-    renderPage(deck(101, 102));
+    renderPage();
 
-    await user.click(button('Passer'));
+    await user.click(await screen.findByRole('button', { name: 'Passer' }));
     expect(heading('Data Analyst')).toBeVisible();
 
     await user.click(button('Liker'));
@@ -72,67 +96,73 @@ describe('CandidateFeedPage', () => {
     expect(screen.getByText('1 offre likée')).toBeVisible();
   });
 
-  // Le like est la seule décision persistée : rien ne stocke un passage dans ce
-  // périmètre.
+  // Le like est la seule décision persistée : rien ne stocke un passage.
   it('enregistre le like côté serveur, et seulement le like', async () => {
     const user = userEvent.setup();
-    renderPage(deck(101, 102));
+    renderPage();
 
-    await user.click(button('Passer'));
+    await user.click(await screen.findByRole('button', { name: 'Passer' }));
     expect(like).not.toHaveBeenCalled();
 
     await user.click(button('Liker'));
 
-    await waitFor(() => expect(like).toHaveBeenCalledWith(102));
+    await waitFor(() => expect(like).toHaveBeenCalledWith(anotherOffer.id));
     expect(like).toHaveBeenCalledTimes(1);
   });
 
   /**
    * La carte quitte le deck avant l'accord du serveur : un swipe qui attendrait
-   * le réseau bloquerait le paquet. L'échec part en toast, et l'endpoint est
-   * idempotent.
+   * le réseau bloquerait le paquet. L'échec part en toast, et le like non écrit
+   * revient au prochain chargement puisque le serveur ne l'exclura pas.
    */
   it('avance dans le deck même si l’enregistrement du like échoue', async () => {
     const user = userEvent.setup();
     like.mockRejectedValue(new Error('réseau'));
-    renderPage(deck(101, 102));
-
-    await user.click(button('Liker'));
-
-    expect(heading('Data Analyst')).toBeVisible();
-  });
-
-  it('réinitialise les filtres qui ont écarté toutes les offres', async () => {
-    const user = userEvent.setup();
     renderPage();
 
-    await user.click(button('Stage'));
-    await user.click(button('Full remote'));
+    await user.click(await screen.findByRole('button', { name: 'Liker' }));
 
-    expect(heading('Aucune offre ne passe vos filtres')).toBeVisible();
-    await user.click(button('Élargir la recherche'));
-
-    expect(heading('Développeur Frontend React')).toBeVisible();
+    expect(heading('Data Analyst')).toBeVisible();
   });
 
   it('délègue l’ouverture de détail depuis la carte', async () => {
     const user = userEvent.setup();
-    const onOpenOffer = vi.fn();
-    renderPage(deck(101), onOpenOffer);
+    const { onOpenOffer } = renderPage();
 
-    await user.click(button("Voir l'offre Développeur Frontend React"));
+    await user.click(
+      await screen.findByRole('button', { name: "Voir l'offre Développeur Frontend React" }),
+    );
 
-    expect(onOpenOffer).toHaveBeenCalledWith(101);
+    expect(onOpenOffer).toHaveBeenCalledWith(anOffer.id);
   });
 
   it('prend les mêmes décisions au clavier et au glissement', async () => {
     const user = userEvent.setup();
-    renderPage(deck(101, 102, 103));
+    renderPage();
 
-    await user.keyboard('{ArrowRight}');
+    await screen.findByRole('heading', { name: 'Développeur Frontend React' });
+    dragCard(200);
     expect(heading('Data Analyst')).toBeVisible();
 
-    dragCard(-200);
-    expect(heading('Développeur Full-Stack')).toBeVisible();
+    await user.keyboard('{ArrowLeft}');
+    expect(heading('Tu as tout vu')).toBeVisible();
+  });
+
+  it('propose de réessayer quand le chargement échoue', async () => {
+    const user = userEvent.setup();
+    findFeed.mockRejectedValueOnce(new Error('réseau'));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Réessayer' }));
+
+    await waitFor(() => expect(findFeed).toHaveBeenCalledTimes(2));
+  });
+
+  // Un paquet vide au chargement n'est pas une fin de paquet : l'écran ne doit
+  // pas annoncer « tu as tout vu » avant d'avoir reçu la réponse.
+  it('n’annonce pas la fin du deck pendant le chargement', () => {
+    renderPage();
+
+    expect(screen.queryByRole('heading', { name: 'Tu as tout vu' })).not.toBeInTheDocument();
   });
 });

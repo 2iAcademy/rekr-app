@@ -15,6 +15,7 @@ type PrismaMock = {
     update: jest.Mock;
   };
   recruiterProfile: { findUnique: jest.Mock };
+  candidateProfile: { findUnique: jest.Mock };
   offerTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
@@ -29,6 +30,7 @@ const buildPrismaMock = (): PrismaMock => {
       update: jest.fn(),
     },
     recruiterProfile: { findUnique: jest.fn() },
+    candidateProfile: { findUnique: jest.fn().mockResolvedValue(null) },
     offerTag: { deleteMany: jest.fn(), createMany: jest.fn() },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
@@ -391,6 +393,58 @@ describe('OfferService', () => {
       (prisma.offer.findMany.mock.calls as FeedFindManyArgs[][])[0][0];
 
     const whereOf = (): Record<string, unknown> => argsOf().where;
+
+    const withPreferences = (profile: {
+      contractTypes?: string[];
+      remotePolicy?: string | null;
+    }): void => {
+      prisma.candidateProfile.findUnique.mockResolvedValue({
+        contractTypes: [],
+        remotePolicy: null,
+        ...profile,
+      });
+    };
+
+    /**
+     * The preferences come from the stored profile, never from the query: the
+     * screen has no filter bar, and letting a caller resend them would give one
+     * fact two sources.
+     */
+    it('reads the preferences from the profile of the caller', async () => {
+      withPreferences({ contractTypes: ['CDI'] });
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(prisma.candidateProfile.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 7 } }),
+      );
+    });
+
+    // Two `OR` keys at the same level would overwrite each other, silently
+    // dropping one of the two preferences — hence the `AND`.
+    it('collects both preferences without either overwriting the other', async () => {
+      withPreferences({ contractTypes: ['CDI'], remotePolicy: 'HYBRID' });
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf().AND).toHaveLength(2);
+    });
+
+    it('narrows nothing when the profile carries no preference', async () => {
+      withPreferences({});
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf()).not.toHaveProperty('AND');
+    });
+
+    it('narrows nothing when the caller has no profile yet', async () => {
+      prisma.candidateProfile.findUnique.mockResolvedValue(null);
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf()).not.toHaveProperty('AND');
+    });
 
     it('keeps open offers the candidate has neither liked nor passed', async () => {
       await service.findFeed(candidate, new OfferFeedQueryDto());

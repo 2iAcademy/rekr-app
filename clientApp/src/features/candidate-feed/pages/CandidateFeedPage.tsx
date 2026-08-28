@@ -7,7 +7,6 @@ import { EmptyDeck } from '@/components/feed/EmptyDeck';
 import { FeedActions } from '@/components/feed/FeedActions';
 import { SwipeHint } from '@/components/feed/SwipeHint';
 import {
-  emptyReason,
   likedCount,
   noDecisions,
   recordDecision,
@@ -16,33 +15,27 @@ import {
 } from '@/components/feed/deck';
 import { useCardSwipe } from '@/hooks/useCardSwipe';
 import { useDeckKeyboard } from '@/hooks/useDeckKeyboard';
-import { matchesOfferFilters } from '../filters';
-import { likedOfferCountLabel, offerDeckTitle } from '../labels';
-import { mockFeedOffers } from '../mocks';
-import type { FeedOffer } from '../types';
-import { emptyOfferFeedFilters, type OfferFeedFilters } from '../types';
+import type { OfferFeedItemDto } from '@/api/generated';
+import { likedOfferCountLabel } from '../labels';
+import { useOfferFeed } from '../useOfferFeed';
 import { OfferCard } from '../components/OfferCard';
-import { OfferFilterBar } from '../components/OfferFilterBar';
 
 const SWIPE_THRESHOLD = 120;
 
 interface CandidateFeedPageProps {
-  offers?: readonly FeedOffer[];
   onOpenOffer: (id: number) => void;
 }
 
-export function CandidateFeedPage({
-  offers = mockFeedOffers,
-  onOpenOffer,
-}: CandidateFeedPageProps) {
-  const [filters, setFilters] = useState<OfferFeedFilters>(emptyOfferFeedFilters);
+export function CandidateFeedPage({ onOpenOffer }: CandidateFeedPageProps) {
+  const { offers, status, reload } = useOfferFeed();
   const [decisions, setDecisions] = useState(noDecisions);
   const deckRef = useRef<HTMLElement>(null);
 
-  const deck = remainingItems(offers, decisions, (offer) => matchesOfferFilters(offer, filters));
+  // No client-side filter left: the endpoint shapes the deck from the profile,
+  // so everything that arrives belongs in it.
+  const deck = remainingItems(offers, decisions, () => true);
   const [current] = deck;
   const liked = likedCount(decisions);
-  const reason = emptyReason(offers, decisions);
 
   /**
    * The card leaves the deck the moment it is answered, before the server has
@@ -54,7 +47,7 @@ export function CandidateFeedPage({
    * Only a like is written: nothing stores a pass in this scope.
    */
   const decide = useCallback(
-    (decision: Decision, offer: FeedOffer | undefined = current): void => {
+    (decision: Decision, offer: OfferFeedItemDto | undefined = current): void => {
       if (!offer) {
         return;
       }
@@ -91,7 +84,16 @@ export function CandidateFeedPage({
     <div className="mx-auto mt-5 flex w-full max-w-xl flex-col gap-4 md:mx-0 md:mt-0">
       <h1 className="sr-only">Offres</h1>
 
-      <OfferFilterBar filters={filters} onChange={setFilters} resultCount={deck.length} />
+      {status === 'loading' && <p className="text-sm text-ink-muted">Chargement…</p>}
+
+      {status === 'failed' && (
+        <p role="alert" className="text-sm text-destructive">
+          Impossible de charger les offres.{' '}
+          <button type="button" onClick={reload} className="cursor-pointer underline">
+            Réessayer
+          </button>
+        </p>
+      )}
 
       <section
         ref={deckRef}
@@ -100,7 +102,7 @@ export function CandidateFeedPage({
         className="flex flex-1 flex-col gap-5 outline-none"
       >
         <p role="status" className="sr-only">
-          {current ? `Offre ${current.title} chez ${current.companyName}` : offerDeckTitle(reason)}
+          {current ? `Offre ${current.title} chez ${current.company.name}` : 'Tu as tout vu'}
         </p>
 
         {current ? (
@@ -135,14 +137,14 @@ export function CandidateFeedPage({
             </p>
           </>
         ) : (
-          <EmptyDeck
-            reason={reason}
-            title={offerDeckTitle(reason)}
-            itemPlural="offres"
-            likedCount={liked}
-            likedLabel={likedOfferCountLabel}
-            onResetFilters={() => setFilters(emptyOfferFeedFilters)}
-          />
+          status === 'ready' && (
+            <EmptyDeck
+              title="Tu as tout vu"
+              itemPlural="offres"
+              likedCount={liked}
+              likedLabel={likedOfferCountLabel}
+            />
+          )
         )}
       </section>
     </div>
