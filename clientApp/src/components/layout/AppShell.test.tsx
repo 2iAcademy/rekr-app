@@ -123,14 +123,22 @@ describe('AppShell', () => {
     ).toBeInTheDocument();
   });
 
-  it('envoie le recruteur sur le feed candidats dans les deux chromes', () => {
+  // Le recruteur ne swipe plus de candidats : ses annonces sont son point
+  // d'entrée, et « Feed » ne lui est plus proposé du tout.
+  it('ne montre aucun feed au recruteur, dans aucun chrome', () => {
     renderShell('recruiter');
 
-    const feedLinks = screen.getAllByRole('link', { name: 'Feed' });
+    expect(screen.queryAllByRole('link', { name: 'Feed' })).toEqual([]);
+  });
 
-    expect(feedLinks).toHaveLength(2);
-    for (const link of feedLinks) {
-      expect(link).toHaveAttribute('href', '/recruteur/candidats');
+  it('envoie le recruteur sur ses offres dans les deux chromes', () => {
+    renderShell('recruiter');
+
+    const offerLinks = screen.getAllByRole('link', { name: 'Mes offres' });
+
+    expect(offerLinks).toHaveLength(2);
+    for (const link of offerLinks) {
+      expect(link).toHaveAttribute('href', '/recruteur/offres');
     }
   });
 

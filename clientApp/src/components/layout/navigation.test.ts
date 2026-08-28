@@ -8,12 +8,15 @@ const itemFor = (isRecruiter: boolean, label: string) =>
 
 describe('navigationItems', () => {
   it('rend les entrées principales dans l’ordre d’affichage', () => {
-    expect(labels(true)).toEqual(['Feed', 'Matches', 'Mes offres', 'Profil']);
+    expect(labels(true)).toEqual(['Matches', 'Mes offres', 'Profil']);
     expect(labels(false)).toEqual(['Feed', 'Matches', 'Profil']);
   });
 
-  it('envoie le recruteur sur le feed candidats', () => {
-    expect(navigationItems(true)[0]).toEqual({ label: 'Feed', to: '/recruteur/candidats' });
+  // Un recruteur ne parcourt pas un paquet de candidats : il publie une annonce
+  // et regarde qui s'y intéresse. Le feed reste un geste de candidat.
+  it('ne propose plus de feed au recruteur', () => {
+    expect(labels(true)).not.toContain('Feed');
+    expect(navigationItems(true).map((item) => item.to)).not.toContain('/recruteur/candidats');
   });
 
   it('envoie le candidat sur son feed d’offres', () => {

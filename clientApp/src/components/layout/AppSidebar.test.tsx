@@ -52,7 +52,6 @@ describe('AppSidebar', () => {
 
     expect(screen.getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument();
     expect(navLinks()).toEqual([
-      { label: 'Feed', href: '/recruteur/candidats', current: null },
       { label: 'Matches', href: '/matches', current: 'page' },
       { label: 'Mes offres', href: '/recruteur/offres', current: null },
       { label: 'Profil', href: '/profil', current: null },
@@ -60,12 +59,11 @@ describe('AppSidebar', () => {
   });
 
   it('reflète l’écran courant sur la seule entrée correspondante', () => {
-    renderSidebar({ path: '/recruteur/candidats' });
+    renderSidebar({ isRecruiter: false, path: '/candidat/offres' });
 
     expect(navLinks()).toEqual([
-      { label: 'Feed', href: '/recruteur/candidats', current: 'page' },
+      { label: 'Feed', href: '/candidat/offres', current: 'page' },
       { label: 'Matches', href: '/matches', current: null },
-      { label: 'Mes offres', href: '/recruteur/offres', current: null },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });
@@ -77,7 +75,6 @@ describe('AppSidebar', () => {
     renderSidebar({ path: '/recruteur/offres/12/edition' });
 
     expect(navLinks()).toEqual([
-      { label: 'Feed', href: '/recruteur/candidats', current: null },
       { label: 'Matches', href: '/matches', current: null },
       { label: 'Mes offres', href: '/recruteur/offres', current: 'page' },
       { label: 'Profil', href: '/profil', current: null },

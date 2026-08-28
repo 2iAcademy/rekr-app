@@ -6,7 +6,6 @@ import {
   Patch,
   Post,
   Put,
-  Query,
   StreamableFile,
   UploadedFile,
   UseGuards,
@@ -28,8 +27,6 @@ import { UploadedFileInterceptor } from '../storage/upload-interceptor';
 import type { UploadedFile as UploadedFileContent } from '../storage/uploaded-file.interface';
 import { CandidateProfileFileService } from './candidate-profile-file.service';
 import { CandidateProfileService } from './candidate-profile.service';
-import { CandidateFeedItemDto } from './dto/candidate-feed-item.dto';
-import { CandidateFeedQueryDto } from './dto/candidate-feed-query.dto';
 import { CandidateProfileResponseDto } from './dto/candidate-profile-response.dto';
 import { CreateCandidateProfileDto } from './dto/create-candidate-profile.dto';
 import { UpdateCandidateProfileDto } from './dto/update-candidate-profile.dto';
@@ -43,20 +40,6 @@ export class CandidateProfileController {
     private readonly service: CandidateProfileService,
     private readonly files: CandidateProfileFileService,
   ) {}
-
-  // On its own path rather than at the collection root: `GET
-  // /candidate-profiles` is the collection, the deck is a distinct resource.
-  // The class-level `@Roles('candidate')` is overridden here: the deck of
-  // candidates is what a recruiter swipes, not what a candidate reads.
-  @Get('feed')
-  @Roles('recruiter')
-  @ApiOkResponse({ type: CandidateFeedItemDto, isArray: true })
-  findFeed(
-    @CurrentUser() user: AuthUser,
-    @Query() query: CandidateFeedQueryDto,
-  ): Promise<CandidateFeedItemDto[]> {
-    return this.service.findFeed(user.id, query);
-  }
 
   @Get('me')
   @ApiOkResponse({ type: CandidateProfileResponseDto })

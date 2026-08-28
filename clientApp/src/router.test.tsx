@@ -66,7 +66,6 @@ const shellChildren = shellRoutes.flatMap((route) => route.children ?? []);
 const ALLOWED_USER_TYPES: Record<string, readonly UserType[]> = {
   '/matches': USER_TYPES,
   '/profil': USER_TYPES,
-  '/recruteur/candidats': ['recruiter'],
   '/candidat/offres': ['candidate'],
   '/recruteur/offres': ['recruiter'],
   '/recruteur/offres/nouvelle': ['recruiter'],
@@ -120,7 +119,6 @@ describe('table de routage', () => {
       '/candidat/offres',
       '/matches',
       '/profil',
-      '/recruteur/candidats',
       '/recruteur/offres',
       '/recruteur/offres/:id/edition',
       '/recruteur/offres/nouvelle',
@@ -145,6 +143,20 @@ describe('table de routage', () => {
 
   it('déclare une seule route attrape-tout', () => {
     expect(declaredPaths(entries).filter((path) => path === '*')).toHaveLength(1);
+  });
+
+  /**
+   * Le deck de swipe recruteur a été retiré : un recruteur travaille depuis ses
+   * annonces. L'ancienne adresse ne doit plus être servie, et c'est le
+   * catch-all qui la reprend — pas une route laissée en place « au cas où ».
+   */
+  it('ne sert plus le deck de swipe recruteur', async () => {
+    expect(insideShell).not.toContain('/recruteur/candidats');
+    authenticateAs('recruiter');
+
+    const router = renderAt('/recruteur/candidats');
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
   });
 });
 

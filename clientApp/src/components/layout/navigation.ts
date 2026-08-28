@@ -15,18 +15,17 @@ export interface ShellUser {
 /**
  * Main navigation items, in the order the chromes render them.
  *
- * Until now the two roles were served the same three items with only the feed
- * re-targeted; offer management is the first entry one role has and the other
- * does not. It is left out for a candidate rather than shown and refused: the
- * screen is guarded recruiter-side, so the item would lead a candidate straight
- * back to the home page.
+ * The two roles no longer share a shape. Swiping is a candidate's gesture: a
+ * recruiter publishes an offer and reads who applied to it, so « Feed » is a
+ * candidate entry and « Mes offres » a recruiter one. Each is left out of the
+ * other role rather than shown and refused — both screens guard themselves, so
+ * the item would only lead straight back to the home page.
  *
- * Inserted after « Matches » so the pair both roles share keeps its order and
- * « Profil », the account item, stays last.
+ * « Profil », the account item, stays last for both.
  */
 export function navigationItems(isRecruiter: boolean): NavigationItem[] {
   return [
-    { label: 'Feed', to: isRecruiter ? '/recruteur/candidats' : '/candidat/offres' },
+    ...(isRecruiter ? [] : [{ label: 'Feed', to: '/candidat/offres' }]),
     { label: 'Matches', to: '/matches' },
     ...(isRecruiter ? [{ label: 'Mes offres', to: '/recruteur/offres' }] : []),
     { label: 'Profil', to: '/profil' },

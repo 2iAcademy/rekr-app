@@ -14,7 +14,6 @@ import {
 } from '@/features/onboarding/routes';
 import { OfferDetailRoute } from '@/features/offers/routes';
 import { ProfileRoute } from '@/features/profile/routes';
-import { RecruiterFeedRoute } from '@/features/recruiter-feed/routes';
 import { OfferFormRoute, RecruiterOffersRoute } from '@/features/recruiter-offers/routes';
 import { RecruiterOnboardingRoute } from '@/features/recruiter-onboarding/routes';
 
@@ -40,7 +39,6 @@ export const routes = [
         element: <AppShell />,
         children: [
           { path: '/matches', element: <MatchesRoute /> },
-          { path: '/recruteur/candidats', element: <RecruiterFeedRoute /> },
           { path: '/recruteur/offres', element: <RecruiterOffersRoute /> },
           // Declared before the dynamic sibling, which is where a reader looks
           // for the answer; react-router ranks by specificity, so the order is a

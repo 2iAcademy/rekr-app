@@ -53,14 +53,6 @@ export const ExperienceLevel = {
   EXPERT: 'EXPERT',
 } as const;
 
-export type RemotePolicy = (typeof RemotePolicy)[keyof typeof RemotePolicy];
-
-export const RemotePolicy = {
-  ON_SITE: 'ON_SITE',
-  HYBRID: 'HYBRID',
-  FULL_REMOTE: 'FULL_REMOTE',
-} as const;
-
 export type Availability = (typeof Availability)[keyof typeof Availability];
 
 export const Availability = {
@@ -69,24 +61,13 @@ export const Availability = {
   SPECIFIC_DATE: 'SPECIFIC_DATE',
 } as const;
 
-export interface CandidateFeedItemDto {
-  userId: number;
-  /** @maxLength 100 */
-  firstName: string;
-  /** @nullable */
-  picture: string | null;
-  /** @nullable */
-  bio: string | null;
-  /** @nullable */
-  city: string | null;
-  /** @nullable */
-  desiredJobTitle: string | null;
-  contractTypes: ContractType[];
-  experienceLevel: ExperienceLevel | null;
-  availability: Availability | null;
-  remotePolicy: RemotePolicy | null;
-  tags: string[];
-}
+export type RemotePolicy = (typeof RemotePolicy)[keyof typeof RemotePolicy];
+
+export const RemotePolicy = {
+  ON_SITE: 'ON_SITE',
+  HYBRID: 'HYBRID',
+  FULL_REMOTE: 'FULL_REMOTE',
+} as const;
 
 export interface CandidateProfileResponseDto {
   id: number;
@@ -464,36 +445,6 @@ export interface MatchListItemDto {
   counterpart?: MatchCounterpartDto | null;
 }
 
-export type CandidateProfileControllerFindFeedParams = {
-  /**
-   * Nombre maximum de cartes renvoyées.
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  /**
-   * Ne garder que les résultats de ce type de contrat.
-   */
-  contractType?: ContractType;
-  /**
-   * Ne garder que les résultats de ce niveau d'expérience.
-   */
-  experienceLevel?: ExperienceLevel;
-  /**
-   * Ne garder que les résultats de ce mode de télétravail.
-   */
-  remotePolicy?: RemotePolicy;
-  /**
-   * Ne garder que les résultats situés dans cette commune.
-   * @maxLength 100
-   */
-  city?: string;
-  /**
-   * Ne garder que les candidats de cette disponibilité.
-   */
-  availability?: Availability;
-};
-
 export type CandidateProfileControllerReplacePictureBody = {
   file: Blob;
 };
@@ -797,46 +748,6 @@ export const authControllerMe = async (
     ...options,
     method: 'GET',
   });
-};
-
-export type candidateProfileControllerFindFeedResponse200 = {
-  data: CandidateFeedItemDto[];
-  status: 200;
-};
-
-export type candidateProfileControllerFindFeedResponseSuccess =
-  candidateProfileControllerFindFeedResponse200 & {
-    headers: Headers;
-  };
-export const getCandidateProfileControllerFindFeedUrl = (
-  params?: CandidateProfileControllerFindFeedParams,
-) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value));
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0
-    ? `/api/candidate-profiles/feed?${stringifiedParams}`
-    : `/api/candidate-profiles/feed`;
-};
-
-export const candidateProfileControllerFindFeed = async (
-  params?: CandidateProfileControllerFindFeedParams,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<candidateProfileControllerFindFeedResponseSuccess> => {
-  return customFetch<candidateProfileControllerFindFeedResponseSuccess>(
-    getCandidateProfileControllerFindFeedUrl(params),
-    {
-      ...options,
-      method: 'GET',
-    },
-  );
 };
 
 export type candidateProfileControllerFindMineResponse200 = {

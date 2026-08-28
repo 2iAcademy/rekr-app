@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { mockFeedCandidates } from '../mocks';
+import { aCandidate } from '../fixtures';
 import type { FeedCandidate } from '../types';
 import { CandidateDetailPage } from './CandidateDetailPage';
 
 const candidate = (overrides: Partial<FeedCandidate> = {}): FeedCandidate => ({
-  ...mockFeedCandidates[0],
+  ...aCandidate,
   ...overrides,
 });
 

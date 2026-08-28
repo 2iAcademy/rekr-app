@@ -11,11 +11,11 @@ import {
   remoteLabel,
   salaryWishLabel,
 } from './labels';
-import { mockFeedCandidates } from './mocks';
+import { aCandidate } from './fixtures';
 import type { FeedCandidate } from './types';
 
 const candidate = (overrides: Partial<FeedCandidate> = {}): FeedCandidate => ({
-  ...mockFeedCandidates[0],
+  ...aCandidate,
   ...overrides,
 });
 

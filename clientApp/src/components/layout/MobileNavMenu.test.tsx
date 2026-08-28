@@ -9,7 +9,7 @@ import { MobileNavMenu } from './MobileNavMenu';
 // The recruiter's own list: it is the longest one the chromes are handed, so a
 // spec built on it also answers for the candidate's.
 const items = [
-  { label: 'Feed', to: '/recruteur/candidats' },
+  { label: 'Feed', to: '/candidat/offres' },
   { label: 'Matches', to: '/matches' },
   { label: 'Mes offres', to: '/recruteur/offres' },
   { label: 'Profil', to: '/profil' },
@@ -54,7 +54,7 @@ describe('MobileNavMenu', () => {
       'Profil',
     ]);
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
-      '/recruteur/candidats',
+      '/candidat/offres',
       '/matches',
       '/recruteur/offres',
       '/profil',
