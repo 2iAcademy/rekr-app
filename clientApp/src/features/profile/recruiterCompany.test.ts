@@ -22,7 +22,6 @@ const company: CompanyResponseDto = {
   postalCode: '69003',
   latitude: '45.7510000',
   longitude: '4.8690000',
-  benefits: ['Mutuelle', 'Tickets resto'],
   recruiter: { firstName: 'Camille', lastName: 'Martin', jobTitle: 'Responsable RH' },
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-02T00:00:00.000Z',
@@ -39,7 +38,6 @@ const filled: RecruiterAccountForm = {
   postalCode: '69003',
   siteUrl: 'https://studiolumen.fr',
   description: 'On éclaire les scènes.',
-  benefits: ['Mutuelle', 'Tickets resto'],
 };
 
 describe('formFromCompany', () => {
@@ -58,7 +56,6 @@ describe('formFromCompany', () => {
       coverImage: null,
       city: null,
       postalCode: null,
-      benefits: [],
       recruiter: { firstName: 'Camille', lastName: 'Martin', jobTitle: null },
     };
 
@@ -109,8 +106,10 @@ describe('buildAccountPayload', () => {
     expect('size' in buildAccountPayload({ ...filled, size: '' })).toBe(false);
   });
 
-  it('envoie toujours les avantages, y compris une liste vidée', () => {
-    expect(buildAccountPayload({ ...filled, benefits: [] }).benefits).toEqual([]);
+  // Les avantages appartiennent à l'offre : ce payload ne doit plus les porter,
+  // sinon la fiche société les rattacherait à nouveau.
+  it('n’envoie plus les avantages avec la société', () => {
+    expect(buildAccountPayload(filled)).not.toHaveProperty('benefits');
   });
 
   it('envoie la ville avec son code postal', () => {

@@ -3,9 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
-import { resolveTagIds } from '../common/tags/tag-sync';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompanyResponseDto } from './dto/company-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
@@ -19,7 +17,7 @@ export class CompanyService {
   ) {}
 
   async create(userId: number, dto: CreateCompanyDto) {
-    const { firstName, lastName, jobTitle, benefits, ...companyData } = dto;
+    const { firstName, lastName, jobTitle, ...companyData } = dto;
 
     // Conflict first, same as `updateMine` checks the company exists before
     // judging its location: a recruiter who already has one deserves the 409,
@@ -49,10 +47,6 @@ export class CompanyService {
       await tx.recruiterProfile.create({
         data: { userId, companyId: company.id, firstName, lastName, jobTitle },
       });
-
-      if (benefits) {
-        await this.syncBenefits(tx, company.id, benefits);
-      }
 
       return company;
     });
@@ -90,15 +84,6 @@ export class CompanyService {
             longitude: true,
             createdAt: true,
             updatedAt: true,
-            // Filtered on the category rather than trusting the writer:
-            // `syncBenefits` is the only writer today, but `company_tag` is a
-            // plain pivot on the shared dictionary and nothing in the schema
-            // stops another category from being linked.
-            companyTags: {
-              where: { tag: { category: 'benefit' } },
-              orderBy: { tag: { label: 'asc' } },
-              select: { tag: { select: { label: true } } },
-            },
           },
         },
       },
@@ -108,13 +93,12 @@ export class CompanyService {
       throw new NotFoundException('Recruiter has no company');
     }
 
-    const { companyTags, latitude, longitude, ...company } = profile.company;
+    const { latitude, longitude, ...company } = profile.company;
 
     return {
       ...company,
       latitude: latitude?.toString() ?? null,
       longitude: longitude?.toString() ?? null,
-      benefits: companyTags.map((link) => link.tag.label),
       recruiter: {
         firstName: profile.firstName,
         lastName: profile.lastName,
@@ -124,7 +108,7 @@ export class CompanyService {
   }
 
   async updateMine(userId: number, dto: UpdateCompanyDto) {
-    const { firstName, lastName, jobTitle, benefits, ...companyData } = dto;
+    const { firstName, lastName, jobTitle, ...companyData } = dto;
     let coordinates: Coordinates | null = null;
 
     if (dto.city !== undefined || dto.postalCode !== undefined) {
@@ -165,32 +149,7 @@ export class CompanyService {
         data: { ...companyData, ...(coordinates ?? {}) },
       });
 
-      if (benefits) {
-        await this.syncBenefits(tx, company.id, benefits);
-      }
-
       return company;
-    });
-  }
-
-  private async syncBenefits(
-    tx: Prisma.TransactionClient,
-    companyId: number,
-    benefits: string[],
-  ): Promise<void> {
-    // `companyTag` rows are only ever written here, and benefits are the only
-    // category a company links, so wiping the set and re-creating it from the
-    // payload is the symmetric operation.
-    await tx.companyTag.deleteMany({ where: { companyId } });
-
-    const tagIds = await resolveTagIds(tx, benefits, 'benefit');
-    if (tagIds.length === 0) {
-      return;
-    }
-
-    await tx.companyTag.createMany({
-      data: tagIds.map((tagId) => ({ companyId, tagId })),
-      skipDuplicates: true,
     });
   }
 }

@@ -36,6 +36,8 @@ const mockOffer = {
     { tag: { id: 1, label: 'React', category: 'tech' } },
     { tag: { id: 2, label: 'Node', category: 'tech' } },
     { tag: { id: 3, label: 'TypeScript', category: 'tech' } },
+    { tag: { id: 4, label: 'Mutuelle', category: 'benefit' } },
+    { tag: { id: 5, label: 'Tickets restaurant', category: 'benefit' } },
   ],
 };
 
@@ -61,6 +63,27 @@ describe('OfferDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 2, name: mockOffer.title })).toBeInTheDocument();
     });
+  });
+
+  // Les avantages sont portés par l'offre : c'est ce que le candidat lit avant
+  // de liker, et ils diffèrent d'un poste à l'autre chez un même employeur.
+  it("affiche les avantages de l'offre", async () => {
+    renderPage();
+
+    expect(await screen.findByText('Avantages')).toBeInTheDocument();
+    expect(screen.getByText('Mutuelle')).toBeInTheDocument();
+    expect(screen.getByText('Tickets restaurant')).toBeInTheDocument();
+  });
+
+  it("masque la section quand l'offre ne propose aucun avantage", async () => {
+    vi.mocked(offerControllerFindOneById).mockResolvedValue({
+      data: { ...mockOffer, offerTags: [] },
+    } as unknown as Awaited<ReturnType<typeof offerControllerFindOneById>>);
+
+    renderPage();
+
+    await screen.findByRole('heading', { level: 2, name: mockOffer.title });
+    expect(screen.queryByText('Avantages')).not.toBeInTheDocument();
   });
 
   it("affiche le nom de l'entreprise, taille et localisation", async () => {

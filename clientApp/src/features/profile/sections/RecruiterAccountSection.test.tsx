@@ -55,7 +55,6 @@ const company: CompanyResponseDto = {
   postalCode: '69003',
   latitude: '45.7510000',
   longitude: '4.8690000',
-  benefits: ['Mutuelle'],
   recruiter: { firstName: 'Camille', lastName: 'Martin', jobTitle: 'Responsable RH' },
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-02T00:00:00.000Z',
@@ -113,7 +112,7 @@ describe('RecruiterAccountSection', () => {
       answer(company) as unknown as Awaited<ReturnType<typeof companyControllerFindMine>>,
     );
     updateMine.mockResolvedValue(
-      answer({ ...company, recruiter: undefined, benefits: undefined }) as unknown as Awaited<
+      answer({ ...company, recruiter: undefined }) as unknown as Awaited<
         ReturnType<typeof companyControllerUpdateMine>
       >,
     );
@@ -154,8 +153,15 @@ describe('RecruiterAccountSection', () => {
     expect(screen.getByLabelText('Site web (optionnel)')).toHaveValue('https://studiolumen.fr');
     expect(screen.getByRole('combobox', { name: 'Ville' })).toHaveValue('Lyon (69003)');
     expect(screen.getByRole('radio', { name: 'PME' })).toBeChecked();
-    expect(screen.getByRole('button', { name: 'Retirer Mutuelle' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Secteur')).toHaveValue('4'));
+  });
+
+  // Les avantages se saisissent désormais sur l'offre, où ils diffèrent d'un
+  // poste à l'autre. Les laisser ici les rattacherait à la société.
+  it('ne propose plus les avantages sur la fiche société', async () => {
+    await renderLoaded();
+
+    expect(screen.queryByLabelText('Avantages (optionnel)')).not.toBeInTheDocument();
   });
 
   // `AppShell` already renders the only `main` of the page.
@@ -239,7 +245,6 @@ describe('RecruiterAccountSection', () => {
       size: 'PME',
       siteUrl: 'https://studiolumen.fr',
       description: 'On éclaire les scènes.',
-      benefits: ['Mutuelle'],
       city: 'Lyon',
       postalCode: '69003',
     });
@@ -273,8 +278,6 @@ describe('RecruiterAccountSection', () => {
     await user.click(screen.getByRole('radio', { name: 'TPE' }));
     await user.clear(screen.getByLabelText('Site web (optionnel)'));
     await user.type(screen.getByLabelText('Site web (optionnel)'), 'https://lumen.dev');
-    await user.click(screen.getByRole('button', { name: 'Retirer Mutuelle' }));
-    await user.type(screen.getByLabelText('Avantages (optionnel)'), 'RTT{Enter}');
     await user.type(screen.getByLabelText('Présentation de la société'), ' Vraiment.');
     await save(user);
 
@@ -284,7 +287,6 @@ describe('RecruiterAccountSection', () => {
         sectorId: 9,
         size: 'TPE',
         siteUrl: 'https://lumen.dev',
-        benefits: ['RTT'],
         description: expect.stringContaining('Vraiment.') as unknown as string,
       }),
     );

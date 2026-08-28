@@ -105,12 +105,12 @@ const completeWizard = async (user: User) => {
     screen.getByLabelText('Présentation de la société'),
     'On construit le matching qui respecte les candidats.',
   );
-  await user.type(screen.getByLabelText('Avantages (optionnel)'), 'Mutuelle, RTT{Enter}');
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 
   await user.type(screen.getByLabelText('Titre du poste'), 'Développeur Front React');
   await user.type(screen.getByLabelText('Missions'), 'Construire les écrans du swipe.');
   await user.type(screen.getByLabelText('Compétences recherchées'), 'React, TypeScript{Enter}');
+  await user.type(screen.getByLabelText('Avantages (optionnel)'), 'Mutuelle, RTT{Enter}');
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 
   await user.click(await screen.findByRole('radio', { name: 'CDI' }));
@@ -163,7 +163,6 @@ describe('parcours recruteur de bout en bout', () => {
       postalCode: '69003',
       siteUrl: 'https://rekr.fr',
       description: 'On construit le matching qui respecte les candidats.',
-      benefits: ['Mutuelle', 'RTT'],
     });
 
     const offer = callTo('/api/offers');
@@ -175,6 +174,7 @@ describe('parcours recruteur de bout en bout', () => {
       city: 'Lyon',
       postalCode: '69003',
       skills: ['React', 'TypeScript'],
+      benefits: ['Mutuelle', 'RTT'],
       contractType: 'CDI',
       minExperienceLevel: 'CONFIRME',
       remotePolicy: 'HYBRID',

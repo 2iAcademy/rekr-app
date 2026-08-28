@@ -334,6 +334,144 @@ describe('Offer (e2e)', () => {
       .send({ title: 'x' })
       .expect(404);
   });
+  /**
+   * Skills and benefits share the `offer_tag` pivot and are told apart by the
+   * category of the tag they point at. These tests are about that boundary:
+   * each list has to be writable without disturbing the other.
+   */
+  describe('benefits of an offer', () => {
+    const tagsOf = (offerId: number) =>
+      prisma.offerTag.findMany({
+        where: { offerId },
+        select: { tag: { select: { label: true, category: true } } },
+      });
+
+    const labelsOf = async (offerId: number, category: 'skill' | 'benefit') =>
+      (await tagsOf(offerId))
+        .filter((link) => link.tag.category === category)
+        .map((link) => link.tag.label)
+        .sort();
+
+    const patchOffer = (userId: number, offerId: number) =>
+      httpRequest(app)
+        .patch(`/api/offers/${offerId}`)
+        .set('Authorization', bearerFor(app, userId, 'recruiter'));
+
+    it('stores the benefits sent at creation under their own category', async () => {
+      const { user } = await seedRecruiterWithCompany('Acme');
+
+      const res = await postOffer(user.id)
+        .send({
+          title: 'Dev',
+          skills: ['React'],
+          benefits: ['Mutuelle', 'Tickets restaurant'],
+        })
+        .expect(201);
+
+      const offerId = offerIdOf(res);
+      await expect(labelsOf(offerId, 'benefit')).resolves.toEqual([
+        'Mutuelle',
+        'Tickets restaurant',
+      ]);
+      await expect(labelsOf(offerId, 'skill')).resolves.toEqual(['React']);
+    });
+
+    it('keeps the benefits when a patch rewrites the skills alone', async () => {
+      const { user } = await seedRecruiterWithCompany('Acme');
+      const offerId = offerIdOf(
+        await postOffer(user.id)
+          .send({ title: 'Dev', skills: ['React'], benefits: ['Mutuelle'] })
+          .expect(201),
+      );
+
+      await patchOffer(user.id, offerId)
+        .send({ skills: ['Vue'] })
+        .expect(200);
+
+      await expect(labelsOf(offerId, 'skill')).resolves.toEqual(['Vue']);
+      await expect(labelsOf(offerId, 'benefit')).resolves.toEqual(['Mutuelle']);
+    });
+
+    it('keeps the skills when a patch rewrites the benefits alone', async () => {
+      const { user } = await seedRecruiterWithCompany('Acme');
+      const offerId = offerIdOf(
+        await postOffer(user.id)
+          .send({ title: 'Dev', skills: ['React'], benefits: ['Mutuelle'] })
+          .expect(201),
+      );
+
+      await patchOffer(user.id, offerId)
+        .send({ benefits: ['Conciergerie'] })
+        .expect(200);
+
+      await expect(labelsOf(offerId, 'benefit')).resolves.toEqual([
+        'Conciergerie',
+      ]);
+      await expect(labelsOf(offerId, 'skill')).resolves.toEqual(['React']);
+    });
+
+    it('clears the benefits when the patch sends an empty list', async () => {
+      const { user } = await seedRecruiterWithCompany('Acme');
+      const offerId = offerIdOf(
+        await postOffer(user.id)
+          .send({ title: 'Dev', skills: ['React'], benefits: ['Mutuelle'] })
+          .expect(201),
+      );
+
+      await patchOffer(user.id, offerId).send({ benefits: [] }).expect(200);
+
+      await expect(labelsOf(offerId, 'benefit')).resolves.toEqual([]);
+      await expect(labelsOf(offerId, 'skill')).resolves.toEqual(['React']);
+    });
+
+    // The candidate reads the perks on the offer they are about to like, so the
+    // detail endpoint has to carry them with their category attached.
+    it('serves the benefits of a published offer to a candidate', async () => {
+      const { user } = await seedRecruiterWithCompany('Acme');
+      const offerId = offerIdOf(
+        await postOffer(user.id)
+          .send({
+            title: 'Dev',
+            status: 'open',
+            skills: ['React'],
+            benefits: ['Mutuelle'],
+          })
+          .expect(201),
+      );
+      const candidate = await createUser('candidate');
+
+      const res = await httpRequest(app)
+        .get(`/api/offers/${offerId}`)
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(200);
+
+      const body = res.body as {
+        offerTags: { tag: { label: string; category: string } }[];
+      };
+      expect(body.offerTags).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            tag: expect.objectContaining({
+              label: 'Mutuelle',
+              category: 'benefit',
+            }) as object,
+          }),
+        ]),
+      );
+    });
+
+    it('refuses more benefits than the cap allows (400)', async () => {
+      const { user } = await seedRecruiterWithCompany('Acme');
+
+      await postOffer(user.id)
+        .send({
+          title: 'Dev',
+          benefits: Array.from({ length: 51 }, (_, i) => `Avantage ${i}`),
+        })
+        .expect(400);
+    });
+  });
+
   describe('GET /offers', () => {
     it('rejects an unauthenticated list with 401', async () => {
       await httpRequest(app).get('/api/offers').expect(401);

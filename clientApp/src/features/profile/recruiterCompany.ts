@@ -17,7 +17,6 @@ export interface RecruiterAccountForm {
   postalCode: string;
   siteUrl: string;
   description: string;
-  benefits: string[];
 }
 
 export const emptyRecruiterAccountForm: RecruiterAccountForm = {
@@ -31,7 +30,6 @@ export const emptyRecruiterAccountForm: RecruiterAccountForm = {
   postalCode: '',
   siteUrl: '',
   description: '',
-  benefits: [],
 };
 
 export type RecruiterAccountField = 'firstName' | 'lastName' | 'name' | 'city';
@@ -50,7 +48,6 @@ export type RecruiterAccountPayload = {
   size?: CompanySize;
   siteUrl: string;
   description: string | null;
-  benefits: string[];
   city?: string;
   postalCode?: string;
 };
@@ -66,7 +63,6 @@ export const formFromCompany = (company: CompanyResponseDto): RecruiterAccountFo
   postalCode: company.postalCode ?? '',
   siteUrl: company.siteUrl ?? '',
   description: company.description ?? '',
-  benefits: company.benefits,
 });
 
 /**
@@ -100,9 +96,6 @@ export const buildAccountPayload = (form: RecruiterAccountForm): RecruiterAccoun
     // is the only way to take a site back off the company.
     siteUrl: form.siteUrl.trim(),
     description: form.description.trim() || null,
-    // Always sent, empty list included: `syncBenefits` rewrites the whole set
-    // from the payload, so an omitted list would keep the removed ones.
-    benefits: form.benefits,
     // A location is a pair or nothing — the API refuses a lone city.
     city: city && postalCode ? city : undefined,
     postalCode: city && postalCode ? postalCode : undefined,

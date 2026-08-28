@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
+import { Prisma, TagCategory } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
 import { resolveTagIds } from '../common/tags/tag-sync';
 import type { AuthUser } from '../auth/auth-user.interface';
@@ -34,7 +34,7 @@ export class OfferService {
   ) {}
 
   async create(userId: number, dto: CreateOfferDto) {
-    const { skills, ...offerData } = dto;
+    const { skills, benefits, ...offerData } = dto;
 
     const coordinates = await this.cities.assertKnown(dto);
 
@@ -55,16 +55,14 @@ export class OfferService {
         },
       });
 
-      if (skills) {
-        await this.syncSkills(tx, offer.id, skills);
-      }
+      await this.syncTagLists(tx, offer.id, { skills, benefits });
 
       return offer;
     });
   }
 
   async update(userId: number, offerId: number, dto: UpdateOfferDto) {
-    const { skills, ...offerData } = dto;
+    const { skills, benefits, ...offerData } = dto;
     let coordinates: Coordinates | null = null;
 
     if (dto.city !== undefined || dto.postalCode !== undefined) {
@@ -89,9 +87,7 @@ export class OfferService {
         data: { ...offerData, ...(coordinates ?? {}) },
       });
 
-      if (skills) {
-        await this.syncSkills(tx, offerId, skills);
-      }
+      await this.syncTagLists(tx, offerId, { skills, benefits });
 
       return updated;
     });
@@ -166,7 +162,11 @@ export class OfferService {
             logo: true,
           },
         },
+        // Filtered on the category rather than trusting the pivot to hold one
+        // kind: `offer_tag` carries the benefits too, and `tags` advertises
+        // the skills of the post, not its perks.
         offerTags: {
+          where: { tag: { category: 'skill' } },
           orderBy: { tag: { label: 'asc' } },
           select: { tag: { select: { label: true } } },
         },
@@ -262,17 +262,41 @@ export class OfferService {
     });
   }
 
-  private async syncSkills(
+  /**
+   * An omitted list means « leave it as it is », an empty one means « clear it ».
+   * Distinguishing the two is what lets a patch touch the skills without
+   * mentioning the benefits, and the other way round.
+   */
+  private async syncTagLists(
     tx: Prisma.TransactionClient,
     offerId: number,
-    skills: string[],
+    lists: { skills?: string[]; benefits?: string[] },
   ): Promise<void> {
-    // `offerTag` rows are only ever written here, and skills are the only
-    // category an offer links, so wiping the set and re-creating it from the
-    // payload is the symmetric operation.
-    await tx.offerTag.deleteMany({ where: { offerId } });
+    if (lists.skills) {
+      await this.syncOfferTags(tx, offerId, lists.skills, 'skill');
+    }
 
-    const tagIds = await resolveTagIds(tx, skills, 'skill');
+    if (lists.benefits) {
+      await this.syncOfferTags(tx, offerId, lists.benefits, 'benefit');
+    }
+  }
+
+  /**
+   * Replaces one category of an offer's tags, and only that one.
+   *
+   * The wipe is scoped on the category as well as on the offer: skills and
+   * benefits share the `offer_tag` pivot, so a wipe on `offerId` alone would
+   * make saving either list silently delete the other.
+   */
+  private async syncOfferTags(
+    tx: Prisma.TransactionClient,
+    offerId: number,
+    labels: string[],
+    category: TagCategory,
+  ): Promise<void> {
+    await tx.offerTag.deleteMany({ where: { offerId, tag: { category } } });
+
+    const tagIds = await resolveTagIds(tx, labels, category);
     if (tagIds.length === 0) {
       return;
     }

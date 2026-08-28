@@ -25,7 +25,6 @@ export type CompanyPayload = {
   postalCode?: string;
   siteUrl?: string;
   description?: string;
-  benefits?: string[];
 };
 
 export type OfferPayload = {
@@ -34,6 +33,7 @@ export type OfferPayload = {
   city?: string;
   postalCode?: string;
   skills?: string[];
+  benefits?: string[];
   contractType?: ContractType;
   minExperienceLevel?: ExperienceLevel;
   remotePolicy?: RemotePolicy;
@@ -54,7 +54,6 @@ export const buildCompanyPayload = (state: RecruiterOnboardingState): CompanyPay
     postalCode: optionalText(state.postalCode),
     siteUrl: optionalText(state.siteUrl),
     description: optionalText(state.description),
-    benefits: optionalList(state.benefits),
   });
 
 export const buildOfferPayload = (state: RecruiterOnboardingState): OfferPayload =>
@@ -64,6 +63,7 @@ export const buildOfferPayload = (state: RecruiterOnboardingState): OfferPayload
     city: optionalText(state.offerCity),
     postalCode: optionalText(state.offerPostalCode),
     skills: optionalList(state.skills),
+    benefits: optionalList(state.benefits),
     contractType: optionalEnum(state.contractType),
     minExperienceLevel: optionalEnum(state.minExperienceLevel),
     remotePolicy: optionalEnum(state.remotePolicy),

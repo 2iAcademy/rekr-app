@@ -16,8 +16,6 @@ type PrismaMock = {
     create: jest.Mock;
     update: jest.Mock;
   };
-  companyTag: { deleteMany: jest.Mock; createMany: jest.Mock };
-  tag: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -29,8 +27,6 @@ const buildPrismaMock = (): PrismaMock => {
       create: jest.fn(),
       update: jest.fn(),
     },
-    companyTag: { deleteMany: jest.fn(), createMany: jest.fn() },
-    tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
   };
   return mock;
@@ -245,7 +241,6 @@ describe('CompanyService', () => {
         name: 'Acme',
         latitude: null,
         longitude: null,
-        companyTags: [] as unknown[],
         ...company,
       },
     });
@@ -258,47 +253,29 @@ describe('CompanyService', () => {
       );
     });
 
-    /**
-     * Two properties in one assertion, both structural: the company is reached
-     * through the caller's own profile — no request names it — and the pivot
-     * rows are filtered on their category rather than assumed to be benefits.
-     */
-    it('resolves the company through the caller and filters the pivot on its category', async () => {
+    // The company is reached through the caller's own profile: no request
+    // names it, so none can name someone else's.
+    it('resolves the company through the caller', async () => {
       prisma.recruiterProfile.findUnique.mockResolvedValue(profileRow());
 
       await service.findMine(7);
 
       expect(prisma.recruiterProfile.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { userId: 7 },
-          select: expect.objectContaining({
-            company: {
-              select: expect.objectContaining({
-                companyTags: {
-                  where: { tag: { category: 'benefit' } },
-                  orderBy: { tag: { label: 'asc' } },
-                  select: { tag: { select: { label: true } } },
-                },
-              }) as object,
-            },
-          }) as object,
-        }),
+        expect.objectContaining({ where: { userId: 7 } }),
       );
     });
 
-    it('flattens the pivot rows into their labels', async () => {
-      prisma.recruiterProfile.findUnique.mockResolvedValue(
-        profileRow({
-          companyTags: [
-            { tag: { label: 'Conciergerie' } },
-            { tag: { label: 'Mutuelle' } },
-          ],
-        }),
-      );
+    /**
+     * The perks now belong to the offer, where they differ from one post to the
+     * next. Reading them back here would resurrect a field the recruiter can no
+     * longer edit on this screen.
+     */
+    it('reports no benefits on the company', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(profileRow());
 
       const result = await service.findMine(7);
 
-      expect(result.benefits).toEqual(['Conciergerie', 'Mutuelle']);
+      expect(result).not.toHaveProperty('benefits');
     });
 
     it('renders the coordinates as strings', async () => {
@@ -325,8 +302,8 @@ describe('CompanyService', () => {
     });
 
     // The identity lives on `recruiter_profile`, so it is nested rather than
-    // read as company data — and the pivot rows must not ride along.
-    it('nests the recruiter identity and drops the pivot rows', async () => {
+    // read as company data.
+    it('nests the recruiter identity', async () => {
       prisma.recruiterProfile.findUnique.mockResolvedValue(profileRow());
 
       const result = await service.findMine(7);
@@ -336,7 +313,6 @@ describe('CompanyService', () => {
         lastName: 'Deckard',
         jobTitle: 'CTO',
       });
-      expect(result).not.toHaveProperty('companyTags');
     });
   });
 });

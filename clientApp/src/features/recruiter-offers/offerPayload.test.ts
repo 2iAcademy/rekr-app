@@ -9,6 +9,7 @@ const filled = {
   city: 'Lyon',
   postalCode: '69003',
   skills: ['React', 'TypeScript'],
+  benefits: ['Mutuelle'],
   contractType: 'CDI' as const,
   minExperienceLevel: 'CONFIRME' as const,
   remotePolicy: 'HYBRID' as const,
@@ -63,6 +64,7 @@ describe('buildOfferPayload', () => {
       city: 'Lyon',
       postalCode: '69003',
       skills: ['React', 'TypeScript'],
+      benefits: ['Mutuelle'],
       contractType: 'CDI',
       minExperienceLevel: 'CONFIRME',
       remotePolicy: 'HYBRID',
@@ -166,6 +168,14 @@ describe('buildOfferPayload', () => {
       skills: ['React'],
     });
   });
+
+  // Même raison que les compétences : la liste est réécrite en entier côté
+  // serveur, donc l'omettre conserverait les avantages que l'on vient d'ôter.
+  it('envoie toujours la liste des avantages, vide comprise', () => {
+    expect(buildOfferPayload({ ...filled, benefits: [] }, 'update')).toMatchObject({
+      benefits: [],
+    });
+  });
 });
 
 describe('offerFormFromDetail', () => {
@@ -176,6 +186,7 @@ describe('offerFormFromDetail', () => {
       city: 'Lyon',
       postalCode: '69003',
       skills: ['React', 'TypeScript'],
+      benefits: [],
       contractType: 'CDI',
       minExperienceLevel: 'CONFIRME',
       remotePolicy: 'HYBRID',
@@ -206,16 +217,20 @@ describe('offerFormFromDetail', () => {
     });
   });
 
-  it('ne remonte que les compétences, pas les autres catégories de tags', () => {
+  // Les deux listes partagent le pivot `offer_tag` et ne se distinguent que par
+  // la catégorie du tag : chacune doit repartir dans son propre champ.
+  it('répartit les tags entre compétences et avantages selon leur catégorie', () => {
     const form = offerFormFromDetail({
       ...detail,
       offerTags: [
         { offerId: 12, tagId: 1, tag: { id: 1, label: 'React', category: 'skill' } },
         { offerId: 12, tagId: 9, tag: { id: 9, label: 'Mutuelle', category: 'benefit' } },
+        { offerId: 12, tagId: 4, tag: { id: 4, label: 'Anglais', category: 'language' } },
       ],
     });
 
     expect(form.skills).toEqual(['React']);
+    expect(form.benefits).toEqual(['Mutuelle']);
   });
 
   it('rend une offre rechargée telle quelle une fois renvoyée à l’API', () => {
@@ -227,6 +242,7 @@ describe('offerFormFromDetail', () => {
       salaryMax: 55000,
       status: 'paused',
       skills: ['React', 'TypeScript'],
+      benefits: [],
     });
   });
 });

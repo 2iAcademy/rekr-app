@@ -98,6 +98,13 @@ export function OfferForm({
           onChange={(skills) => onChange({ skills })}
           {...markGroupIfInvalid(error?.field, 'skills')}
         />
+
+        <TagInput
+          label="Avantages (optionnel)"
+          placeholder="Mutuelle, tickets resto, RTT…"
+          values={value.benefits}
+          onChange={(benefits) => onChange({ benefits })}
+        />
       </section>
 
       <section className="flex flex-col gap-6">

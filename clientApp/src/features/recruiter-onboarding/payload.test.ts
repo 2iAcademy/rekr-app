@@ -39,7 +39,6 @@ describe('buildCompanyPayload', () => {
       postalCode: '69003',
       siteUrl: 'https://rekr.fr',
       description: 'On construit le matching qui respecte les candidats.',
-      benefits: ['Mutuelle', 'Tickets resto'],
     });
   });
 
@@ -73,10 +72,10 @@ describe('buildCompanyPayload', () => {
     });
   });
 
-  it('omet les avantages quand aucun n’a été ajouté', () => {
-    const payload = buildCompanyPayload({ ...filled, benefits: [] });
-
-    expect(payload).not.toHaveProperty('benefits');
+  // Les avantages partent avec l'offre : les laisser ici les rattacherait à la
+  // société, où le recruteur ne peut plus les éditer.
+  it('n’envoie pas les avantages avec la société', () => {
+    expect(buildCompanyPayload(filled)).not.toHaveProperty('benefits');
   });
 });
 
@@ -88,6 +87,7 @@ describe('buildOfferPayload', () => {
       city: 'Lyon',
       postalCode: '69003',
       skills: ['React', 'TypeScript'],
+      benefits: ['Mutuelle', 'Tickets resto'],
       contractType: 'CDI',
       minExperienceLevel: 'CONFIRME',
       remotePolicy: 'HYBRID',
@@ -95,6 +95,12 @@ describe('buildOfferPayload', () => {
       salaryMax: 55000,
       status: 'open',
     });
+  });
+
+  it('omet les avantages quand aucun n’a été ajouté', () => {
+    const payload = buildOfferPayload({ ...filled, benefits: [] });
+
+    expect(payload).not.toHaveProperty('benefits');
   });
 
   it('convertit les salaires en entiers et omet ceux laissés vides', () => {

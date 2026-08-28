@@ -194,7 +194,6 @@ export interface CompanyResponseDto {
   latitude: string | null;
   /** @nullable */
   longitude: string | null;
-  benefits: string[];
   recruiter: CompanyRecruiterDto;
   createdAt: string;
   updatedAt: string;
@@ -360,6 +359,8 @@ export interface CreateOfferDto {
   status?: OfferStatus;
   /** @maxItems 50 */
   skills?: string[];
+  /** @maxItems 50 */
+  benefits?: string[];
 }
 
 export interface OfferDto {
@@ -418,6 +419,8 @@ export interface UpdateOfferDto {
   status?: OfferStatus;
   /** @maxItems 50 */
   skills?: string[];
+  /** @maxItems 50 */
+  benefits?: string[];
 }
 
 export interface SectorDto {

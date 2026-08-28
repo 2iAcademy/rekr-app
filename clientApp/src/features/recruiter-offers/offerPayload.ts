@@ -18,6 +18,7 @@ export interface OfferFormValue {
   city: string;
   postalCode: string;
   skills: string[];
+  benefits: string[];
   contractType: ContractType | '';
   minExperienceLevel: ExperienceLevel | '';
   remotePolicy: RemotePolicy | '';
@@ -33,6 +34,7 @@ export const emptyOfferForm: OfferFormValue = {
   city: '',
   postalCode: '',
   skills: [],
+  benefits: [],
   contractType: '',
   minExperienceLevel: '',
   remotePolicy: '',
@@ -81,9 +83,10 @@ export const buildOfferPayload = (form: OfferFormValue, intent: OfferWriteIntent
     description: form.description.trim(),
     city: form.city.trim(),
     postalCode: form.postalCode.trim(),
-    // Always sent, never `optionalList`: `syncSkills` rewrites the whole set
-    // from the payload, so an omitted list would keep the removed skills.
+    // Always sent, never `optionalList`: each category is rewritten as a whole
+    // server-side, so an omitted list would keep the entries just removed.
     skills: form.skills,
+    benefits: form.benefits,
     contractType: optionalEnum(form.contractType),
     minExperienceLevel: optionalEnum(form.minExperienceLevel),
     remotePolicy: optionalEnum(form.remotePolicy),
@@ -92,19 +95,22 @@ export const buildOfferPayload = (form: OfferFormValue, intent: OfferWriteIntent
     status: form.status,
   });
 
+const labelsOfCategory = (offer: OfferDetailDto, category: 'skill' | 'benefit'): string[] =>
+  offer.offerTags.filter((link) => link.tag.category === category).map((link) => link.tag.label);
+
 /**
  * The detail endpoint is shared with the candidate screen, so it answers with
- * the joined row: skills arrive as tag links, and only the `skill` category
- * belongs in this form — the others are not the recruiter's to edit here.
+ * the joined row: both lists arrive as tag links on the same pivot, told apart
+ * by their category. Anything in a third category is left out — it is not the
+ * recruiter's to edit here.
  */
 export const offerFormFromDetail = (offer: OfferDetailDto): OfferFormValue => ({
   title: offer.title,
   description: offer.description ?? '',
   city: offer.city ?? '',
   postalCode: offer.postalCode ?? '',
-  skills: offer.offerTags
-    .filter((link) => link.tag.category === 'skill')
-    .map((link) => link.tag.label),
+  skills: labelsOfCategory(offer, 'skill'),
+  benefits: labelsOfCategory(offer, 'benefit'),
   contractType: offer.contractType ?? '',
   minExperienceLevel: offer.minExperienceLevel ?? '',
   remotePolicy: offer.remotePolicy ?? '',

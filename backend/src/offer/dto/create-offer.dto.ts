@@ -16,7 +16,11 @@ import {
   OfferStatus,
   RemotePolicy,
 } from '../../../generated/prisma/client';
-import { MAX_SKILLS, MAX_TAG_LABEL_LENGTH } from '../../common/tags/tag-bounds';
+import {
+  MAX_BENEFITS,
+  MAX_SKILLS,
+  MAX_TAG_LABEL_LENGTH,
+} from '../../common/tags/tag-bounds';
 import { MAX_INT4 } from '../../common/validation/numeric-bounds';
 import { NoControlCharacters } from '../../common/validation/no-control-characters';
 import { MAX_FREE_TEXT_LENGTH } from '../../common/validation/text-bounds';
@@ -149,4 +153,25 @@ export class CreateOfferDto {
   @MaxLength(MAX_TAG_LABEL_LENGTH, { each: true })
   @NoControlCharacters({ each: true })
   skills?: string[];
+
+  /**
+   * Carried by the offer rather than by the company: two posts of the same
+   * employer rarely come with the same perks, and the candidate reads them on
+   * the offer they are about to like.
+   *
+   * Shares the `offer_tag` pivot with `skills`, told apart by the category of
+   * the tag — hence the paired, category-scoped writes in `OfferService`.
+   */
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['Mutuelle', 'Tickets restaurant'],
+    maxItems: MAX_BENEFITS,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_BENEFITS)
+  @IsString({ each: true })
+  @MaxLength(MAX_TAG_LABEL_LENGTH, { each: true })
+  @NoControlCharacters({ each: true })
+  benefits?: string[];
 }

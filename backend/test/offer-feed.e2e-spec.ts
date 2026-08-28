@@ -230,6 +230,30 @@ describe('Offer feed (e2e)', () => {
       });
     });
 
+    /**
+     * `offer_tag` carries the skills AND the benefits of an offer, told apart
+     * by the category of the tag. `tags` advertises the skills alone, so the
+     * read has to filter on the category rather than assume the pivot only
+     * ever holds one kind — which stopped being true when the benefits moved
+     * from the company onto the offer.
+     */
+    it('advertises the skills alone, never the benefits', async () => {
+      const offer = await seedOffer();
+      const link = async (label: string, category: 'skill' | 'benefit') => {
+        const tag = await prisma.tag.create({ data: { label, category } });
+        await prisma.offerTag.create({
+          data: { offerId: offer.id, tagId: tag.id },
+        });
+      };
+      await link('React', 'skill');
+      await link('Mutuelle', 'benefit');
+
+      const res = await getFeed().expect(200);
+      const [item] = feedOf(res);
+
+      expect(item.tags).toEqual(['React']);
+    });
+
     it('leaks no account data, internal key or geolocation', async () => {
       await seedOffer();
 

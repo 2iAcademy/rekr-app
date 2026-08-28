@@ -14,7 +14,6 @@ import { FileField } from '@/components/form/FileField';
 import { FILE_CONSTRAINTS } from '@/components/form/fileConstraints';
 import { OptionCards } from '@/components/form/OptionCards';
 import { RichTextField } from '@/components/form/RichTextField';
-import { TagInput } from '@/components/form/TagInput';
 import { TextField } from '@/components/form/TextField';
 import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
@@ -130,9 +129,9 @@ export function RecruiterAccountSection() {
     try {
       await companyControllerUpdateMine(buildAccountPayload(form));
       // Nothing to adopt from the answer: it carries the `company` row alone —
-      // no recruiter, no benefits — and every column it reports is one this
-      // form has just sent. Reading it back would only risk losing the identity
-      // half it does not return.
+      // no recruiter — and every column it reports is one this form has just
+      // sent. Reading it back would only risk losing the identity half it does
+      // not return.
       notifySuccess(PROFILE_UPDATE_SUCCESS);
     } catch (cause) {
       notifyFailure(cause, profileUpdateBusiness);
@@ -308,13 +307,6 @@ export function RecruiterAccountSection() {
             maxLength={MAX_FREE_TEXT_LENGTH}
             value={form.description}
             onChange={(description) => patch({ description })}
-          />
-
-          <TagInput
-            label="Avantages (optionnel)"
-            placeholder="Mutuelle, tickets resto, RTT…"
-            values={form.benefits}
-            onChange={(benefits) => patch({ benefits })}
           />
         </section>
 
