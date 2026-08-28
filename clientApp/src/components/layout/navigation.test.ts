@@ -8,7 +8,7 @@ const itemFor = (isRecruiter: boolean, label: string) =>
 
 describe('navigationItems', () => {
   it('rend les entrées principales dans l’ordre d’affichage', () => {
-    expect(labels(true)).toEqual(['Matches', 'Mes offres', 'Profil']);
+    expect(labels(true)).toEqual(['Mes offres', 'Profil']);
     expect(labels(false)).toEqual(['Feed', 'Matches', 'Profil']);
   });
 
@@ -34,13 +34,16 @@ describe('navigationItems', () => {
     expect(navigationItems(false).map((item) => item.to)).not.toContain('/recruteur/offres');
   });
 
-  it('garde les mêmes destinations Matches et Profil pour les deux rôles', () => {
-    for (const label of ['Matches', 'Profil']) {
-      expect(itemFor(true, label)).toEqual(itemFor(false, label));
-    }
-
-    expect(itemFor(true, 'Matches')).toEqual({ label: 'Matches', to: '/matches' });
+  it('garde la même destination Profil pour les deux rôles', () => {
+    expect(itemFor(true, 'Profil')).toEqual(itemFor(false, 'Profil'));
     expect(itemFor(true, 'Profil')).toEqual({ label: 'Profil', to: '/profil' });
+  });
+
+  // Les matches naissent d'un like réciproque sur une annonce donnée : le
+  // recruteur les lit sur l'annonce concernée, pas dans une liste globale.
+  it('réserve les matches au candidat', () => {
+    expect(labels(true)).not.toContain('Matches');
+    expect(itemFor(false, 'Matches')).toEqual({ label: 'Matches', to: '/matches' });
   });
 
   // Every chrome (sidebar, header, mobile panel) calls this on each render and

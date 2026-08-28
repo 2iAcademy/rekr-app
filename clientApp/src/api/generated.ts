@@ -424,7 +424,6 @@ export type MatchCounterpartDtoKind =
 
 export const MatchCounterpartDtoKind = {
   company: 'company',
-  candidate: 'candidate',
 } as const;
 
 export interface MatchCounterpartDto {
@@ -441,8 +440,7 @@ export interface MatchListItemDto {
   id: number;
   matchedAt: string;
   offer: MatchOfferDto;
-  /** @nullable */
-  counterpart?: MatchCounterpartDto | null;
+  counterpart: MatchCounterpartDto;
 }
 
 export type CandidateProfileControllerReplacePictureBody = {

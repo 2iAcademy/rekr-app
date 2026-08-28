@@ -15,19 +15,23 @@ export interface ShellUser {
 /**
  * Main navigation items, in the order the chromes render them.
  *
- * The two roles no longer share a shape. Swiping is a candidate's gesture: a
- * recruiter publishes an offer and reads who applied to it, so « Feed » is a
- * candidate entry and « Mes offres » a recruiter one. Each is left out of the
- * other role rather than shown and refused — both screens guard themselves, so
- * the item would only lead straight back to the home page.
+ * The two roles no longer share a shape. A candidate swipes a deck of offers
+ * and follows the matches it produces; a recruiter publishes an offer and reads
+ * who applied to it, on the offer itself. « Profil », the account item, is now
+ * the only entry they have in common, and it stays last for both.
  *
- * « Profil », the account item, stays last for both.
+ * Each entry is left out of the role it does not serve rather than shown and
+ * refused: every screen guards itself, so the item would only lead straight
+ * back to the home page.
  */
 export function navigationItems(isRecruiter: boolean): NavigationItem[] {
   return [
-    ...(isRecruiter ? [] : [{ label: 'Feed', to: '/candidat/offres' }]),
-    { label: 'Matches', to: '/matches' },
-    ...(isRecruiter ? [{ label: 'Mes offres', to: '/recruteur/offres' }] : []),
+    ...(isRecruiter
+      ? [{ label: 'Mes offres', to: '/recruteur/offres' }]
+      : [
+          { label: 'Feed', to: '/candidat/offres' },
+          { label: 'Matches', to: '/matches' },
+        ]),
     { label: 'Profil', to: '/profil' },
   ];
 }

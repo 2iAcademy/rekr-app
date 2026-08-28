@@ -77,11 +77,14 @@ describe('navigation vers le match', () => {
     expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
   });
 
-  it('affiche la liste des matches pour un recruteur connecté', async () => {
+  // La vue du recruteur est son annonce : il lit qui s'y intéresse depuis
+  // « Mes offres », pas depuis une liste de matches tous postes confondus.
+  it('écarte un recruteur de la liste des matches', async () => {
     authenticateAs('recruiter');
     renderAt('/matches');
 
-    expect(await screen.findByRole('heading', { name: 'Tes matches' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
   });
 
   it('n’affiche pas la liste des matches tant que la session est en cours de vérification', () => {

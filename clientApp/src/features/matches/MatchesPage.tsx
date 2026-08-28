@@ -62,16 +62,17 @@ const avatarClasses = ['bg-brand', 'bg-violet', 'bg-[#e8a712]', 'bg-[#0ea5b5]', 
 const initial = (name: string) => name.charAt(0).toUpperCase();
 
 function toPreview(match: MatchListItemDto): MatchPreview {
-  const counterpart = match.counterpart;
+  const { counterpart } = match;
   const age = Date.now() - new Date(match.matchedAt).getTime();
 
   return {
     id: String(match.id),
-    name: counterpart?.name ?? 'Profil indisponible',
-    role: counterpart?.headline ?? match.offer.title,
+    name: counterpart.name,
+    // Le titre du poste, quand l'entreprise n'a pas d'accroche à afficher.
+    role: counterpart.headline ?? match.offer.title,
     time: timeSince(match.matchedAt),
     avatarClass: avatarClasses[match.id % avatarClasses.length],
-    avatarUrl: fileUrl(counterpart?.avatarUrl),
+    avatarUrl: fileUrl(counterpart.avatarUrl),
     isNew: age >= 0 && age < 24 * 60 * 60 * 1000,
   };
 }

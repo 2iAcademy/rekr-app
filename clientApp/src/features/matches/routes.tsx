@@ -4,9 +4,14 @@ import { homePathFor } from '@/domain/homeRoute';
 import { RouteGuard } from '@/features/auth/RouteGuard';
 import { MatchPage } from '@/features/matches/pages/MatchPage';
 
+/**
+ * Candidate-only: a match is born of a reciprocal like on one given offer, so a
+ * recruiter reads it on the offer concerned rather than in a list spanning every
+ * post of their company.
+ */
 export function MatchesRoute() {
   return (
-    <RouteGuard>
+    <RouteGuard allowedUserTypes={['candidate']}>
       <MatchesPage />
     </RouteGuard>
   );

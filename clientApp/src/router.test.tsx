@@ -64,7 +64,7 @@ const shellChildren = shellRoutes.flatMap((route) => route.children ?? []);
 // completeness case below turns a child missing from this table into a failure,
 // so declaring a route is not enough to slip past the guard-rail.
 const ALLOWED_USER_TYPES: Record<string, readonly UserType[]> = {
-  '/matches': USER_TYPES,
+  '/matches': ['candidate'],
   '/profil': USER_TYPES,
   '/candidat/offres': ['candidate'],
   '/recruteur/offres': ['recruiter'],
