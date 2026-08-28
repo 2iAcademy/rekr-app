@@ -189,12 +189,190 @@ export interface UpdateCompanyDto {
   [key: string]: unknown;
 }
 
+export type OfferStatus = (typeof OfferStatus)[keyof typeof OfferStatus];
+
+export const OfferStatus = {
+  draft: 'draft',
+  open: 'open',
+  paused: 'paused',
+  filled: 'filled',
+  closed: 'closed',
+} as const;
+
+export interface OfferListItemDto {
+  id: number;
+  /** @maxLength 255 */
+  title: string;
+  status: OfferStatus;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  postalCode: string | null;
+  contractType: ContractType | null;
+  minExperienceLevel: ExperienceLevel | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OfferDetailCompanyDto {
+  id: number;
+  /** @maxLength 255 */
+  name: string;
+  /** @nullable */
+  logo: string | null;
+  size: CompanySize | null;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  city: string | null;
+}
+
+export type TagCategory = (typeof TagCategory)[keyof typeof TagCategory];
+
+export const TagCategory = {
+  skill: 'skill',
+  tech: 'tech',
+  contract: 'contract',
+  theme: 'theme',
+  other: 'other',
+  language: 'language',
+  benefit: 'benefit',
+} as const;
+
+export interface OfferDetailTagDto {
+  id: number;
+  /** @maxLength 100 */
+  label: string;
+  category: TagCategory;
+}
+
+export interface OfferDetailTagLinkDto {
+  offerId: number;
+  tagId: number;
+  tag: OfferDetailTagDto;
+}
+
+export interface OfferDetailDto {
+  id: number;
+  companyId: number;
+  /** @nullable */
+  createdById: number | null;
+  /** @maxLength 255 */
+  title: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  postalCode: string | null;
+  /** @nullable */
+  latitude: string | null;
+  /** @nullable */
+  longitude: string | null;
+  contractType: ContractType | null;
+  minExperienceLevel: ExperienceLevel | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  status: OfferStatus;
+  createdAt: string;
+  updatedAt: string;
+  company: OfferDetailCompanyDto;
+  offerTags: OfferDetailTagLinkDto[];
+}
+
 export interface CreateOfferDto {
-  [key: string]: unknown;
+  /** @maxLength 255 */
+  title: string;
+  /** @maxLength 5000 */
+  description?: string;
+  /** @maxLength 100 */
+  city?: string;
+  /** @maxLength 10 */
+  postalCode?: string;
+  contractType?: ContractType;
+  minExperienceLevel?: ExperienceLevel;
+  remotePolicy?: RemotePolicy;
+  /**
+   * @minimum 0
+   * @maximum 2147483647
+   * @nullable
+   */
+  salaryMin?: number | null;
+  /**
+   * @minimum 0
+   * @maximum 2147483647
+   * @nullable
+   */
+  salaryMax?: number | null;
+  status?: OfferStatus;
+  /** @maxItems 50 */
+  skills?: string[];
+}
+
+export interface OfferDto {
+  id: number;
+  companyId: number;
+  /** @nullable */
+  createdById: number | null;
+  /** @maxLength 255 */
+  title: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  postalCode: string | null;
+  /** @nullable */
+  latitude: string | null;
+  /** @nullable */
+  longitude: string | null;
+  contractType: ContractType | null;
+  minExperienceLevel: ExperienceLevel | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  status: OfferStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UpdateOfferDto {
-  [key: string]: unknown;
+  /** @maxLength 255 */
+  title?: string;
+  /** @maxLength 5000 */
+  description?: string;
+  /** @maxLength 100 */
+  city?: string;
+  /** @maxLength 10 */
+  postalCode?: string;
+  contractType?: ContractType;
+  minExperienceLevel?: ExperienceLevel;
+  remotePolicy?: RemotePolicy;
+  /**
+   * @minimum 0
+   * @maximum 2147483647
+   * @nullable
+   */
+  salaryMin?: number | null;
+  /**
+   * @minimum 0
+   * @maximum 2147483647
+   * @nullable
+   */
+  salaryMax?: number | null;
+  status?: OfferStatus;
+  /** @maxItems 50 */
+  skills?: string[];
 }
 
 export interface SectorDto {
@@ -260,6 +438,24 @@ export type CompanyControllerReplaceLogoBody = {
 
 export type CompanyControllerReplaceCoverImageBody = {
   file: Blob;
+};
+
+export type OfferControllerFindMineParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * Nombre maximum d’offres par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * Ne renvoie que les offres de ce statut.
+   */
+  status?: OfferStatus;
 };
 
 export type MatchControllerFindMineParams = {
@@ -942,14 +1138,142 @@ export const companyControllerRemoveCoverImage = async (
   );
 };
 
-export type offerControllerFindOneByIdResponse200 = {
-  data: void;
+export type offerControllerFindMineResponse200 = {
+  data: OfferListItemDto[];
   status: 200;
+};
+
+export type offerControllerFindMineResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindMineResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindMineResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerFindMineResponseSuccess = offerControllerFindMineResponse200 & {
+  headers: Headers;
+};
+export type offerControllerFindMineResponseError = (
+  | offerControllerFindMineResponse401
+  | offerControllerFindMineResponse403
+  | offerControllerFindMineResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerFindMineUrl = (params?: OfferControllerFindMineParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/offers?${stringifiedParams}` : `/api/offers`;
+};
+
+export const offerControllerFindMine = async (
+  params?: OfferControllerFindMineParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerFindMineResponseSuccess> => {
+  return customFetch<offerControllerFindMineResponseSuccess>(
+    getOfferControllerFindMineUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type offerControllerCreateResponse201 = {
+  data: OfferDto;
+  status: 201;
+};
+
+export type offerControllerCreateResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerCreateResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerCreateResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerCreateResponseSuccess = offerControllerCreateResponse201 & {
+  headers: Headers;
+};
+export type offerControllerCreateResponseError = (
+  | offerControllerCreateResponse401
+  | offerControllerCreateResponse403
+  | offerControllerCreateResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerCreateUrl = () => {
+  return `/api/offers`;
+};
+
+export const offerControllerCreate = async (
+  createOfferDto: CreateOfferDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerCreateResponseSuccess> => {
+  return customFetch<offerControllerCreateResponseSuccess>(getOfferControllerCreateUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createOfferDto),
+  });
+};
+
+export type offerControllerFindOneByIdResponse200 = {
+  data: OfferDetailDto;
+  status: 200;
+};
+
+export type offerControllerFindOneByIdResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindOneByIdResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindOneByIdResponse404 = {
+  data: void;
+  status: 404;
 };
 
 export type offerControllerFindOneByIdResponseSuccess = offerControllerFindOneByIdResponse200 & {
   headers: Headers;
 };
+export type offerControllerFindOneByIdResponseError = (
+  | offerControllerFindOneByIdResponse401
+  | offerControllerFindOneByIdResponse403
+  | offerControllerFindOneByIdResponse404
+) & {
+  headers: Headers;
+};
+
 export const getOfferControllerFindOneByIdUrl = (id: number) => {
   return `/api/offers/${id}`;
 };
@@ -968,13 +1292,36 @@ export const offerControllerFindOneById = async (
 };
 
 export type offerControllerUpdateResponse200 = {
-  data: void;
+  data: OfferDto;
   status: 200;
+};
+
+export type offerControllerUpdateResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerUpdateResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerUpdateResponse404 = {
+  data: void;
+  status: 404;
 };
 
 export type offerControllerUpdateResponseSuccess = offerControllerUpdateResponse200 & {
   headers: Headers;
 };
+export type offerControllerUpdateResponseError = (
+  | offerControllerUpdateResponse401
+  | offerControllerUpdateResponse403
+  | offerControllerUpdateResponse404
+) & {
+  headers: Headers;
+};
+
 export const getOfferControllerUpdateUrl = (id: number) => {
   return `/api/offers/${id}`;
 };
@@ -989,30 +1336,6 @@ export const offerControllerUpdate = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(updateOfferDto),
-  });
-};
-
-export type offerControllerCreateResponse201 = {
-  data: void;
-  status: 201;
-};
-
-export type offerControllerCreateResponseSuccess = offerControllerCreateResponse201 & {
-  headers: Headers;
-};
-export const getOfferControllerCreateUrl = () => {
-  return `/api/offers`;
-};
-
-export const offerControllerCreate = async (
-  createOfferDto: CreateOfferDto,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<offerControllerCreateResponseSuccess> => {
-  return customFetch<offerControllerCreateResponseSuccess>(getOfferControllerCreateUrl(), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(createOfferDto),
   });
 };
 

@@ -1,7 +1,6 @@
 import { SKILL_CHIP } from '@/components/ui/chip-variants';
-import { contractLabel, metaLine } from '@/components/feed/labels';
+import { contractLabel, metaLine, offerSalaryLabel } from '@/components/feed/labels';
 import { FeedCard } from '@/components/feed/FeedCard';
-import { offerSalaryLabel } from '../labels';
 import type { FeedOffer } from '../types';
 
 interface OfferCardProps {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { navigationItems } from './navigation';
 import { AppSidebar } from './AppSidebar';
@@ -34,21 +34,27 @@ const renderSidebar = ({ path = '/matches', isRecruiter = true }: RenderOptions 
   return render(<RouterProvider router={router} />);
 };
 
+// Every link of the navigation landmark, not a chosen few: an allow-list of
+// labels here would silently drop a new entry instead of failing on it, which
+// is exactly what the specs below are meant to catch.
 const navLinks = () =>
-  screen.getAllByRole('link', { name: /^(Feed|Matches|Profil)$/ }).map((link) => ({
-    label: link.textContent,
-    href: link.getAttribute('href'),
-    current: link.getAttribute('aria-current'),
-  }));
+  within(screen.getByRole('navigation', { name: 'Navigation principale' }))
+    .getAllByRole('link')
+    .map((link) => ({
+      label: link.textContent,
+      href: link.getAttribute('href'),
+      current: link.getAttribute('aria-current'),
+    }));
 
 describe('AppSidebar', () => {
-  it('rend les trois entrées de navigation dans l’ordre, avec leurs destinations', () => {
+  it('rend les entrées de navigation du recruteur dans l’ordre, avec leurs destinations', () => {
     renderSidebar();
 
     expect(screen.getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument();
     expect(navLinks()).toEqual([
       { label: 'Feed', href: '/recruteur/candidats', current: null },
       { label: 'Matches', href: '/matches', current: 'page' },
+      { label: 'Mes offres', href: '/recruteur/offres', current: null },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });
@@ -59,6 +65,21 @@ describe('AppSidebar', () => {
     expect(navLinks()).toEqual([
       { label: 'Feed', href: '/recruteur/candidats', current: 'page' },
       { label: 'Matches', href: '/matches', current: null },
+      { label: 'Mes offres', href: '/recruteur/offres', current: null },
+      { label: 'Profil', href: '/profil', current: null },
+    ]);
+  });
+
+  // Creation and edition live under the list's own path, so the section stays
+  // flagged while the recruiter is inside it — losing the highlight there would
+  // leave them with no trace of where they are.
+  it('garde la section offres active sur les écrans qu’elle contient', () => {
+    renderSidebar({ path: '/recruteur/offres/12/edition' });
+
+    expect(navLinks()).toEqual([
+      { label: 'Feed', href: '/recruteur/candidats', current: null },
+      { label: 'Matches', href: '/matches', current: null },
+      { label: 'Mes offres', href: '/recruteur/offres', current: 'page' },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });
