@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CandidateAvatar } from './CandidateAvatar';
 
-// Both screens already cover the photo, the missing photo and the empty string.
-// Only what they leave untested is asserted here.
+// The two screens that mount it — the applicant row and the profile — already
+// cover the photo, its absence and the empty string. Only what they leave
+// untested is asserted here.
 describe('CandidateAvatar', () => {
   it('traite une URL réduite à des espaces comme une absence de photo', () => {
     render(<CandidateAvatar name="Camille Moreau" avatarUrl="   " className="size-24" />);

@@ -452,6 +452,24 @@ describe('CandidateProfile (e2e)', () => {
           .expect(404);
       },
     );
+
+    /**
+     * The collection root, guarded too. It is where a « list the candidates »
+     * handler would naturally land — and it would inherit the class-level
+     * `@Roles('candidate')`, serving the whole pool to every candidate. Nothing
+     * else in the suite holds that address.
+     */
+    it.each(['recruiter', 'candidate'] as const)(
+      'does not list the candidate pool from the collection root to a %s (404)',
+      async (userType) => {
+        const user = await createUser(userType);
+
+        await httpRequest(app)
+          .get('/api/candidate-profiles')
+          .set('Authorization', bearerFor(app, user.id, userType))
+          .expect(404);
+      },
+    );
   });
 
   describe('GET /api/candidate-profiles/me', () => {

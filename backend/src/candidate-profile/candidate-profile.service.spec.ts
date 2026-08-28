@@ -12,11 +12,9 @@ import { PrismaService } from '../prisma/prisma.service';
 type PrismaMock = {
   candidateProfile: {
     create: jest.Mock;
-    findMany: jest.Mock;
     findUnique: jest.Mock;
     update: jest.Mock;
   };
-  recruiterProfile: { findUnique: jest.Mock };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
   candidateTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   $transaction: jest.Mock;
@@ -26,12 +24,8 @@ const buildPrismaMock = (): PrismaMock => {
   const mock: PrismaMock = {
     candidateProfile: {
       create: jest.fn(),
-      findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
       update: jest.fn(),
-    },
-    recruiterProfile: {
-      findUnique: jest.fn().mockResolvedValue({ userId: 7, companyId: 10 }),
     },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     candidateTag: { deleteMany: jest.fn(), createMany: jest.fn() },

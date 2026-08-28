@@ -19,7 +19,7 @@ const resultLabel = (count: number): string => {
   return count === 1 ? '1 offre correspond' : `${count} offres correspondent`;
 };
 
-/** Candidate-specific filter data plugged into the shared recruiter-feed layout. */
+/** Candidate-specific filter data plugged into the shared feed filter layout. */
 export function OfferFilterBar({ filters, onChange, resultCount }: OfferFilterBarProps) {
   const changeContractTypes = (value: ContractType) =>
     onChange({

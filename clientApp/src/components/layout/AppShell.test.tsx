@@ -131,17 +131,6 @@ describe('AppShell', () => {
     expect(screen.queryAllByRole('link', { name: 'Feed' })).toEqual([]);
   });
 
-  it('envoie le recruteur sur ses offres dans les deux chromes', () => {
-    renderShell('recruiter');
-
-    const offerLinks = screen.getAllByRole('link', { name: 'Mes offres' });
-
-    expect(offerLinks).toHaveLength(2);
-    for (const link of offerLinks) {
-      expect(link).toHaveAttribute('href', '/recruteur/offres');
-    }
-  });
-
   it('envoie le candidat sur son feed d’offres dans les deux chromes', () => {
     renderShell('candidate');
 
