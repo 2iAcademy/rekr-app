@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { offerControllerLike } from '@/api/generated';
 import { mockFeedOffers } from '../mocks';
 import { CandidateFeedPage } from './CandidateFeedPage';
+
+vi.mock('@/api/generated', () => ({ offerControllerLike: vi.fn() }));
+
+const like = vi.mocked(offerControllerLike);
 
 const deck = (...ids: number[]) => mockFeedOffers.filter(({ id }) => ids.includes(id));
 
@@ -42,6 +47,11 @@ const dragCard = (distance: number) => {
 };
 
 describe('CandidateFeedPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    like.mockResolvedValue(undefined as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
+  });
+
   it('ouvre le deck mocké sur la première offre', () => {
     renderPage();
 
@@ -60,6 +70,36 @@ describe('CandidateFeedPage', () => {
     await user.click(button('Liker'));
     expect(heading('Tu as tout vu')).toBeVisible();
     expect(screen.getByText('1 offre likée')).toBeVisible();
+  });
+
+  // Le like est la seule décision persistée : rien ne stocke un passage dans ce
+  // périmètre.
+  it('enregistre le like côté serveur, et seulement le like', async () => {
+    const user = userEvent.setup();
+    renderPage(deck(101, 102));
+
+    await user.click(button('Passer'));
+    expect(like).not.toHaveBeenCalled();
+
+    await user.click(button('Liker'));
+
+    await waitFor(() => expect(like).toHaveBeenCalledWith(102));
+    expect(like).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * La carte quitte le deck avant l'accord du serveur : un swipe qui attendrait
+   * le réseau bloquerait le paquet. L'échec part en toast, et l'endpoint est
+   * idempotent.
+   */
+  it('avance dans le deck même si l’enregistrement du like échoue', async () => {
+    const user = userEvent.setup();
+    like.mockRejectedValue(new Error('réseau'));
+    renderPage(deck(101, 102));
+
+    await user.click(button('Liker'));
+
+    expect(heading('Data Analyst')).toBeVisible();
   });
 
   it('réinitialise les filtres qui ont écarté toutes les offres', async () => {

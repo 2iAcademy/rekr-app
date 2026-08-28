@@ -18,6 +18,7 @@ const offer: OfferListItemDto = {
   salaryMax: 55000,
   createdAt: '2026-02-01T00:00:00.000Z',
   updatedAt: '2026-02-01T00:00:00.000Z',
+  applicantCount: 0,
 };
 
 const renderRow = (over: Partial<OfferListItemDto> = {}, pending = false) => {
@@ -38,6 +39,37 @@ const renderRow = (over: Partial<OfferListItemDto> = {}, pending = false) => {
 };
 
 describe('OfferRow', () => {
+  // Le titre mène aux candidats intéressés : c'est ce que le recruteur vient
+  // chercher dans cette liste.
+  it('fait du titre le lien vers les candidats intéressés', () => {
+    renderRow();
+
+    expect(screen.getByRole('link', { name: 'Développeuse backend' })).toHaveAttribute(
+      'href',
+      '/recruteur/offres/12/candidats',
+    );
+  });
+
+  it('annonce le nombre de candidats intéressés', () => {
+    renderRow({ applicantCount: 3 });
+
+    expect(screen.getByText('3 intéressés')).toBeInTheDocument();
+  });
+
+  it('accorde le libellé au singulier', () => {
+    renderRow({ applicantCount: 1 });
+
+    expect(screen.getByText('1 intéressé')).toBeInTheDocument();
+  });
+
+  // Zéro est un état, pas une quantité : « 0 intéressé » se lirait comme un
+  // score plutôt que comme une absence.
+  it('masque la pastille quand personne n’a manifesté d’intérêt', () => {
+    renderRow({ applicantCount: 0 });
+
+    expect(screen.queryByText(/intéressé/)).not.toBeInTheDocument();
+  });
+
   it('affiche le titre, le statut et la ligne de contexte de l’offre', () => {
     renderRow();
 

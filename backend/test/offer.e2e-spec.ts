@@ -472,7 +472,576 @@ describe('Offer (e2e)', () => {
     });
   });
 
+  /**
+   * Interest, written down.
+   *
+   * A candidate likes an offer; the recruiter who owns it reads who applied and
+   * may like back. No `Match` is derived from the pair here — the reciprocity
+   * rule is #134's, and inventing it in passing would settle a product decision
+   * this ticket does not carry.
+   */
+  describe('interest in an offer', () => {
+    const asCandidate = (userId: number) => bearerFor(app, userId, 'candidate');
+
+    const likeAsCandidate = (userId: number, offerId: number) =>
+      httpRequest(app)
+        .post(`/api/offers/${offerId}/like`)
+        .set('Authorization', asCandidate(userId));
+
+    const readInterested = (userId: number, offerId: number, query = '') =>
+      httpRequest(app)
+        .get(`/api/offers/${offerId}/likes${query}`)
+        .set('Authorization', bearerFor(app, userId, 'recruiter'));
+
+    const likeBack = (
+      recruiterId: number,
+      offerId: number,
+      candidateUserId: number,
+    ) =>
+      httpRequest(app)
+        .post(`/api/offers/${offerId}/likes/${candidateUserId}`)
+        .set('Authorization', bearerFor(app, recruiterId, 'recruiter'));
+
+    const seedCandidateWithProfile = async (firstName: string) => {
+      const user = await createUser('candidate');
+      await prisma.candidateProfile.create({
+        data: {
+          userId: user.id,
+          firstName,
+          lastName: 'Moreau',
+          desiredJobTitle: 'Développeuse back-end',
+          city: 'Lyon',
+        },
+      });
+      return user;
+    };
+
+    const namesOf = (res: request.Response): string[] =>
+      (res.body as { firstName: string }[]).map((item) => item.firstName);
+
+    describe('POST /offers/:id/like', () => {
+      it('rejects an unauthenticated like with 401', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+
+        await httpRequest(app).post(`/api/offers/${offer.id}/like`).expect(401);
+      });
+
+      it('forbids a recruiter from liking an offer (403)', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+
+        await httpRequest(app)
+          .post(`/api/offers/${offer.id}/like`)
+          .set('Authorization', bearerFor(app, user.id, 'recruiter'))
+          .expect(403);
+      });
+
+      it('records the like of a candidate on a published offer', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        await expect(
+          prisma.candidateLikesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      // Liking twice is what a double tap produces, not an error to show.
+      it('stays idempotent when the same candidate likes twice', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        await expect(
+          prisma.candidateLikesOffer.count({ where: { offerId: offer.id } }),
+        ).resolves.toBe(1);
+      });
+
+      // Same 404 as the detail route, and for the same reason: a 403 on an
+      // unpublished offer would confirm that the id exists.
+      it.each(['draft', 'paused', 'filled', 'closed'] as const)(
+        'refuses a like on a %s offer (404)',
+        async (status) => {
+          const { company } = await seedRecruiterWithCompany('Acme');
+          const offer = await seedOffer(company, { status });
+          const candidate = await seedCandidateWithProfile('Camille');
+
+          await likeAsCandidate(candidate.id, offer.id).expect(404);
+
+          await expect(prisma.candidateLikesOffer.count()).resolves.toBe(0);
+        },
+      );
+
+      it('refuses a like on an offer that does not exist (404)', async () => {
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await likeAsCandidate(candidate.id, 999_999).expect(404);
+      });
+    });
+
+    describe('GET /offers/liked', () => {
+      const readLiked = (userId: number) =>
+        httpRequest(app)
+          .get('/api/offers/liked')
+          .set('Authorization', asCandidate(userId));
+
+      // `liked` sits under the same prefix as the `:id` detail route: declared
+      // after it, the word would be parsed as an identifier.
+      it('is reachable as a literal segment, not read as an id', async () => {
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await readLiked(candidate.id).expect(200);
+      });
+
+      it('rejects an unauthenticated read with 401', async () => {
+        await httpRequest(app).get('/api/offers/liked').expect(401);
+      });
+
+      it('forbids a recruiter from reading the liked offers (403)', async () => {
+        const { user } = await seedRecruiterWithCompany('Acme');
+
+        await httpRequest(app)
+          .get('/api/offers/liked')
+          .set('Authorization', bearerFor(app, user.id, 'recruiter'))
+          .expect(403);
+      });
+
+      it('lists the offers the caller liked, and only those', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const liked = await seedOffer(company, {
+          title: 'Aimée',
+          status: 'open',
+        });
+        await seedOffer(company, { title: 'Ignorée', status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+        const other = await seedCandidateWithProfile('Yanis');
+        const otherLiked = await seedOffer(company, {
+          title: 'Aimée par un autre',
+          status: 'open',
+        });
+
+        await likeAsCandidate(candidate.id, liked.id).expect(201);
+        await likeAsCandidate(other.id, otherLiked.id).expect(201);
+
+        const res = await readLiked(candidate.id).expect(200);
+
+        expect(
+          (res.body as { title: string }[]).map((offer) => offer.title),
+        ).toEqual(['Aimée']);
+      });
+
+      /**
+       * Same rule as the match list, and for the same reason: a like is not a
+       * standing right to read the offer. Unpublished, the post is being
+       * reworked — its current salary and description are not what the
+       * candidate applied to, and `GET /offers/:id` would answer 404 on it.
+       */
+      it.each(['draft', 'paused', 'filled', 'closed'] as const)(
+        'drops a liked offer once it is %s',
+        async (status) => {
+          const { user, company } = await seedRecruiterWithCompany('Acme');
+          const offer = await seedOffer(company, { status: 'open' });
+          const candidate = await seedCandidateWithProfile('Camille');
+          await likeAsCandidate(candidate.id, offer.id).expect(201);
+          await httpRequest(app)
+            .patch(`/api/offers/${offer.id}`)
+            .set('Authorization', bearerFor(app, user.id, 'recruiter'))
+            .send({ status })
+            .expect(200);
+
+          const res = await readLiked(candidate.id).expect(200);
+
+          expect(res.body).toEqual([]);
+        },
+      );
+
+      it.each([
+        ['a page beyond the int4 ceiling', '?page=1000000000000000000'],
+        ['a page of zero', '?page=0'],
+        ['a limit of zero', '?limit=0'],
+        ['a limit over the cap', '?limit=500'],
+      ])('rejects %s with 400', async (_label, query) => {
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await httpRequest(app)
+          .get(`/api/offers/liked${query}`)
+          .set('Authorization', asCandidate(candidate.id))
+          .expect(400);
+      });
+
+      /**
+       * Exhaustive on both levels, and on the offer itself rather than on its
+       * company alone: this list shares `SHOWCASE_OFFER_COLUMNS` with the
+       * candidate feed, so a column added there reaches two screens at once.
+       * `toEqual` fails on an extra key, which is the point.
+       */
+      it('exposes the showcase fields of a liked offer and nothing else', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, {
+          status: 'open',
+          city: 'Lyon',
+          postalCode: '69003',
+        });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        const res = await readLiked(candidate.id).expect(200);
+        const [item] = res.body as { company: Record<string, unknown> }[];
+
+        expect(Object.keys(item).sort()).toEqual([
+          'city',
+          'company',
+          'contractType',
+          'createdAt',
+          'description',
+          'id',
+          'minExperienceLevel',
+          'remotePolicy',
+          'salaryMax',
+          'salaryMin',
+          'tags',
+          'title',
+        ]);
+        expect(Object.keys(item.company).sort()).toEqual([
+          'id',
+          'logo',
+          'name',
+        ]);
+      });
+    });
+
+    describe('GET /offers/:id/likes', () => {
+      it('rejects an unauthenticated read with 401', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+
+        await httpRequest(app).get(`/api/offers/${offer.id}/likes`).expect(401);
+      });
+
+      it('forbids a candidate from reading who applied (403)', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await httpRequest(app)
+          .get(`/api/offers/${offer.id}/likes`)
+          .set('Authorization', asCandidate(candidate.id))
+          .expect(403);
+      });
+
+      it('lists the candidates who liked the offer', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const camille = await seedCandidateWithProfile('Camille');
+        const yanis = await seedCandidateWithProfile('Yanis');
+        await likeAsCandidate(camille.id, offer.id).expect(201);
+        await likeAsCandidate(yanis.id, offer.id).expect(201);
+
+        const res = await readInterested(user.id, offer.id).expect(200);
+
+        expect(namesOf(res).sort()).toEqual(['Camille', 'Yanis']);
+      });
+
+      it('leaves out a candidate who liked another offer of the same company', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const sibling = await seedOffer(company, {
+          title: 'Autre poste',
+          status: 'open',
+        });
+        const camille = await seedCandidateWithProfile('Camille');
+        const yanis = await seedCandidateWithProfile('Yanis');
+        await likeAsCandidate(camille.id, offer.id).expect(201);
+        await likeAsCandidate(yanis.id, sibling.id).expect(201);
+
+        const res = await readInterested(user.id, offer.id).expect(200);
+
+        expect(namesOf(res)).toEqual(['Camille']);
+      });
+
+      // 404 and not 403: telling a stranger « not yours » already tells them
+      // the offer exists.
+      it("hides the applicants of another company's offer behind a 404", async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const other = await seedRecruiterWithCompany('Globex');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        await readInterested(other.user.id, offer.id).expect(404);
+      });
+
+      it('answers 404 on an offer that does not exist', async () => {
+        const { user } = await seedRecruiterWithCompany('Acme');
+
+        await readInterested(user.id, 999_999).expect(404);
+      });
+
+      // The recruiter drives the whole life cycle from their own screens, so a
+      // paused or filled offer still has applicants to read.
+      it.each(['draft', 'paused', 'filled', 'closed'] as const)(
+        'still lists the applicants of a %s offer of the company',
+        async (status) => {
+          const { user, company } = await seedRecruiterWithCompany('Acme');
+          const offer = await seedOffer(company, { status: 'open' });
+          const candidate = await seedCandidateWithProfile('Camille');
+          await likeAsCandidate(candidate.id, offer.id).expect(201);
+          await prisma.offer.update({
+            where: { id: offer.id },
+            data: { status },
+          });
+
+          const res = await readInterested(user.id, offer.id).expect(200);
+
+          expect(namesOf(res)).toEqual(['Camille']);
+        },
+      );
+
+      /**
+       * A deactivated account leaves the list. The rule was carried by the
+       * retired deck and is restated here rather than dropped: the candidate is
+       * gone from the product, and their name and photo have no reason to keep
+       * reaching a recruiter.
+       */
+      it('leaves out an applicant whose account was deactivated', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const camille = await seedCandidateWithProfile('Camille');
+        const yanis = await seedCandidateWithProfile('Yanis');
+        await likeAsCandidate(camille.id, offer.id).expect(201);
+        await likeAsCandidate(yanis.id, offer.id).expect(201);
+        await prisma.user.update({
+          where: { id: yanis.id },
+          data: { isActive: false },
+        });
+
+        const res = await readInterested(user.id, offer.id).expect(200);
+
+        expect(namesOf(res)).toEqual(['Camille']);
+      });
+
+      /**
+       * The badge and the screen must agree. Counted over the raw pivot, the
+       * figure would announce people the list cannot show — and the gap would
+       * tell the recruiter that an account was deactivated.
+       */
+      it('counts the same people the list shows', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const shown = await seedCandidateWithProfile('Camille');
+        const deactivated = await seedCandidateWithProfile('Yanis');
+        // Signup writes the user, the wizard writes the profile: this one
+        // stopped in between.
+        const profileless = await createUser('candidate');
+        for (const candidate of [shown, deactivated, profileless]) {
+          await likeAsCandidate(candidate.id, offer.id).expect(201);
+        }
+        await prisma.user.update({
+          where: { id: deactivated.id },
+          data: { isActive: false },
+        });
+
+        const listed = await readInterested(user.id, offer.id).expect(200);
+        const offers = await getOffers(user.id).expect(200);
+        const counted = (
+          offers.body as { id: number; applicantCount: number }[]
+        ).find((item) => item.id === offer.id);
+
+        expect(namesOf(listed)).toEqual(['Camille']);
+        expect(counted?.applicantCount).toBe(1);
+      });
+
+      it('leaks no account data, internal key or geolocation', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        const res = await readInterested(user.id, offer.id).expect(200);
+        const [item] = res.body as Record<string, unknown>[];
+
+        for (const forbidden of [
+          'email',
+          'passwordHash',
+          'isActive',
+          'role',
+          'latitude',
+          'longitude',
+          'postalCode',
+          'lastName',
+        ]) {
+          expect(item).not.toHaveProperty(forbidden);
+        }
+        expect(JSON.stringify(res.body)).not.toContain('@test.dev');
+      });
+
+      it('honours limit and page', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        for (const name of ['Camille', 'Yanis', 'Sacha']) {
+          const candidate = await seedCandidateWithProfile(name);
+          await likeAsCandidate(candidate.id, offer.id).expect(201);
+        }
+
+        const first = await readInterested(
+          user.id,
+          offer.id,
+          '?page=1&limit=2',
+        ).expect(200);
+        const second = await readInterested(
+          user.id,
+          offer.id,
+          '?page=2&limit=2',
+        ).expect(200);
+
+        expect(namesOf(first)).toHaveLength(2);
+        expect(namesOf(second)).toHaveLength(1);
+      });
+
+      it('rejects a limit outside its bounds (400)', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+
+        await readInterested(user.id, offer.id, '?limit=500').expect(400);
+      });
+    });
+
+    describe('POST /offers/:id/likes/:candidateUserId', () => {
+      it('rejects an unauthenticated like-back with 401', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await httpRequest(app)
+          .post(`/api/offers/${offer.id}/likes/${candidate.id}`)
+          .expect(401);
+      });
+
+      it('forbids a candidate from liking back (403)', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await httpRequest(app)
+          .post(`/api/offers/${offer.id}/likes/${candidate.id}`)
+          .set('Authorization', asCandidate(candidate.id))
+          .expect(403);
+      });
+
+      it('records the interest of the recruiter in an applicant', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        await likeBack(user.id, offer.id, candidate.id).expect(201);
+
+        await expect(
+          prisma.recruiterLikesCandidate.count({
+            where: { recruiterUserId: user.id, candidateUserId: candidate.id },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      it('stays idempotent when the recruiter likes the same applicant twice', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        await likeBack(user.id, offer.id, candidate.id).expect(201);
+        await likeBack(user.id, offer.id, candidate.id).expect(201);
+
+        await expect(prisma.recruiterLikesCandidate.count()).resolves.toBe(1);
+      });
+
+      /**
+       * The reciprocity rule belongs to #134. Asserted rather than left
+       * unsaid: deriving a match here would settle a product decision this
+       * ticket does not carry, and a later reader has to be able to tell the
+       * omission from an oversight.
+       */
+      it('derives no match from the reciprocal pair', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        await likeBack(user.id, offer.id, candidate.id).expect(201);
+
+        await expect(prisma.match.count()).resolves.toBe(0);
+      });
+
+      it('refuses to like back a candidate who did not apply to the offer (404)', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await likeBack(user.id, offer.id, candidate.id).expect(404);
+
+        await expect(prisma.recruiterLikesCandidate.count()).resolves.toBe(0);
+      });
+
+      it("refuses to like back through another company's offer (404)", async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const other = await seedRecruiterWithCompany('Globex');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        await likeBack(other.user.id, offer.id, candidate.id).expect(404);
+
+        await expect(prisma.recruiterLikesCandidate.count()).resolves.toBe(0);
+      });
+    });
+  });
+
   describe('GET /offers', () => {
+    /**
+     * The count is what makes the list actionable: without it the recruiter has
+     * to open every offer to find the one people applied to.
+     */
+    it('carries the number of candidates interested in each offer', async () => {
+      const { user, company } = await seedRecruiterWithCompany('Acme');
+      const wanted = await seedOffer(company, {
+        title: 'Convoitée',
+        status: 'open',
+      });
+      const ignored = await seedOffer(company, {
+        title: 'Ignorée',
+        status: 'open',
+      });
+      for (const name of ['Camille', 'Yanis']) {
+        const candidate = await createUser('candidate');
+        await prisma.candidateProfile.create({
+          data: { userId: candidate.id, firstName: name, lastName: 'M' },
+        });
+        await httpRequest(app)
+          .post(`/api/offers/${wanted.id}/like`)
+          .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+          .expect(201);
+      }
+
+      const res = await getOffers(user.id).expect(200);
+      const counts = Object.fromEntries(
+        (res.body as { id: number; applicantCount: number }[]).map((offer) => [
+          offer.id,
+          offer.applicantCount,
+        ]),
+      );
+
+      expect(counts[wanted.id]).toBe(2);
+      expect(counts[ignored.id]).toBe(0);
+    });
+
     it('rejects an unauthenticated list with 401', async () => {
       await httpRequest(app).get('/api/offers').expect(401);
     });

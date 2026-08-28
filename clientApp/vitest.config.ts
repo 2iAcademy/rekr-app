@@ -77,6 +77,21 @@ export default defineConfig({
           functions: 80,
           lines: 80,
         },
+        'src/features/candidate-feed/**': {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
+        // The deck state machine lives here and is driven by the candidate
+        // feed: it was covered only through the retired recruiter deck, so the
+        // threshold is what keeps it from drifting back out of sight.
+        'src/components/feed/**': {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
         'src/features/recruiter-offers/**': {
           statements: 80,
           branches: 80,

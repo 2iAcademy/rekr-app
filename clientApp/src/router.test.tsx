@@ -67,6 +67,7 @@ const ALLOWED_USER_TYPES: Record<string, readonly UserType[]> = {
   '/matches': ['candidate'],
   '/profil': USER_TYPES,
   '/candidat/offres': ['candidate'],
+  '/recruteur/offres/:id/candidats': ['recruiter'],
   '/recruteur/offres': ['recruiter'],
   '/recruteur/offres/nouvelle': ['recruiter'],
   '/recruteur/offres/:id/edition': ['recruiter'],
@@ -120,6 +121,7 @@ describe('table de routage', () => {
       '/matches',
       '/profil',
       '/recruteur/offres',
+      '/recruteur/offres/:id/candidats',
       '/recruteur/offres/:id/edition',
       '/recruteur/offres/nouvelle',
     ]);

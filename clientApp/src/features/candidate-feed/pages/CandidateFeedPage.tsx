@@ -1,4 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
+import { offerControllerLike } from '@/api/generated';
+import { notifyFailure } from '@/lib/feedback/notify';
+import { likeFailureBusiness } from '../likeFeedback';
 import { cn } from '@/lib/utils';
 import { EmptyDeck } from '@/components/feed/EmptyDeck';
 import { FeedActions } from '@/components/feed/FeedActions';
@@ -41,6 +44,15 @@ export function CandidateFeedPage({
   const liked = likedCount(decisions);
   const reason = emptyReason(offers, decisions);
 
+  /**
+   * The card leaves the deck the moment it is answered, before the server has
+   * agreed. That is deliberate: a swipe that waited on the network would stall
+   * the deck, and a like nobody sees fail is a worse outcome than a like that
+   * silently has to be redone. The failure is surfaced as a toast, and the
+   * endpoint is idempotent, so liking the same offer again is harmless.
+   *
+   * Only a like is written: nothing stores a pass in this scope.
+   */
   const decide = useCallback(
     (decision: Decision, offer: FeedOffer | undefined = current): void => {
       if (!offer) {
@@ -48,6 +60,12 @@ export function CandidateFeedPage({
       }
 
       setDecisions((previous) => recordDecision(previous, offer.id, decision));
+
+      if (decision === 'liked') {
+        void offerControllerLike(offer.id).catch((cause: unknown) =>
+          notifyFailure(cause, likeFailureBusiness),
+        );
+      }
 
       if (deck.length === 1) {
         deckRef.current?.focus();

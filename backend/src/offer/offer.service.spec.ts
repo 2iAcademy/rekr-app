@@ -319,7 +319,10 @@ describe('OfferService', () => {
 
     it("lists the offers of the recruiter's company, newest first", async () => {
       prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
-      prisma.offer.findMany.mockResolvedValue([{ id: 50 }, { id: 49 }]);
+      prisma.offer.findMany.mockResolvedValue([
+        { id: 50, _count: { candidateLikes: 2 } },
+        { id: 49, _count: { candidateLikes: 0 } },
+      ]);
 
       const result = await service.findMine(7, listQuery());
 
@@ -329,7 +332,12 @@ describe('OfferService', () => {
           orderBy: { createdAt: 'desc' },
         }),
       );
-      expect(result).toEqual([{ id: 50 }, { id: 49 }]);
+      // `_count` is a Prisma shape and must not reach the contract: the
+      // figure travels as a plain column of the item.
+      expect(result).toEqual([
+        { id: 50, applicantCount: 2 },
+        { id: 49, applicantCount: 0 },
+      ]);
     });
 
     it('turns page and limit into skip and take', async () => {

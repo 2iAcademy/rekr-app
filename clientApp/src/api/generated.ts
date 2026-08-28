@@ -216,6 +216,8 @@ export interface OfferListItemDto {
   salaryMax: number | null;
   createdAt: string;
   updatedAt: string;
+  /** @minimum 0 */
+  applicantCount: number;
 }
 
 export interface OfferFeedCompanyDto {
@@ -404,6 +406,25 @@ export interface UpdateOfferDto {
   benefits?: string[];
 }
 
+export interface OfferApplicantDto {
+  userId: number;
+  /** @maxLength 100 */
+  firstName: string;
+  /** @nullable */
+  picture: string | null;
+  /** @nullable */
+  bio: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  desiredJobTitle: string | null;
+  contractTypes: ContractType[];
+  experienceLevel: ExperienceLevel | null;
+  availability: Availability | null;
+  remotePolicy: RemotePolicy | null;
+  tags: string[];
+}
+
 export interface SectorDto {
   id: number;
   /** @maxLength 100 */
@@ -510,6 +531,36 @@ export type OfferControllerFindFeedParams = {
    * @maxLength 100
    */
   city?: string;
+};
+
+export type OfferControllerFindLikedParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   * @maximum 2147483647
+   */
+  page?: number;
+  /**
+   * Nombre maximum de candidats par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type OfferControllerFindApplicantsParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   * @maximum 2147483647
+   */
+  page?: number;
+  /**
+   * Nombre maximum de candidats par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type MatchControllerFindMineParams = {
@@ -1398,6 +1449,59 @@ export const offerControllerFindFeed = async (
   );
 };
 
+export type offerControllerFindLikedResponse200 = {
+  data: OfferFeedItemDto[];
+  status: 200;
+};
+
+export type offerControllerFindLikedResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindLikedResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindLikedResponseSuccess = offerControllerFindLikedResponse200 & {
+  headers: Headers;
+};
+export type offerControllerFindLikedResponseError = (
+  offerControllerFindLikedResponse401 | offerControllerFindLikedResponse403
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerFindLikedUrl = (params?: OfferControllerFindLikedParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/offers/liked?${stringifiedParams}`
+    : `/api/offers/liked`;
+};
+
+export const offerControllerFindLiked = async (
+  params?: OfferControllerFindLikedParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerFindLikedResponseSuccess> => {
+  return customFetch<offerControllerFindLikedResponseSuccess>(
+    getOfferControllerFindLikedUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
 export type offerControllerFindOneByIdResponse200 = {
   data: OfferDetailDto;
   status: 200;
@@ -1498,6 +1602,164 @@ export const offerControllerUpdate = async (
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateOfferDto),
   });
+};
+
+export type offerControllerLikeResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type offerControllerLikeResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerLikeResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerLikeResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerLikeResponseSuccess = offerControllerLikeResponse201 & {
+  headers: Headers;
+};
+export type offerControllerLikeResponseError = (
+  offerControllerLikeResponse401 | offerControllerLikeResponse403 | offerControllerLikeResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerLikeUrl = (id: number) => {
+  return `/api/offers/${id}/like`;
+};
+
+export const offerControllerLike = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerLikeResponseSuccess> => {
+  return customFetch<offerControllerLikeResponseSuccess>(getOfferControllerLikeUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type offerControllerFindApplicantsResponse200 = {
+  data: OfferApplicantDto[];
+  status: 200;
+};
+
+export type offerControllerFindApplicantsResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindApplicantsResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindApplicantsResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerFindApplicantsResponseSuccess =
+  offerControllerFindApplicantsResponse200 & {
+    headers: Headers;
+  };
+export type offerControllerFindApplicantsResponseError = (
+  | offerControllerFindApplicantsResponse401
+  | offerControllerFindApplicantsResponse403
+  | offerControllerFindApplicantsResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerFindApplicantsUrl = (
+  id: number,
+  params?: OfferControllerFindApplicantsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/offers/${id}/likes?${stringifiedParams}`
+    : `/api/offers/${id}/likes`;
+};
+
+export const offerControllerFindApplicants = async (
+  id: number,
+  params?: OfferControllerFindApplicantsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerFindApplicantsResponseSuccess> => {
+  return customFetch<offerControllerFindApplicantsResponseSuccess>(
+    getOfferControllerFindApplicantsUrl(id, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type offerControllerLikeApplicantResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type offerControllerLikeApplicantResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerLikeApplicantResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerLikeApplicantResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerLikeApplicantResponseSuccess =
+  offerControllerLikeApplicantResponse201 & {
+    headers: Headers;
+  };
+export type offerControllerLikeApplicantResponseError = (
+  | offerControllerLikeApplicantResponse401
+  | offerControllerLikeApplicantResponse403
+  | offerControllerLikeApplicantResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerLikeApplicantUrl = (id: number, candidateUserId: number) => {
+  return `/api/offers/${id}/likes/${candidateUserId}`;
+};
+
+export const offerControllerLikeApplicant = async (
+  id: number,
+  candidateUserId: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerLikeApplicantResponseSuccess> => {
+  return customFetch<offerControllerLikeApplicantResponseSuccess>(
+    getOfferControllerLikeApplicantUrl(id, candidateUserId),
+    {
+      ...options,
+      method: 'POST',
+    },
+  );
 };
 
 export type sectorControllerFindAllResponse200 = {

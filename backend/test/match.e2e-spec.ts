@@ -109,6 +109,42 @@ describe('Match (e2e)', () => {
     expect(schemas.MatchListItemDto.required).toContain('counterpart');
   });
 
+  /**
+   * The tenant axis, observed rather than mocked.
+   *
+   * Both matches sit on the same open offer, so nothing but `candidateUserId`
+   * tells them apart: drop it from the `where` and this test fails, where a
+   * fixture with a single candidate would still pass. It replaces the
+   * company-isolation case the recruiter branch used to carry.
+   */
+  it('never returns the matches of another candidate', async () => {
+    const alice = await createUser('candidate');
+    const bob = await createUser('candidate');
+    const recruiter = await seedRecruiterWithCompany('Acme');
+    const offer = await prisma.offer.create({
+      data: {
+        title: 'Développeur Front',
+        status: 'open',
+        companyId: recruiter.company.id,
+        createdById: recruiter.user.id,
+      },
+    });
+    const aliceMatch = await prisma.match.create({
+      data: { candidateUserId: alice.id, offerId: offer.id },
+    });
+    await prisma.match.create({
+      data: { candidateUserId: bob.id, offerId: offer.id },
+    });
+
+    const res = await httpRequest(app)
+      .get('/api/matches')
+      .set('Authorization', bearerFor(app, alice.id, 'candidate'))
+      .expect(200);
+
+    expect(res.body).toHaveLength(1);
+    expect((res.body as { id: number }[])[0].id).toBe(aliceMatch.id);
+  });
+
   it('hides matches for a candidate when the offer is no longer open', async () => {
     const candidate = await createUser('candidate');
     const recruiter = await seedRecruiterWithCompany('Acme');

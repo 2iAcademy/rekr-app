@@ -73,4 +73,8 @@ export class OfferListItemDto {
     example: '2026-08-20T14:03:00.000Z',
   })
   updatedAt!: Date;
+
+  /** How many candidates have shown interest in this offer. */
+  @ApiProperty({ example: 3, minimum: 0 })
+  applicantCount!: number;
 }
