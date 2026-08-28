@@ -25,6 +25,8 @@ import { RolesGuard } from '../auth/roles.guard';
 import { OfferService } from './offer.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
 import { OfferDetailDto, OfferDto } from './dto/offer-detail.dto';
+import { OfferFeedItemDto } from './dto/offer-feed-item.dto';
+import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
 import { OfferListItemDto } from './dto/offer-list-item.dto';
 import { OfferListQueryDto } from './dto/offer-list-query.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
@@ -48,6 +50,18 @@ export class OfferController {
     @Query() query: OfferListQueryDto,
   ): Promise<OfferListItemDto[]> {
     return this.service.findMine(user.id, query);
+  }
+
+  // Declared before `:id`, which would otherwise swallow `feed` and answer 400
+  // on the ParseIntPipe.
+  @Get('feed')
+  @Roles('candidate')
+  @ApiOkResponse({ type: OfferFeedItemDto, isArray: true })
+  findFeed(
+    @CurrentUser() user: AuthUser,
+    @Query() query: OfferFeedQueryDto,
+  ): Promise<OfferFeedItemDto[]> {
+    return this.service.findFeed(user, query);
   }
 
   // 404 and not 403 on an offer the caller may not read: telling a stranger

@@ -4,6 +4,8 @@ export async function resetDb(prisma: PrismaService): Promise<void> {
   await prisma.match.deleteMany();
   await prisma.candidateLikesOffer.deleteMany();
   await prisma.recruiterLikesCandidate.deleteMany();
+  await prisma.candidatePassesOffer.deleteMany();
+  await prisma.recruiterPassesCandidate.deleteMany();
   await prisma.candidateTag.deleteMany();
   await prisma.companyTag.deleteMany();
   await prisma.offerTag.deleteMany();

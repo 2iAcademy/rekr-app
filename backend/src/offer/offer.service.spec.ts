@@ -1,5 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import type { AuthUser } from '../auth/auth-user.interface';
+import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
 import { OfferService } from './offer.service';
 import { CityService } from '../city/city.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -32,6 +34,12 @@ const buildPrismaMock = (): PrismaMock => {
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
   };
   return mock;
+};
+
+type FeedFindManyArgs = {
+  where: Record<string, unknown>;
+  orderBy: unknown;
+  take: number;
 };
 
 describe('OfferService', () => {
@@ -288,6 +296,108 @@ describe('OfferService', () => {
       );
 
       expect(prisma.offer.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findFeed', () => {
+    const candidate: AuthUser = { id: 7, userType: 'candidate' };
+
+    const argsOf = (): FeedFindManyArgs =>
+      (prisma.offer.findMany.mock.calls as FeedFindManyArgs[][])[0][0];
+
+    const whereOf = (): Record<string, unknown> => argsOf().where;
+
+    it('keeps open offers the candidate has neither liked nor passed', async () => {
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf()).toMatchObject({
+        status: 'open',
+        candidateLikes: { none: { candidateUserId: 7 } },
+        candidatePasses: { none: { candidateUserId: 7 } },
+      });
+    });
+
+    it('leaves out every filter the query does not carry', async () => {
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      const where = whereOf();
+      expect(where).not.toHaveProperty('contractType');
+      expect(where).not.toHaveProperty('minExperienceLevel');
+      expect(where).not.toHaveProperty('remotePolicy');
+      expect(where).not.toHaveProperty('city');
+    });
+
+    it('maps the experience filter onto the minimum level of the offer', async () => {
+      await service.findFeed(candidate, {
+        ...new OfferFeedQueryDto(),
+        experienceLevel: 'SENIOR',
+      });
+
+      expect(whereOf()).toMatchObject({ minExperienceLevel: 'SENIOR' });
+    });
+
+    it('carries the contract and remote filters straight through', async () => {
+      await service.findFeed(candidate, {
+        ...new OfferFeedQueryDto(),
+        contractType: 'CDI',
+        remotePolicy: 'FULL_REMOTE',
+      });
+
+      expect(whereOf()).toMatchObject({
+        contractType: 'CDI',
+        remotePolicy: 'FULL_REMOTE',
+      });
+    });
+
+    it('compares the city without regard to case', async () => {
+      await service.findFeed(candidate, {
+        ...new OfferFeedQueryDto(),
+        city: 'lYoN',
+      });
+
+      expect(whereOf()).toMatchObject({
+        city: { equals: 'lYoN', mode: 'insensitive' },
+      });
+    });
+
+    // `createdAt` is not unique, so the id break is what keeps two reads of
+    // the deck in the same order.
+    it('orders by creation date then id, and takes the deck from the top', async () => {
+      await service.findFeed(candidate, {
+        ...new OfferFeedQueryDto(),
+        limit: 10,
+      });
+
+      expect(argsOf()).toMatchObject({
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 10,
+      });
+      expect(argsOf()).not.toHaveProperty('skip');
+    });
+
+    it('flattens the offer tags into their labels', async () => {
+      prisma.offer.findMany.mockResolvedValue([
+        {
+          id: 50,
+          title: 'Dev Front',
+          company: { id: 10, name: 'Acme', logo: null },
+          offerTags: [
+            { tag: { label: 'React' } },
+            { tag: { label: 'TypeScript' } },
+          ],
+        },
+      ]);
+
+      const result = await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(result).toEqual([
+        {
+          id: 50,
+          title: 'Dev Front',
+          company: { id: 10, name: 'Acme', logo: null },
+          tags: ['React', 'TypeScript'],
+        },
+      ]);
     });
   });
 });
