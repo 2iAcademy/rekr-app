@@ -11,7 +11,6 @@ interface RouteGuardProps {
   children?: ReactNode | ((user: AuthenticatedUser) => ReactNode);
   allowedUserTypes?: readonly UserType[];
   profile?: ProfileRequirement;
-  forbiddenRedirectTo?: string;
 }
 
 const hasAllowedUserType = (
@@ -29,12 +28,7 @@ const hasAllowedUserType = (
  * concern: it waits for the boot refresh, requires a session, checks the role
  * and keeps completed and incomplete profiles on their respective journeys.
  */
-export function RouteGuard({
-  children,
-  allowedUserTypes,
-  profile,
-  forbiddenRedirectTo,
-}: RouteGuardProps) {
+export function RouteGuard({ children, allowedUserTypes, profile }: RouteGuardProps) {
   const { status, user } = useAuth();
 
   if (status === 'loading') {
@@ -46,7 +40,7 @@ export function RouteGuard({
   }
 
   if (!hasAllowedUserType(user.userType, allowedUserTypes)) {
-    return <Navigate to={forbiddenRedirectTo ?? homePathFor(user)} replace />;
+    return <Navigate to={homePathFor(user)} replace />;
   }
 
   if (profile === 'complete' && needsOnboarding(user)) {
