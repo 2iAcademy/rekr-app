@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
@@ -49,7 +49,14 @@ const authenticateAs = (userType: 'candidate' | 'recruiter', email = 'camille@re
     status: 200,
     json: vi.fn().mockResolvedValue({
       accessToken: 'test-token',
-      user: { id: 1, email, role: 'user', userType, isActive: true },
+      user: {
+        id: 1,
+        email,
+        role: 'user',
+        userType,
+        isActive: true,
+        hasProfile: true,
+      },
     }),
   } as unknown as Response);
 };
@@ -124,13 +131,18 @@ describe('ProfileRoute', () => {
     expect(router.state.location.pathname).toBe('/profil');
   });
 
+  /*
+   * L'attente porte sur l'appel lui-même, pas sur le titre de la page : le
+   * heading appartient à `AccountPage` tandis que la requête part d'un effet de
+   * la section montée en dessous. Attendre le premier pour conclure sur le
+   * second est une course, que seule une machine chargée perd.
+   */
   it('monte la section du candidat pour un candidat', async () => {
     authenticateAs('candidate');
     renderProfile();
 
-    await screen.findByRole('heading', { level: 1, name: 'Mon compte' });
+    await waitFor(() => expect(findCandidateProfile).toHaveBeenCalled());
 
-    expect(findCandidateProfile).toHaveBeenCalled();
     expect(findCompany).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'Ma société' })).not.toBeInTheDocument();
   });
@@ -139,9 +151,8 @@ describe('ProfileRoute', () => {
     authenticateAs('recruiter', 'sacha@acme.fr');
     renderProfile();
 
-    await screen.findByRole('heading', { level: 1, name: 'Mon compte' });
+    await waitFor(() => expect(findCompany).toHaveBeenCalled());
 
-    expect(findCompany).toHaveBeenCalled();
     expect(findCandidateProfile).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'Mon profil' })).not.toBeInTheDocument();
   });

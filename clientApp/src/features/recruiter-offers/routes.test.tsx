@@ -34,7 +34,14 @@ const authenticateAs = (userType: 'candidate' | 'recruiter') => {
     status: 200,
     json: vi.fn().mockResolvedValue({
       accessToken: 'test-token',
-      user: { id: 1, email: 'sacha@rekr.fr', role: 'user', userType, isActive: true },
+      user: {
+        id: 1,
+        email: 'sacha@rekr.fr',
+        role: 'user',
+        userType,
+        isActive: true,
+        hasProfile: true,
+      },
     }),
   } as unknown as Response);
 };

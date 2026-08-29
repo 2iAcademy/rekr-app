@@ -1,7 +1,7 @@
 import { isValidElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { createMemoryRouter, Navigate, RouterProvider, type NavigateProps } from 'react-router';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
 import { USER_TYPES, type UserType } from '@/domain/userType';
 import { AuthProvider } from '@/features/auth/AuthProvider';
@@ -33,10 +33,20 @@ interface RouteLike {
 
 const entries: RouteLike[] = routes;
 
-const declaredPaths = (routeList: RouteLike[]): string[] =>
-  routeList.map((route) => route.path).filter((path): path is string => path !== undefined);
+/*
+ * Layout routes nest — the shell now sits under the onboarding gate, and the
+ * public screens under their own guard — so neither "declared" nor "under the
+ * shell" can be read off the first level of the table any more.
+ */
+const flatten = (routeList: RouteLike[]): RouteLike[] =>
+  routeList.flatMap((route) => [route, ...flatten(route.children ?? [])]);
 
-const shellRoutes = entries.filter(
+const declaredPaths = (routeList: RouteLike[]): string[] =>
+  flatten(routeList)
+    .map((route) => route.path)
+    .filter((path): path is string => path !== undefined);
+
+const shellRoutes = flatten(entries).filter(
   (route) => isValidElement(route.element) && route.element.type === AppShell,
 );
 
@@ -70,13 +80,13 @@ const restrictedShellScreens = insideShell.flatMap((path) =>
   ),
 );
 
-const authenticateAs = (userType: UserType) => {
+const authenticateAs = (userType: UserType, hasProfile = true) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({
       accessToken: 'test-token',
-      user: { id: 1, email: 'camille@rekr.fr', role: 'user', userType, isActive: true },
+      user: { id: 1, email: 'camille@rekr.fr', role: 'user', userType, isActive: true, hasProfile },
     }),
   } as unknown as Response);
 };
@@ -102,12 +112,6 @@ const shellChrome = () => [
   ...screen.queryAllByRole('navigation'),
   ...screen.queryAllByRole('link', { name: 'Mon profil' }),
 ];
-
-const isRedirectTo = (node: ReactNode, to: string): boolean =>
-  isValidElement<NavigateProps>(node) &&
-  node.type === Navigate &&
-  node.props.to === to &&
-  node.props.replace === true;
 
 describe('table de routage', () => {
   it('regroupe les écrans applicatifs sous un shell unique', () => {
@@ -139,11 +143,8 @@ describe('table de routage', () => {
     expect(pathsAlsoInsideShell(authPaths)).toEqual([]);
   });
 
-  it('renvoie toute route inconnue vers l’accueil', () => {
-    const catchAll = entries.filter((route) => route.path === '*');
-
-    expect(catchAll).toHaveLength(1);
-    expect(catchAll.every((route) => isRedirectTo(route.element, '/'))).toBe(true);
+  it('déclare une seule route attrape-tout', () => {
+    expect(declaredPaths(entries).filter((path) => path === '*')).toHaveLength(1);
   });
 });
 
@@ -192,19 +193,251 @@ describe('protection des écrans du shell', () => {
     expect(restrictedShellScreens.length).toBeGreaterThan(0);
   });
 
+  /*
+   * The chrome is no longer part of the assertion: the redirect now lands on the
+   * user's own feed, which is another screen of the same shell, so the sidebar
+   * legitimately survives. Where they end up is what says the refusal worked —
+   * and it must be their home, not the anonymous splash they used to be sent to.
+   */
   it.each(restrictedShellScreens)(
-    'refuse $path à un utilisateur de type $userType',
+    'refuse $path à un utilisateur de type $userType et le renvoie chez lui',
     async ({ path, userType }) => {
       authenticateAs(userType);
       const router = renderAt(path);
 
-      // Both inside `waitFor`: the router state changes a render before React
-      // unmounts the shell, so reading the chrome right after the redirect
-      // catches an `aside` that is on its way out.
       await waitFor(() => {
-        expect(router.state.location.pathname).not.toBe(path);
-        expect(shellChrome()).toEqual([]);
+        expect(router.state.location.pathname).toBe(
+          userType === 'recruiter' ? '/recruteur/candidats' : '/candidat/offres',
+        );
       });
     },
   );
+});
+
+/**
+ * The mirror image of the guards above, and the half that was missing: every
+ * screen knew how to turn an anonymous visitor away, none knew what to do with
+ * a settled session. `/` being both the public splash and the destination of
+ * every `navigate('/')` in the application, signing in landed the user back on
+ * the entry screen they had just come through.
+ */
+describe('écrans publics face à une session établie', () => {
+  const publicPaths = ['/', '/connexion', '/inscription', '/mot-de-passe-oublie'];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+  });
+
+  /*
+   * Generated from the route table rather than from the list above, so a fifth
+   * public screen cannot be added without a case landing on it.
+   */
+  it('couvre tous les écrans publics déclarés', () => {
+    expect(publicPaths.every((path) => outsideShell.includes(path))).toBe(true);
+  });
+
+  it.each(publicPaths)('renvoie un candidat instruit de %s vers son feed', async (path) => {
+    authenticateAs('candidate');
+    const router = renderAt(path);
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/candidat/offres');
+    });
+  });
+
+  it.each(publicPaths)('renvoie un recruteur instruit de %s vers son feed', async (path) => {
+    authenticateAs('recruiter');
+    const router = renderAt(path);
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/recruteur/candidats');
+    });
+  });
+
+  /*
+   * A session that never finished its wizard has no feed worth showing: the
+   * gate has to hold on the public screens too, or signing in would be a way
+   * around it.
+   */
+  it('renvoie un candidat sans profil vers son onboarding', async () => {
+    authenticateAs('candidate', false);
+    const router = renderAt('/connexion');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/candidat/onboarding');
+    });
+  });
+
+  it('renvoie un recruteur sans profil vers son onboarding', async () => {
+    authenticateAs('recruiter', false);
+    const router = renderAt('/connexion');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/recruteur/onboarding');
+    });
+  });
+
+  /*
+   * The redirect must not fire before the boot refresh has answered: a visitor
+   * who is genuinely anonymous has to be able to reach the login form.
+   */
+  it('laisse un visiteur anonyme atteindre la connexion', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+
+    const router = renderAt('/connexion');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Connexion' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/connexion');
+  });
+});
+
+/**
+ * The onboarding gate. Reaching a feed without a profile shows an empty deck
+ * and no explanation, and the matching has nothing to compare — so an
+ * unfinished wizard is the only place such a session can usefully be.
+ */
+describe('parcours d’onboarding inachevé', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+  });
+
+  const gatedPaths = ['/candidat/offres', '/matches', '/profil'];
+
+  it.each(gatedPaths)('renvoie un candidat sans profil de %s vers son wizard', async (path) => {
+    authenticateAs('candidate', false);
+    const router = renderAt(path);
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/candidat/onboarding');
+    });
+  });
+
+  it('renvoie un recruteur sans profil vers son wizard', async () => {
+    authenticateAs('recruiter', false);
+    const router = renderAt('/recruteur/candidats');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/recruteur/onboarding');
+    });
+  });
+
+  /*
+   * Otherwise the gate would send the session to the wizard, and the wizard
+   * would send it back to its home — which is the wizard. The screen that
+   * resolves the gate has to stay reachable.
+   */
+  it('laisse le wizard accessible à qui doit le remplir', async () => {
+    authenticateAs('candidate', false);
+    const router = renderAt('/candidat/onboarding');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/candidat/onboarding');
+    });
+  });
+
+  /*
+   * And once it is filled in, the wizard stops being home: coming back to it
+   * would be a way to overwrite a finished profile through a creation form.
+   */
+  it('détourne du wizard une session déjà instruite', async () => {
+    authenticateAs('candidate');
+    const router = renderAt('/candidat/onboarding');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/candidat/offres');
+    });
+  });
+});
+
+/**
+ * A mistyped URL used to land on the public splash whatever the session was —
+ * the same dead end as signing in. It has to lead wherever the session belongs.
+ */
+describe('route inconnue', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+  });
+
+  it('renvoie un candidat instruit vers son feed', async () => {
+    authenticateAs('candidate');
+    const router = renderAt('/une-page-qui-n-existe-pas');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/candidat/offres');
+    });
+  });
+
+  it('renvoie un recruteur instruit vers son feed', async () => {
+    authenticateAs('recruiter');
+    const router = renderAt('/une-page-qui-n-existe-pas');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/recruteur/candidats');
+    });
+  });
+
+  it('renvoie un visiteur anonyme vers l’accueil public', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+
+    const router = renderAt('/une-page-qui-n-existe-pas');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/');
+    });
+  });
+});
+
+/**
+ * The offer detail lives outside the shell because it paints its own full-frame
+ * chrome — and it was the one screen that never got a guard of its own. Anyone
+ * with the URL could read an offer without a session.
+ */
+describe('détail d’une offre', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+  });
+
+  it('renvoie un visiteur anonyme vers la connexion', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+
+    const router = renderAt('/offres/12');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/connexion');
+    });
+  });
+
+  it('renvoie un candidat sans profil vers son onboarding', async () => {
+    authenticateAs('candidate', false);
+    const router = renderAt('/offres/12');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/candidat/onboarding');
+    });
+  });
+
+  it('laisse passer un candidat instruit', async () => {
+    authenticateAs('candidate');
+    const router = renderAt('/offres/12');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/offres/12');
+    });
+  });
 });

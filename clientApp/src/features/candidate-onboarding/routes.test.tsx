@@ -21,13 +21,20 @@ vi.mock('@/api/generated', () => ({
 const signupRequest = vi.mocked(authControllerSignup);
 
 /** Makes the provider's boot refresh succeed, which is what authenticates the session. */
-const authenticateAs = (userType: 'recruiter' | 'candidate') => {
+const authenticateAs = (userType: 'recruiter' | 'candidate', hasProfile = true) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({
       accessToken: 'test-token',
-      user: { id: 1, email: 'a@rekr.fr', role: 'user', userType, isActive: true },
+      user: {
+        id: 1,
+        email: 'a@rekr.fr',
+        role: 'user',
+        userType,
+        isActive: true,
+        hasProfile,
+      },
     }),
   } as unknown as Response);
 };
@@ -59,6 +66,7 @@ describe('navigation création de profil candidat', () => {
           role: 'user',
           userType: 'candidate',
           isActive: true,
+          hasProfile: false,
         },
       },
       status: 201,
@@ -66,9 +74,9 @@ describe('navigation création de profil candidat', () => {
     } as unknown as Awaited<ReturnType<typeof authControllerSignup>>);
   });
 
-  it('affiche le wizard sur /candidat/profil pour un candidat connecté', async () => {
-    authenticateAs('candidate');
-    renderAt('/candidat/profil');
+  it('affiche le wizard sur /candidat/onboarding pour un candidat connecté', async () => {
+    authenticateAs('candidate', false);
+    renderAt('/candidat/onboarding');
 
     expect(await screen.findByRole('heading', { name: 'Mon identité' })).toBeInTheDocument();
     expect(screen.getByText('Étape 1 sur 4')).toBeInTheDocument();
@@ -77,24 +85,40 @@ describe('navigation création de profil candidat', () => {
   // Without this, a visitor could fill four steps and lose everything on the
   // 401 raised by the very last click.
   it('renvoie un visiteur anonyme vers la connexion', async () => {
-    renderAt('/candidat/profil');
+    renderAt('/candidat/onboarding');
 
     expect(await screen.findByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
     expect(screen.queryByText('Étape 1 sur 4')).not.toBeInTheDocument();
   });
 
-  it('renvoie un recruteur connecté vers l’accueil', async () => {
+  /*
+   * Not to the public splash, which is where this used to lead: a recruiter has
+   * a home of their own, and being on the wrong wizard is no reason to sign out.
+   */
+  it('renvoie un recruteur connecté vers son propre feed', async () => {
     authenticateAs('recruiter');
-    renderAt('/candidat/profil');
+    renderAt('/candidat/onboarding');
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
+    expect(screen.queryByText('Étape 1 sur 4')).not.toBeInTheDocument();
+  });
+
+  /*
+   * The wizard creates the profile; opening it with one already filled in would
+   * offer to overwrite it through a creation form.
+   */
+  it('détourne un candidat qui a déjà rempli son profil', async () => {
+    authenticateAs('candidate');
+    renderAt('/candidat/onboarding');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
     expect(screen.queryByText('Étape 1 sur 4')).not.toBeInTheDocument();
   });
 
   it('n’affiche pas le formulaire tant que la session n’est pas tranchée', () => {
     // The boot refresh never settles here, so the guard stays in its loading state.
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}) as Promise<Response>);
-    renderAt('/candidat/profil');
+    renderAt('/candidat/onboarding');
 
     expect(screen.queryByText('Étape 1 sur 4')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Se connecter' })).not.toBeInTheDocument();
@@ -104,7 +128,7 @@ describe('navigation création de profil candidat', () => {
     const user = userEvent.setup();
     renderAt('/inscription');
 
-    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(await screen.findByLabelText('Email'), 'candidat@rekr.fr');
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
     await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
     await user.click(screen.getByRole('checkbox'));

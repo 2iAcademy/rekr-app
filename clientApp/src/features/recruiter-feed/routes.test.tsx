@@ -13,17 +13,25 @@ vi.mock('@/api/generated', () => ({
   candidateProfileControllerUpdate: vi.fn(),
   companyControllerCreate: vi.fn(),
   companyControllerUpdateMine: vi.fn(),
+  matchControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerCreate: vi.fn(),
   sectorControllerFindAll: vi.fn(),
 }));
 
-const authenticateAs = (userType: 'candidate' | 'recruiter') => {
+const authenticateAs = (userType: 'candidate' | 'recruiter', hasProfile = true) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({
       accessToken: 'test-token',
-      user: { id: 1, email: 'a@rekr.fr', role: 'user', userType, isActive: true },
+      user: {
+        id: 1,
+        email: 'a@rekr.fr',
+        role: 'user',
+        userType,
+        isActive: true,
+        hasProfile,
+      },
     }),
   } as unknown as Response);
 };
@@ -94,11 +102,11 @@ describe('navigation vers le feed recruteur', () => {
     expect(feedHeading()).not.toBeInTheDocument();
   });
 
-  it('renvoie un candidat connecté vers l’accueil', async () => {
+  it('renvoie un candidat connecté vers son propre feed', async () => {
     authenticateAs('candidate');
     renderAt('/recruteur/candidats');
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
     expect(feedHeading()).not.toBeInTheDocument();
   });
 
@@ -138,11 +146,11 @@ describe('accès au détail d’un candidat', () => {
     expect(profileHeading()).not.toBeInTheDocument();
   });
 
-  it('renvoie un candidat connecté vers l’accueil', async () => {
+  it('renvoie un candidat connecté vers son propre feed', async () => {
     authenticateAs('candidate');
     renderAt('/recruteur/candidats?profil=1');
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
     expect(profileHeading()).not.toBeInTheDocument();
   });
 
@@ -210,7 +218,7 @@ describe('accès au détail d’un candidat', () => {
 
   it('ne laisse pas d’entrée d’historique en corrigeant l’URL', async () => {
     authenticateAs('recruiter');
-    const { router } = renderAt('/recruteur/candidats?profil=abc', '/');
+    const { router } = renderAt('/recruteur/candidats?profil=abc', '/matches');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
 
@@ -218,7 +226,9 @@ describe('accès au détail d’un candidat', () => {
 
     // Had the correction been pushed, this back would step onto `?profil=abc`
     // and the recruiter would need a second one to leave the feed.
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Tes matches' }),
+    ).toBeInTheDocument();
   });
 
   it('referme le profil au retour du navigateur', async () => {

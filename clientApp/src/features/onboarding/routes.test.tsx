@@ -20,6 +20,7 @@ const authenticatedUser = {
   role: 'user',
   userType: 'candidate',
   isActive: true,
+  hasProfile: false,
 };
 
 function renderAt(path: string) {
@@ -48,17 +49,17 @@ describe('navigation onboarding', () => {
     } as unknown as Awaited<ReturnType<typeof authControllerSignup>>);
   });
 
-  it('affiche le Splash sur /', () => {
+  it('affiche le Splash sur /', async () => {
     renderAt('/');
 
-    expect(screen.getByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
   });
 
   it("navigue du Splash vers l'inscription", async () => {
     const user = userEvent.setup();
     renderAt('/');
 
-    await user.click(screen.getByRole('button', { name: 'Créer un compte' }));
+    await user.click(await screen.findByRole('button', { name: 'Créer un compte' }));
 
     expect(screen.getByRole('button', { name: 'Créer mon compte' })).toBeInTheDocument();
   });
@@ -67,7 +68,7 @@ describe('navigation onboarding', () => {
     const user = userEvent.setup();
     renderAt('/');
 
-    await user.click(screen.getByRole('button', { name: "J'ai déjà un compte" }));
+    await user.click(await screen.findByRole('button', { name: "J'ai déjà un compte" }));
 
     expect(screen.getByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
   });
@@ -76,7 +77,7 @@ describe('navigation onboarding', () => {
     const user = userEvent.setup();
     renderAt('/inscription');
 
-    await user.click(screen.getByRole('button', { name: 'Retour' }));
+    await user.click(await screen.findByRole('button', { name: 'Retour' }));
 
     expect(screen.getByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
   });
@@ -85,7 +86,7 @@ describe('navigation onboarding', () => {
     const user = userEvent.setup();
     renderAt('/inscription');
 
-    await user.click(screen.getByRole('button', { name: 'Connexion' }));
+    await user.click(await screen.findByRole('button', { name: 'Connexion' }));
 
     expect(screen.getByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
   });
@@ -94,7 +95,7 @@ describe('navigation onboarding', () => {
     const user = userEvent.setup();
     renderAt('/connexion');
 
-    await user.click(screen.getByRole('button', { name: 'Inscription' }));
+    await user.click(await screen.findByRole('button', { name: 'Inscription' }));
 
     expect(screen.getByRole('button', { name: 'Créer mon compte' })).toBeInTheDocument();
   });
@@ -103,7 +104,7 @@ describe('navigation onboarding', () => {
     const user = userEvent.setup();
     renderAt('/connexion');
 
-    await user.click(screen.getByRole('button', { name: 'Mot de passe oublié ?' }));
+    await user.click(await screen.findByRole('button', { name: 'Mot de passe oublié ?' }));
 
     expect(screen.getByRole('button', { name: 'Envoyer le lien' })).toBeInTheDocument();
   });
@@ -112,7 +113,7 @@ describe('navigation onboarding', () => {
     const user = userEvent.setup();
     renderAt('/mot-de-passe-oublie');
 
-    await user.click(screen.getByRole('button', { name: 'Retour' }));
+    await user.click(await screen.findByRole('button', { name: 'Retour' }));
 
     expect(screen.getByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
   });
@@ -121,7 +122,7 @@ describe('navigation onboarding', () => {
     const user = userEvent.setup();
     renderAt('/inscription');
 
-    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(await screen.findByLabelText('Email'), 'candidat@rekr.fr');
     await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
     await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
     await user.click(screen.getByRole('checkbox'));
@@ -133,9 +134,9 @@ describe('navigation onboarding', () => {
     expect(screen.queryByRole('button', { name: 'Créer mon compte' })).toBeNull();
   });
 
-  it('redirige toute route inconnue vers le Splash', () => {
+  it('redirige un visiteur anonyme d’une route inconnue vers le Splash', async () => {
     renderAt('/route-inexistante');
 
-    expect(screen.getByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
   });
 });

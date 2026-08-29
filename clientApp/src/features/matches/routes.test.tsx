@@ -18,13 +18,20 @@ vi.mock('@/api/generated', () => ({
   sectorControllerFindAll: vi.fn(),
 }));
 
-const authenticateAs = (userType: 'candidate' | 'recruiter') => {
+const authenticateAs = (userType: 'candidate' | 'recruiter', hasProfile = true) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({
       accessToken: 'test-token',
-      user: { id: 1, email: 'a@rekr.fr', role: 'user', userType, isActive: true },
+      user: {
+        id: 1,
+        email: 'a@rekr.fr',
+        role: 'user',
+        userType,
+        isActive: true,
+        hasProfile,
+      },
     }),
   } as unknown as Response);
 };
@@ -107,23 +114,23 @@ describe('navigation vers le match', () => {
     expect(screen.queryByRole('button', { name: 'Se connecter' })).not.toBeInTheDocument();
   });
 
-  it('revient à l’accueil après avoir choisi d’écrire un message', async () => {
+  it('revient au feed après avoir choisi d’écrire un message', async () => {
     const user = userEvent.setup();
     authenticateAs('candidate');
     renderAt('/match');
 
     await user.click(await screen.findByRole('button', { name: 'Écrire un message' }));
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
   });
 
-  it('revient à l’accueil après avoir choisi de continuer à swiper', async () => {
+  it('revient au feed après avoir choisi de continuer à swiper', async () => {
     const user = userEvent.setup();
     authenticateAs('candidate');
     renderAt('/match');
 
     await user.click(await screen.findByRole('button', { name: 'Continuer à swiper' }));
 
-    expect(await screen.findByRole('button', { name: "J'ai déjà un compte" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
   });
 });

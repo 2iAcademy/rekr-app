@@ -5,10 +5,18 @@ import { AccountPage } from './AccountPage';
 
 const session: AuthContextValue = {
   status: 'authenticated',
-  user: { id: 1, email: 'camille@rekr.fr', role: 'user', userType: 'candidate', isActive: true },
+  user: {
+    id: 1,
+    email: 'camille@rekr.fr',
+    role: 'user',
+    userType: 'candidate',
+    isActive: true,
+    hasProfile: true,
+  },
   login: vi.fn(),
   signup: vi.fn(),
   logout: vi.fn().mockResolvedValue(undefined),
+  markProfileCompleted: vi.fn(),
 };
 
 // The page embeds the logout control, which reads the session from the context.
