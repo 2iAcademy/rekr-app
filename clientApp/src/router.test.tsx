@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
+import { AnonymousOnly } from '@/features/auth/AnonymousOnly';
 import { USER_TYPES, type UserType } from '@/domain/userType';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { routes } from '@/router';
@@ -11,6 +12,8 @@ vi.mock('@/api/generated', () => ({
   authControllerLogin: vi.fn(),
   authControllerLogout: vi.fn(),
   authControllerSignup: vi.fn(),
+  authControllerForgotPassword: vi.fn(),
+  authControllerResetPassword: vi.fn(),
   candidateProfileControllerCreate: vi.fn(),
   candidateProfileControllerUpdate: vi.fn(),
   companyControllerCreate: vi.fn(),
@@ -137,7 +140,13 @@ describe('table de routage', () => {
   });
 
   it('laisse hors du shell les écrans d’authentification', () => {
-    const authPaths = ['/', '/inscription', '/connexion', '/mot-de-passe-oublie'];
+    const authPaths = [
+      '/',
+      '/inscription',
+      '/connexion',
+      '/mot-de-passe-oublie',
+      '/reinitialiser-mot-de-passe',
+    ];
 
     expect(outsideShell).toEqual(expect.arrayContaining(authPaths));
     expect(pathsAlsoInsideShell(authPaths)).toEqual([]);
@@ -238,7 +247,13 @@ describe('protection des écrans du shell', () => {
  * the entry screen they had just come through.
  */
 describe('écrans publics face à une session établie', () => {
-  const publicPaths = ['/', '/connexion', '/inscription', '/mot-de-passe-oublie'];
+  const publicPaths = [
+    '/',
+    '/connexion',
+    '/inscription',
+    '/mot-de-passe-oublie',
+    '/reinitialiser-mot-de-passe',
+  ];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -251,6 +266,22 @@ describe('écrans publics face à une session établie', () => {
    */
   it('couvre tous les écrans publics déclarés', () => {
     expect(publicPaths.every((path) => outsideShell.includes(path))).toBe(true);
+  });
+
+  /*
+   * Read off the route table rather than from the list above: a public screen
+   * declared outside `AnonymousOnly` would be unguarded, and one declared under
+   * it without a case here would go untested.
+   */
+  it('déclare exactement ces écrans sous AnonymousOnly', () => {
+    const anonymousRoutes = flatten(entries).filter(
+      (route) => isValidElement(route.element) && route.element.type === AnonymousOnly,
+    );
+
+    expect(anonymousRoutes).toHaveLength(1);
+    expect(declaredPaths(anonymousRoutes[0].children ?? []).sort()).toEqual(
+      [...publicPaths].sort(),
+    );
   });
 
   it.each(publicPaths)('renvoie un candidat instruit de %s vers ses offres', async (path) => {

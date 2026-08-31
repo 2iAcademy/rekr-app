@@ -33,6 +33,20 @@ export interface LoginDto {
   password: string;
 }
 
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface ResetPasswordDto {
+  /** Jeton reçu par e-mail, tel qu’il figure dans le lien. */
+  token: string;
+  /**
+   * @minLength 8
+   * @maxLength 512
+   */
+  password: string;
+}
+
 export type ContractType = (typeof ContractType)[keyof typeof ContractType];
 
 export const ContractType = {
@@ -759,6 +773,73 @@ export const authControllerLogout = async (
     ...options,
     method: 'POST',
   });
+};
+
+export type authControllerForgotPasswordResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type authControllerForgotPasswordResponseSuccess =
+  authControllerForgotPasswordResponse204 & {
+    headers: Headers;
+  };
+export const getAuthControllerForgotPasswordUrl = () => {
+  return `/api/auth/password/forgot`;
+};
+
+export const authControllerForgotPassword = async (
+  forgotPasswordDto: ForgotPasswordDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<authControllerForgotPasswordResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+  return customFetch<authControllerForgotPasswordResponseSuccess>(
+    getAuthControllerForgotPasswordUrl(),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(forgotPasswordDto),
+    },
+  );
+};
+
+export type authControllerResetPasswordResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type authControllerResetPasswordResponseSuccess = authControllerResetPasswordResponse204 & {
+  headers: Headers;
+};
+export const getAuthControllerResetPasswordUrl = () => {
+  return `/api/auth/password/reset`;
+};
+
+export const authControllerResetPassword = async (
+  resetPasswordDto: ResetPasswordDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<authControllerResetPasswordResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+  return customFetch<authControllerResetPasswordResponseSuccess>(
+    getAuthControllerResetPasswordUrl(),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(resetPasswordDto),
+    },
+  );
 };
 
 export type authControllerMeResponse200 = {

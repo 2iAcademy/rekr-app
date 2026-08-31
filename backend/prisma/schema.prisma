@@ -104,19 +104,27 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  candidateProfile   CandidateProfile?
-  createdOffers      Offer[]
-  likedOffers        CandidateLikesOffer[]
-  likesGiven         RecruiterLikesCandidate[]  @relation("RecruiterLikes")
-  likesReceived      RecruiterLikesCandidate[]  @relation("CandidateLikedByRecruiter")
-  passedOffers       CandidatePassesOffer[]
-  passesGiven        RecruiterPassesCandidate[] @relation("RecruiterPasses")
-  passesReceived     RecruiterPassesCandidate[] @relation("CandidatePassedByRecruiter")
-  recruiterProfile   RecruiterProfile?
-  candidateTags      CandidateTag[]
-  matchesAsCandidate Match[]                    @relation("MatchCandidate")
-  matchesAsRecruiter Match[]                    @relation("MatchRecruiter")
-  refreshTokens      RefreshToken[]
+  /// Instant of the last password change, written in the same transaction as
+  /// the hash. `JwtAuthGuard` refuses any access token issued before it, which
+  /// is what makes a reset cut the sessions already running instead of only
+  /// the refresh tokens. NULL on accounts whose password predates the column:
+  /// nothing to compare against, so nothing is refused.
+  passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
+
+  candidateProfile    CandidateProfile?
+  createdOffers       Offer[]
+  likedOffers         CandidateLikesOffer[]
+  likesGiven          RecruiterLikesCandidate[]  @relation("RecruiterLikes")
+  likesReceived       RecruiterLikesCandidate[]  @relation("CandidateLikedByRecruiter")
+  passedOffers        CandidatePassesOffer[]
+  passesGiven         RecruiterPassesCandidate[] @relation("RecruiterPasses")
+  passesReceived      RecruiterPassesCandidate[] @relation("CandidatePassedByRecruiter")
+  recruiterProfile    RecruiterProfile?
+  candidateTags       CandidateTag[]
+  matchesAsCandidate  Match[]                    @relation("MatchCandidate")
+  matchesAsRecruiter  Match[]                    @relation("MatchRecruiter")
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("user")
 }
@@ -143,6 +151,20 @@ model RefreshToken {
   @@index([userId])
   @@index([familyId])
   @@map("refresh_token")
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("fk_user")
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_token")
 }
 
 model CandidateProfile {

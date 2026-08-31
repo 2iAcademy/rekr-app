@@ -4,15 +4,18 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { routes } from '@/router';
 import { AuthProvider } from '@/features/auth/AuthProvider';
-import { authControllerSignup } from '@/api/generated';
+import { authControllerResetPassword, authControllerSignup } from '@/api/generated';
 
 vi.mock('@/api/generated', () => ({
   authControllerLogin: vi.fn(),
   authControllerSignup: vi.fn(),
   authControllerLogout: vi.fn(),
+  authControllerForgotPassword: vi.fn(),
+  authControllerResetPassword: vi.fn(),
 }));
 
 const signupRequest = vi.mocked(authControllerSignup);
+const resetRequest = vi.mocked(authControllerResetPassword);
 
 const authenticatedUser = {
   id: 1,
@@ -116,6 +119,49 @@ describe('navigation onboarding', () => {
     await user.click(await screen.findByRole('button', { name: 'Retour' }));
 
     expect(screen.getByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
+  });
+
+  it('affiche la saisie du nouveau mot de passe sur le lien de réinitialisation', async () => {
+    renderAt('/reinitialiser-mot-de-passe?token=jeton-valide');
+
+    expect(
+      await screen.findByRole('button', { name: 'Réinitialiser le mot de passe' }),
+    ).toBeInTheDocument();
+  });
+
+  it("transmet le jeton de l'URL à la réinitialisation", async () => {
+    const user = userEvent.setup();
+    resetRequest.mockResolvedValue({
+      data: undefined,
+      status: 204,
+      headers: new Headers(),
+    } as unknown as Awaited<ReturnType<typeof authControllerResetPassword>>);
+    renderAt('/reinitialiser-mot-de-passe?token=jeton-de-lurl');
+
+    await user.type(await screen.findByLabelText('Nouveau mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
+
+    await waitFor(() =>
+      expect(resetRequest).toHaveBeenCalledWith({
+        token: 'jeton-de-lurl',
+        password: 'motdepasse1',
+      }),
+    );
+
+    // Aucune session n'est ouverte : la sortie de l'écran est la connexion.
+    expect(await screen.findByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
+  });
+
+  it('renvoie vers la demande de lien quand le jeton est absent de l’URL', async () => {
+    const user = userEvent.setup();
+    renderAt('/reinitialiser-mot-de-passe');
+
+    expect(await screen.findByRole('heading', { name: 'Lien invalide.' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Demander un nouveau lien' }));
+
+    expect(screen.getByRole('button', { name: 'Envoyer le lien' })).toBeInTheDocument();
   });
 
   it('envoie le candidat sur son wizard de profil après une inscription réussie', async () => {

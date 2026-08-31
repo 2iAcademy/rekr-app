@@ -14,4 +14,7 @@ import { UserType } from '../../generated/prisma/client';
 export interface JwtPayload {
   sub: string;
   userType: UserType;
+  /** Seconds since the epoch, set by the signer. Read by `JwtAuthGuard` to
+   * place the token relative to the account's last password change. */
+  iat?: number;
 }

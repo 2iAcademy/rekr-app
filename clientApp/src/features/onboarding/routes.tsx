@@ -1,8 +1,9 @@
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { SplashPage } from '@/features/onboarding/pages/SplashPage';
 import { SignupPage } from '@/features/onboarding/pages/SignupPage';
 import { SigninPage } from '@/features/onboarding/pages/SigninPage';
 import { ForgotPasswordPage } from '@/features/onboarding/pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/features/onboarding/pages/ResetPasswordPage';
 
 export function SplashRoute() {
   const navigate = useNavigate();
@@ -43,6 +44,26 @@ export function ForgotPasswordRoute() {
     <ForgotPasswordPage
       onBack={() => navigate('/connexion')}
       onSignIn={() => navigate('/connexion')}
+    />
+  );
+}
+
+export function ResetPasswordRoute() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  /*
+   * Replaced, not pushed: the reset link is single-use, so the entry it would
+   * leave in the history only leads back to a token the server has already
+   * burnt.
+   */
+  return (
+    <ResetPasswordPage
+      token={searchParams.get('token')}
+      onBack={() => navigate('/connexion')}
+      onSignIn={() => navigate('/connexion')}
+      onRequestNewLink={() => navigate('/mot-de-passe-oublie', { replace: true })}
+      onSuccess={() => navigate('/connexion', { replace: true })}
     />
   );
 }

@@ -401,6 +401,26 @@ describe('RefreshTokenService', () => {
     });
   });
 
+  describe('revokeAllForUser', () => {
+    it('revokes every live session of the account', async () => {
+      await service.revokeAllForUser(4);
+
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 4, revokedAt: null },
+        data: { revokedAt: expect.any(Date) as Date },
+      });
+    });
+
+    it('writes through the client it is handed, so a caller can enrol it in a transaction', async () => {
+      const tx = { refreshToken: { updateMany: jest.fn() } };
+
+      await service.revokeAllForUser(4, tx as never);
+
+      expect(tx.refreshToken.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe('revokeById', () => {
     it('revokes a single session', async () => {
       await service.revokeById(7);
