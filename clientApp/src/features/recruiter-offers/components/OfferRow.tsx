@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { ChevronRight } from 'lucide-react';
 import type { OfferListItemDto } from '@/api/generated';
 import { contractLabel, metaLine, offerSalaryLabel } from '@/components/feed/labels';
 import { buttonVariants } from '@/components/ui/button-variants';
@@ -7,10 +8,21 @@ import type { OfferStatus } from '@/domain/offerStatus';
 import { cn } from '@/lib/utils';
 import { OfferStatusSelect } from './OfferStatusSelect';
 
-// Zero is a state, not a quantity: the badge is dropped rather than showing
-// « 0 intéressé », which reads like a scoreboard.
-const applicantLabel = (count: number): string =>
-  count === 1 ? '1 intéressé' : `${count} intéressés`;
+/**
+ * Always shown, zero included.
+ *
+ * Hiding it at zero left nothing on the row to say that the offer leads
+ * anywhere — the title was a link, but only a hover revealed it, and a
+ * recruiter whose offers had no applicant yet had no way to discover the screen
+ * at all. « Aucun candidat » is an answer; silence was not.
+ */
+const applicantLabel = (count: number): string => {
+  if (count === 0) {
+    return 'Aucun candidat intéressé';
+  }
+
+  return count === 1 ? '1 candidat intéressé' : `${count} candidats intéressés`;
+};
 
 interface OfferRowProps {
   offer: OfferListItemDto;
@@ -43,25 +55,29 @@ export function OfferRow({ offer, statusPending = false, onStatusChange }: Offer
               announced by its own title. The title is the destination — that is
               exactly what a link should say. */}
           <h2 className="font-heading text-base font-bold break-words text-ink md:text-lg">
-            <Link
-              to={`/recruteur/offres/${offer.id}/candidats`}
-              className="underline-offset-4 hover:underline"
-            >
-              {title}
-            </Link>
+            {title}
           </h2>
           <StatusBadge status={status} />
-          {applicantCount > 0 && (
-            <span className="rounded-full bg-role/10 px-2 py-0.5 text-xs font-semibold text-role">
-              {applicantLabel(applicantCount)}
-            </span>
-          )}
         </div>
 
         <p className="text-sm break-words text-ink-muted">
           {metaLine([city, contractType ? contractLabel(contractType) : null])}
         </p>
         <p className="text-sm font-semibold text-ink">{offerSalaryLabel(salaryMin, salaryMax)}</p>
+
+        {/* The way in to who applied, said out loud rather than hidden behind
+            the title: this is what the recruiter comes to the list for, and a
+            link that only appears on hover is unreachable on a touch screen. */}
+        <Link
+          to={`/recruteur/offres/${offer.id}/candidats`}
+          className={cn(
+            'inline-flex items-center gap-1 self-start rounded-lg text-sm font-semibold underline-offset-4 hover:underline',
+            applicantCount > 0 ? 'text-role' : 'text-ink-muted',
+          )}
+        >
+          {applicantLabel(applicantCount)}
+          <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
       </div>
 
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center md:gap-3">

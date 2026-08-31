@@ -69,6 +69,7 @@ interface Invalid {
  */
 export function RecruiterAccountSection() {
   const errorId = useId();
+  const formId = useId();
   const [status, setStatus] = useState<Status>('loading');
   const [attempt, setAttempt] = useState(0);
   const [form, setForm] = useState<RecruiterAccountForm>(emptyRecruiterAccountForm);
@@ -236,7 +237,7 @@ export function RecruiterAccountSection() {
 
   return (
     <>
-      <form onSubmit={(event) => void submit(event)}>
+      <form id={formId} onSubmit={(event) => void submit(event)}>
         <ProfileSections defaultOpen={['identity']}>
           <ProfileSection value="identity" title="Mon identité" summary={identitySummary}>
             <p className="text-sm text-ink-muted">
@@ -330,23 +331,6 @@ export function RecruiterAccountSection() {
             {invalid.message}
           </p>
         )}
-
-        {/* Sticky, and opaque across the full width: the folded form is still
-            tall enough that a button at the very bottom means scrolling past
-            everything to commit. A gradient let the content read through it and
-            the button sat on top of whatever happened to be behind — the page
-            reserves `pb-28` so the bar floats over empty space instead. */}
-        <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-line bg-background px-4 py-3 sm:-mx-6 sm:px-6">
-          <Button
-            type="submit"
-            variant="role"
-            size="xl"
-            disabled={saving}
-            className="w-full sm:w-auto"
-          >
-            {saving ? 'Enregistrement…' : 'Enregistrer'}
-          </Button>
-        </div>
       </form>
 
       {/* Outside the form and outside the accordion: each image is written the
@@ -384,6 +368,23 @@ export function RecruiterAccountSection() {
           />
         </div>
       </section>
+      {/* Last on the screen, and outside the form it commits — the images block
+          above answers to no button, each upload being written on selection.
+          Left inside the form, the bar landed between the two and `sticky` kept
+          it there: it only sticks when it would otherwise leave the viewport.
+          `form` is what still ties the button to the fields it saves. */}
+      <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-line bg-background px-4 py-3 sm:-mx-6 sm:px-6">
+        <Button
+          type="submit"
+          form={formId}
+          variant="role"
+          size="xl"
+          disabled={saving}
+          className="w-full sm:w-auto"
+        >
+          {saving ? 'Enregistrement…' : 'Enregistrer'}
+        </Button>
+      </div>
     </>
   );
 }

@@ -123,6 +123,10 @@ export function FileField({
 
         {filled && onRemove !== undefined && (
           <Button
+            // Explicit, because this field can sit inside a form: a `button`
+            // with no type submits it, so removing a photo would have saved the
+            // whole profile.
+            type="button"
             variant="destructive"
             size="sm"
             aria-label={`Supprimer ${label}`}

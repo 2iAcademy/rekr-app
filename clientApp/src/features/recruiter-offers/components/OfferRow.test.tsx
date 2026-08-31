@@ -39,35 +39,45 @@ const renderRow = (over: Partial<OfferListItemDto> = {}, pending = false) => {
 };
 
 describe('OfferRow', () => {
-  // Le titre mène aux candidats intéressés : c'est ce que le recruteur vient
-  // chercher dans cette liste.
-  it('fait du titre le lien vers les candidats intéressés', () => {
-    renderRow();
+  /**
+   * Un lien nommé par son contenu, et visible sans survol : c'est ce que le
+   * recruteur vient chercher dans cette liste, et un lien qui n'apparaît qu'au
+   * survol du titre est inatteignable sur un écran tactile.
+   */
+  it('mène aux candidats intéressés depuis un lien nommé', () => {
+    renderRow({ applicantCount: 3 });
 
-    expect(screen.getByRole('link', { name: 'Développeuse backend' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /3 candidats intéressés/ })).toHaveAttribute(
       'href',
       '/recruteur/offres/12/candidats',
     );
   });
 
-  it('annonce le nombre de candidats intéressés', () => {
-    renderRow({ applicantCount: 3 });
-
-    expect(screen.getByText('3 intéressés')).toBeInTheDocument();
-  });
-
   it('accorde le libellé au singulier', () => {
     renderRow({ applicantCount: 1 });
 
-    expect(screen.getByText('1 intéressé')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /1 candidat intéressé/ })).toBeInTheDocument();
   });
 
-  // Zéro est un état, pas une quantité : « 0 intéressé » se lirait comme un
-  // score plutôt que comme une absence.
-  it('masque la pastille quand personne n’a manifesté d’intérêt', () => {
+  /**
+   * Affiché même à zéro : masqué, plus rien sur la ligne ne disait que l'offre
+   * menait quelque part, et un recruteur dont aucune offre n'a encore de
+   * candidat ne pouvait pas découvrir l'écran.
+   */
+  it('reste accessible quand personne n’a encore manifesté d’intérêt', () => {
     renderRow({ applicantCount: 0 });
 
-    expect(screen.queryByText(/intéressé/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Aucun candidat intéressé/ })).toHaveAttribute(
+      'href',
+      '/recruteur/offres/12/candidats',
+    );
+  });
+
+  it('ne fait plus du titre un lien, pour ne pas doubler la même cible', () => {
+    renderRow();
+
+    expect(screen.queryByRole('link', { name: 'Développeuse backend' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Développeuse backend' })).toBeInTheDocument();
   });
 
   it('affiche le titre, le statut et la ligne de contexte de l’offre', () => {
