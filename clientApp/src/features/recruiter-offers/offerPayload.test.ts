@@ -18,16 +18,17 @@ const filled = {
   status: 'open' as const,
 };
 
+/**
+ * The offer as its own company reads it: the endpoint adds the postcode and the
+ * status to the showcase projection only for the recruiter carrying it, and
+ * this form is that screen.
+ */
 const detail: OfferDetailDto = {
   id: 12,
-  companyId: 7,
-  createdById: 3,
   title: 'Développeuse Front',
   description: 'Vous construirez le design system.',
   city: 'Lyon',
   postalCode: '69003',
-  latitude: '45.7510000',
-  longitude: '4.8690000',
   contractType: 'CDI',
   minExperienceLevel: 'CONFIRME',
   remotePolicy: 'HYBRID',
@@ -35,7 +36,6 @@ const detail: OfferDetailDto = {
   salaryMax: 55000,
   status: 'paused',
   createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-02T00:00:00.000Z',
   company: {
     id: 7,
     name: 'Studio Lumen',
@@ -44,9 +44,9 @@ const detail: OfferDetailDto = {
     description: null,
     city: 'Lyon',
   },
-  offerTags: [
-    { offerId: 12, tagId: 1, tag: { id: 1, label: 'React', category: 'skill' } },
-    { offerId: 12, tagId: 2, tag: { id: 2, label: 'TypeScript', category: 'skill' } },
+  tags: [
+    { label: 'React', category: 'skill' },
+    { label: 'TypeScript', category: 'skill' },
   ],
 };
 
@@ -207,7 +207,7 @@ describe('offerFormFromDetail', () => {
       remotePolicy: null,
       salaryMin: null,
       salaryMax: null,
-      offerTags: [],
+      tags: [],
     });
 
     expect(bare).toEqual({
@@ -217,20 +217,31 @@ describe('offerFormFromDetail', () => {
     });
   });
 
-  // Les deux listes partagent le pivot `offer_tag` et ne se distinguent que par
-  // la catégorie du tag : chacune doit repartir dans son propre champ.
+  // Les deux listes arrivent sur la même offre et ne se distinguent que par la
+  // catégorie du tag : chacune doit repartir dans son propre champ.
   it('répartit les tags entre compétences et avantages selon leur catégorie', () => {
     const form = offerFormFromDetail({
       ...detail,
-      offerTags: [
-        { offerId: 12, tagId: 1, tag: { id: 1, label: 'React', category: 'skill' } },
-        { offerId: 12, tagId: 9, tag: { id: 9, label: 'Mutuelle', category: 'benefit' } },
-        { offerId: 12, tagId: 4, tag: { id: 4, label: 'Anglais', category: 'language' } },
+      tags: [
+        { label: 'React', category: 'skill' },
+        { label: 'Mutuelle', category: 'benefit' },
+        { label: 'Anglais', category: 'language' },
       ],
     });
 
     expect(form.skills).toEqual(['React']);
     expect(form.benefits).toEqual(['Mutuelle']);
+  });
+
+  /**
+   * Le statut n'est servi qu'à la société qui porte l'offre. S'il manque, la
+   * réponse n'est pas celle du propriétaire : la retomber sur une valeur par
+   * défaut réécrirait l'état de publication à l'enregistrement suivant.
+   */
+  it('refuse de préremplir le formulaire sans les champs de gestion', () => {
+    const withoutOwnerFields: OfferDetailDto = { ...detail, status: undefined };
+
+    expect(() => offerFormFromDetail(withoutOwnerFields)).toThrow(/champs de gestion/);
   });
 
   it('rend une offre rechargée telle quelle une fois renvoyée à l’API', () => {

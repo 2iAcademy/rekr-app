@@ -41,14 +41,10 @@ const apiError = (status: number) =>
 
 const offer: OfferDetailDto = {
   id: 12,
-  companyId: 7,
-  createdById: 3,
   title: 'Développeuse Front',
   description: 'Vous construirez le design system.',
   city: 'Lyon',
   postalCode: '69003',
-  latitude: '45.7510000',
-  longitude: '4.8690000',
   contractType: 'CDI',
   minExperienceLevel: 'CONFIRME',
   remotePolicy: 'HYBRID',
@@ -56,7 +52,6 @@ const offer: OfferDetailDto = {
   salaryMax: 55000,
   status: 'draft',
   createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-02T00:00:00.000Z',
   company: {
     id: 7,
     name: 'Studio Lumen',
@@ -65,7 +60,7 @@ const offer: OfferDetailDto = {
     description: null,
     city: 'Lyon',
   },
-  offerTags: [{ offerId: 12, tagId: 1, tag: { id: 1, label: 'React', category: 'skill' } }],
+  tags: [{ label: 'React', category: 'skill' }],
 };
 
 /**

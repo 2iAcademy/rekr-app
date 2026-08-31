@@ -22,7 +22,6 @@ const mockOffer = {
   remotePolicy: 'HYBRID',
   salaryMin: 45000,
   salaryMax: 55000,
-  status: 'open',
   company: {
     id: 1,
     name: 'Acme Corp',
@@ -32,12 +31,12 @@ const mockOffer = {
       'Acme Corp construit des outils SaaS pour PME industrielles. Fondée en 2018, basée à Lyon, 35 personnes.',
     city: 'Lyon',
   },
-  offerTags: [
-    { tag: { id: 1, label: 'React', category: 'tech' } },
-    { tag: { id: 2, label: 'Node', category: 'tech' } },
-    { tag: { id: 3, label: 'TypeScript', category: 'tech' } },
-    { tag: { id: 4, label: 'Mutuelle', category: 'benefit' } },
-    { tag: { id: 5, label: 'Tickets restaurant', category: 'benefit' } },
+  tags: [
+    { label: 'React', category: 'tech' },
+    { label: 'Node', category: 'tech' },
+    { label: 'TypeScript', category: 'tech' },
+    { label: 'Mutuelle', category: 'benefit' },
+    { label: 'Tickets restaurant', category: 'benefit' },
   ],
 };
 
@@ -77,7 +76,7 @@ describe('OfferDetailPage', () => {
 
   it("masque la section quand l'offre ne propose aucun avantage", async () => {
     vi.mocked(offerControllerFindOneById).mockResolvedValue({
-      data: { ...mockOffer, offerTags: [] },
+      data: { ...mockOffer, tags: [] },
     } as unknown as Awaited<ReturnType<typeof offerControllerFindOneById>>);
 
     renderPage();
@@ -108,8 +107,8 @@ describe('OfferDetailPage', () => {
     renderPage();
 
     await waitFor(() => {
-      for (const ot of mockOffer.offerTags) {
-        expect(screen.getByText(ot.tag.label)).toBeInTheDocument();
+      for (const tag of mockOffer.tags) {
+        expect(screen.getByText(tag.label)).toBeInTheDocument();
       }
     });
   });
