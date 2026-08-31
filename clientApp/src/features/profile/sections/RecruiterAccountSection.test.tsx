@@ -107,7 +107,9 @@ const openEverySection = async (user: ReturnType<typeof userEvent.setup>) => {
 
 const renderLoaded = async () => {
   const rendered = renderSection();
-  await screen.findByLabelText('Nom de la société');
+  // A field of the section that is open on arrival: the others are unmounted
+  // until their own header is clicked, just below.
+  await screen.findByLabelText('Prénom');
   await openEverySection(userEvent.setup());
 
   return rendered;
@@ -153,7 +155,7 @@ describe('RecruiterAccountSection', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Chargement de vos informations…');
 
-    await screen.findByLabelText('Nom de la société');
+    await screen.findByLabelText('Prénom');
   });
 
   /**
@@ -163,13 +165,13 @@ describe('RecruiterAccountSection', () => {
    */
   it('n’ouvre que la première section à l’arrivée', async () => {
     renderSection();
-    await screen.findByLabelText('Nom de la société');
+    await screen.findByLabelText('Prénom');
 
-    expect(screen.getByRole('button', { name: 'Mon identité' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: new RegExp('Mon identité') })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
-    expect(screen.getByRole('button', { name: 'Ma société' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: new RegExp('Ma société') })).toHaveAttribute(
       'aria-expanded',
       'false',
     );
@@ -236,7 +238,9 @@ describe('RecruiterAccountSection', () => {
 
     await user.click(screen.getByRole('button', { name: 'Réessayer' }));
 
-    expect(await screen.findByLabelText('Nom de la société')).toHaveValue('Studio Lumen');
+    // Un champ de la section ouverte : la fiche société est repliée à l'arrivée,
+    // et le formulaire rempli suffit à prouver que la relecture a abouti.
+    expect(await screen.findByLabelText('Prénom')).toHaveValue('Camille');
   });
 
   /** A recruiter who skipped the wizard has no company at all: there is nothing

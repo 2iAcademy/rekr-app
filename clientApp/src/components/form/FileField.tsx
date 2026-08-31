@@ -1,4 +1,4 @@
-import { useId, useState, type ChangeEvent } from 'react';
+import { useId, useRef, useState, type ChangeEvent } from 'react';
 import { Paperclip, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -84,6 +84,13 @@ export function FileField({
     }
   };
 
+  // The native input is kept in the DOM and labelled, but taken out of the
+  // layout: the « Aucun fichier choisi » text the browser appends next to it
+  // cannot be styled, and it repeated the state line just above. A real button
+  // opens the picker instead, in the same visual language as the rest of the
+  // form.
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const described = [hintId, rejection === null ? null : errorId, describedBy]
     .filter(Boolean)
     .join(' ');
@@ -129,6 +136,7 @@ export function FileField({
       </div>
 
       <input
+        ref={inputRef}
         id={fieldId}
         type="file"
         accept={acceptAttribute(constraint)}
@@ -137,12 +145,24 @@ export function FileField({
         aria-invalid={rejection !== null || invalid === true}
         aria-describedby={described}
         onChange={handleChange}
-        className="w-full cursor-pointer text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-role-gradient file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:cursor-not-allowed disabled:opacity-50"
+        className="sr-only"
       />
 
-      <p id={hintId} className="text-xs text-ink-faint">
-        {constraintHint(constraint)}
-      </p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+        >
+          {filled ? 'Remplacer' : 'Choisir un fichier'}
+        </Button>
+
+        <p id={hintId} className="text-xs text-ink-faint">
+          {constraintHint(constraint)}
+        </p>
+      </div>
 
       {rejection !== null && (
         <p id={errorId} role="alert" className="text-xs text-destructive">

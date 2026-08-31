@@ -18,6 +18,7 @@ import { SalaryRange } from '@/components/form/SalaryRange';
 import { TagInput } from '@/components/form/TagInput';
 import { TextField } from '@/components/form/TextField';
 import { ProfileSection, ProfileSections } from '@/components/ui/accordion';
+import { candidateSummaries } from '@/features/profile/candidateSummaries';
 import { Button } from '@/components/ui/button';
 import {
   AVAILABILITY_OPTIONS,
@@ -90,7 +91,6 @@ const storedKey = (body: unknown, column: keyof StoredFiles): string | null => {
 
 export function CandidateAccountSection() {
   const errorId = useId();
-  const headingId = useId();
   const [state, setState] = useState<SectionState>({ status: 'loading' });
   const [invalid, setInvalid] = useState<CandidateAccountInvalidField | null>(null);
   const [saving, setSaving] = useState(false);
@@ -229,93 +229,100 @@ export function CandidateAccountSection() {
   }
 
   const { form } = state;
+  const summaries = candidateSummaries(form);
 
   return (
-    <section aria-labelledby={headingId} className="mt-8 flex flex-col gap-6">
-      <h2 id={headingId} className="font-heading text-lg font-semibold text-ink">
-        Mon profil
-      </h2>
-
+    // Pas de titre ici : « Mon compte » en tête de page nomme déjà l'écran, et
+    // « Mon profil » juste en dessous ne disait rien de plus.
+    <section aria-label="Mon profil" className="flex flex-col">
       <form onSubmit={(event) => void save(event)}>
-        <ProfileSections>
-          <ProfileSection value="identity" title="Identité et documents">
-            <FileField
-              label={PICTURE_LABEL}
-              constraint={FILE_CONSTRAINTS.picture}
-              previewUrl={fileUrl(state.picture)}
-              emptyLabel="Aucune photo enregistrée"
-              presentLabel="Photo enregistrée"
-              busy={busy.picture}
-              busyLabel="Envoi de la photo…"
-              onSelect={(file) =>
-                void writeFile(
-                  'picture',
-                  () => candidateProfileControllerReplacePicture({ file }),
-                  FILE_REPLACE_SUCCESS,
-                  fileReplaceBusiness,
-                )
-              }
-              onRemove={() =>
-                void writeFile(
-                  'picture',
-                  candidateProfileControllerRemovePicture,
-                  FILE_REMOVE_SUCCESS,
-                  fileRemoveBusiness,
-                )
-              }
-            />
+        <ProfileSections defaultOpen={['identity']}>
+          <ProfileSection
+            value="identity"
+            title="Identité et documents"
+            summary={summaries.identity}
+          >
+            {/* Côte à côte dès `sm` : empilées, les deux zones de téléversement
+                repoussaient le premier champ de texte hors de l'écran. */}
+            <div className="grid gap-5 sm:grid-cols-2">
+              <FileField
+                label={PICTURE_LABEL}
+                constraint={FILE_CONSTRAINTS.picture}
+                previewUrl={fileUrl(state.picture)}
+                emptyLabel="Aucune photo enregistrée"
+                presentLabel="Photo enregistrée"
+                busy={busy.picture}
+                busyLabel="Envoi de la photo…"
+                onSelect={(file) =>
+                  void writeFile(
+                    'picture',
+                    () => candidateProfileControllerReplacePicture({ file }),
+                    FILE_REPLACE_SUCCESS,
+                    fileReplaceBusiness,
+                  )
+                }
+                onRemove={() =>
+                  void writeFile(
+                    'picture',
+                    candidateProfileControllerRemovePicture,
+                    FILE_REMOVE_SUCCESS,
+                    fileRemoveBusiness,
+                  )
+                }
+              />
 
-            {/* No preview and no read link: `/api/files` refuses the `cv` kind, and
+              {/* No preview and no read link: `/api/files` refuses the `cv` kind, and
             the only route that serves one cannot be consumed through the
             generated client, which reads every response as text. */}
-            <FileField
-              label={CV_LABEL}
-              constraint={FILE_CONSTRAINTS.cv}
-              previewUrl={null}
-              hasFile={state.cvUrl !== null}
-              presentLabel="CV enregistré"
-              emptyLabel="Aucun CV enregistré"
-              busy={busy.cv}
-              busyLabel="Envoi du CV…"
-              onSelect={(file) =>
-                void writeFile(
-                  'cv',
-                  () => candidateProfileControllerReplaceCv({ file }),
-                  FILE_REPLACE_SUCCESS,
-                  fileReplaceBusiness,
-                )
-              }
-              onRemove={() =>
-                void writeFile(
-                  'cv',
-                  candidateProfileControllerRemoveCv,
-                  FILE_REMOVE_SUCCESS,
-                  fileRemoveBusiness,
-                )
-              }
-            />
+              <FileField
+                label={CV_LABEL}
+                constraint={FILE_CONSTRAINTS.cv}
+                previewUrl={null}
+                hasFile={state.cvUrl !== null}
+                presentLabel="CV enregistré"
+                emptyLabel="Aucun CV enregistré"
+                busy={busy.cv}
+                busyLabel="Envoi du CV…"
+                onSelect={(file) =>
+                  void writeFile(
+                    'cv',
+                    () => candidateProfileControllerReplaceCv({ file }),
+                    FILE_REPLACE_SUCCESS,
+                    fileReplaceBusiness,
+                  )
+                }
+                onRemove={() =>
+                  void writeFile(
+                    'cv',
+                    candidateProfileControllerRemoveCv,
+                    FILE_REMOVE_SUCCESS,
+                    fileRemoveBusiness,
+                  )
+                }
+              />
 
-            <TextField
-              label="Prénom"
-              aria-required
-              aria-invalid={invalid?.field === 'firstName'}
-              aria-describedby={invalid?.field === 'firstName' ? errorId : undefined}
-              autoComplete="given-name"
-              maxLength={100}
-              value={form.firstName}
-              onChange={(event) => change({ firstName: event.target.value })}
-            />
+              <TextField
+                label="Prénom"
+                aria-required
+                aria-invalid={invalid?.field === 'firstName'}
+                aria-describedby={invalid?.field === 'firstName' ? errorId : undefined}
+                autoComplete="given-name"
+                maxLength={100}
+                value={form.firstName}
+                onChange={(event) => change({ firstName: event.target.value })}
+              />
 
-            <TextField
-              label="Nom"
-              aria-required
-              aria-invalid={invalid?.field === 'lastName'}
-              aria-describedby={invalid?.field === 'lastName' ? errorId : undefined}
-              autoComplete="family-name"
-              maxLength={100}
-              value={form.lastName}
-              onChange={(event) => change({ lastName: event.target.value })}
-            />
+              <TextField
+                label="Nom"
+                aria-required
+                aria-invalid={invalid?.field === 'lastName'}
+                aria-describedby={invalid?.field === 'lastName' ? errorId : undefined}
+                autoComplete="family-name"
+                maxLength={100}
+                value={form.lastName}
+                onChange={(event) => change({ lastName: event.target.value })}
+              />
+            </div>
 
             <CityField
               label="Ville"
@@ -329,7 +336,7 @@ export function CandidateAccountSection() {
             />
           </ProfileSection>
 
-          <ProfileSection value="project" title="Mon projet">
+          <ProfileSection value="project" title="Mon projet" summary={summaries.project}>
             <TextField
               label="Poste recherché"
               maxLength={255}
@@ -387,7 +394,11 @@ export function CandidateAccountSection() {
             )}
           </ProfileSection>
 
-          <ProfileSection value="preferences" title="Mes préférences">
+          <ProfileSection
+            value="preferences"
+            title="Mes préférences"
+            summary={summaries.preferences}
+          >
             <OptionCards
               legend="Télétravail"
               name="account-remote-policy"
@@ -424,7 +435,7 @@ export function CandidateAccountSection() {
             />
           </ProfileSection>
 
-          <ProfileSection value="showcase" title="Ma vitrine">
+          <ProfileSection value="showcase" title="Ma vitrine" summary={summaries.showcase}>
             <TagInput
               label="Compétences"
               placeholder="React, TypeScript, Figma…"
@@ -465,11 +476,19 @@ export function CandidateAccountSection() {
           </p>
         )}
 
-        {/* Sticky: nineteen fields folded into four sections is still a tall
-            screen, and a save button at the very bottom means scrolling past
-            everything to reach the only thing that commits the change. */}
-        <div className="sticky bottom-0 z-10 mt-4 flex justify-start bg-gradient-to-t from-background from-40% via-background/85 to-transparent pt-6 pb-4">
-          <Button type="submit" variant="role" size="xl" disabled={saving}>
+        {/* Sticky, and opaque across the full width: the folded form is still
+            tall enough that a button at the very bottom means scrolling past
+            everything to commit. A gradient let the content read through it and
+            the button sat on top of whatever happened to be behind — the page
+            reserves `pb-28` so the bar floats over empty space instead. */}
+        <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-line bg-background px-4 py-3 sm:-mx-6 sm:px-6">
+          <Button
+            type="submit"
+            variant="role"
+            size="xl"
+            disabled={saving}
+            className="w-full sm:w-auto"
+          >
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </Button>
         </div>

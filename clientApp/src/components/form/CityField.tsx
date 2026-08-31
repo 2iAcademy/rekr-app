@@ -48,6 +48,19 @@ export function CityField({
   const latestQuery = useRef('');
 
   useEffect(() => {
+    /**
+     * Nothing to search for a query that is already the label of the selected
+     * commune: it is what this field wrote itself, not something a user typed.
+     *
+     * Checked here and not only through the `silent` flag below, because that
+     * flag is spent on the first run of the effect — and an effect runs twice
+     * under StrictMode. The second run used to open the suggestion list on a
+     * pre-filled field, before anyone had touched it.
+     */
+    if (selected !== null && query === format(selected)) {
+      return;
+    }
+
     if (silent.current) {
       silent.current = false;
       return;
@@ -78,7 +91,7 @@ export function CityField({
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [query, debounceMs]);
+  }, [query, debounceMs, selected]);
 
   const close = (): void => {
     setCities(null);
@@ -172,7 +185,7 @@ export function CityField({
         role="listbox"
         aria-label={label}
         className={cn(
-          'absolute top-full right-0 left-0 z-10 mt-1 max-h-60 overflow-auto rounded-xl border border-line bg-card shadow-lg',
+          'absolute top-full right-0 left-0 z-20 mt-1 max-h-60 overflow-auto rounded-xl border border-line bg-card shadow-lg',
           expanded && cities.length > 0 ? 'block' : 'hidden',
         )}
       >

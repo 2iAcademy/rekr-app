@@ -166,12 +166,11 @@ describe('CandidateAccountSection', () => {
       renderSection();
       await screen.findByLabelText('Prénom');
 
-      expect(screen.getByRole('button', { name: 'Identité et documents' })).toHaveAttribute(
-        'aria-expanded',
-        'true',
-      );
+      expect(
+        screen.getByRole('button', { name: new RegExp('Identité et documents') }),
+      ).toHaveAttribute('aria-expanded', 'true');
       for (const title of ['Mon projet', 'Mes préférences', 'Ma vitrine']) {
-        expect(screen.getByRole('button', { name: title })).toHaveAttribute(
+        expect(screen.getByRole('button', { name: new RegExp(title) })).toHaveAttribute(
           'aria-expanded',
           'false',
         );

@@ -15,6 +15,7 @@ import { FILE_CONSTRAINTS } from '@/components/form/fileConstraints';
 import { OptionCards } from '@/components/form/OptionCards';
 import { RichTextField } from '@/components/form/RichTextField';
 import { TextField } from '@/components/form/TextField';
+import { metaLine } from '@/components/feed/labels';
 import { ProfileSection, ProfileSections } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
@@ -221,11 +222,23 @@ export function RecruiterAccountSection() {
     );
   }
 
+  // Ce que chaque section replié dit d'elle-même : sans ça, le lecteur doit
+  // toutes les déplier pour trouver celle qu'il cherche.
+  const identitySummary = metaLine([
+    `${form.firstName} ${form.lastName}`.trim() || null,
+    form.jobTitle.trim() || null,
+  ]);
+  const companySummary = metaLine([
+    form.name.trim() || null,
+    form.city.trim() || null,
+    COMPANY_SIZE_OPTIONS.find((option) => option.value === form.size)?.label ?? null,
+  ]);
+
   return (
     <>
       <form onSubmit={(event) => void submit(event)}>
-        <ProfileSections>
-          <ProfileSection value="identity" title="Mon identité">
+        <ProfileSections defaultOpen={['identity']}>
+          <ProfileSection value="identity" title="Mon identité" summary={identitySummary}>
             <p className="text-sm text-ink-muted">
               Ces informations n’apparaissent aux candidats qu’après un match.
             </p>
@@ -259,7 +272,7 @@ export function RecruiterAccountSection() {
             />
           </ProfileSection>
 
-          <ProfileSection value="company" title="Ma société">
+          <ProfileSection value="company" title="Ma société" summary={companySummary}>
             <TextField
               label="Nom de la société"
               aria-required
@@ -318,11 +331,19 @@ export function RecruiterAccountSection() {
           </p>
         )}
 
-        {/* Sticky: the form is folded into sections but still tall, and a save
-            button at the very bottom means scrolling past everything to reach
-            the only thing that commits the change. */}
-        <div className="sticky bottom-0 z-10 mt-4 flex justify-start bg-gradient-to-t from-background from-40% via-background/85 to-transparent pt-6 pb-4">
-          <Button type="submit" variant="role" size="xl" disabled={saving}>
+        {/* Sticky, and opaque across the full width: the folded form is still
+            tall enough that a button at the very bottom means scrolling past
+            everything to commit. A gradient let the content read through it and
+            the button sat on top of whatever happened to be behind — the page
+            reserves `pb-28` so the bar floats over empty space instead. */}
+        <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-line bg-background px-4 py-3 sm:-mx-6 sm:px-6">
+          <Button
+            type="submit"
+            variant="role"
+            size="xl"
+            disabled={saving}
+            className="w-full sm:w-auto"
+          >
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </Button>
         </div>
@@ -337,27 +358,31 @@ export function RecruiterAccountSection() {
           votre société. Chaque envoi est enregistré aussitôt.
         </p>
 
-        <FileField
-          label={LOGO_LABEL}
-          constraint={FILE_CONSTRAINTS.logo}
-          previewUrl={fileUrl(files.logo)}
-          presentLabel="Logo enregistré"
-          emptyLabel="Aucun logo"
-          busy={busy.logo}
-          onSelect={(file) => replace('logo', file)}
-          onRemove={() => drop('logo')}
-        />
+        {/* Côte à côte dès `sm` : empilées, les deux zones de téléversement
+            doublaient inutilement la hauteur du bloc. */}
+        <div className="grid gap-5 sm:grid-cols-2">
+          <FileField
+            label={LOGO_LABEL}
+            constraint={FILE_CONSTRAINTS.logo}
+            previewUrl={fileUrl(files.logo)}
+            presentLabel="Logo enregistré"
+            emptyLabel="Aucun logo"
+            busy={busy.logo}
+            onSelect={(file) => replace('logo', file)}
+            onRemove={() => drop('logo')}
+          />
 
-        <FileField
-          label={COVER_LABEL}
-          constraint={FILE_CONSTRAINTS.coverImage}
-          previewUrl={fileUrl(files.coverImage)}
-          presentLabel="Image enregistrée"
-          emptyLabel="Aucune image de couverture"
-          busy={busy.coverImage}
-          onSelect={(file) => replace('coverImage', file)}
-          onRemove={() => drop('coverImage')}
-        />
+          <FileField
+            label={COVER_LABEL}
+            constraint={FILE_CONSTRAINTS.coverImage}
+            previewUrl={fileUrl(files.coverImage)}
+            presentLabel="Image enregistrée"
+            emptyLabel="Aucune image de couverture"
+            busy={busy.coverImage}
+            onSelect={(file) => replace('coverImage', file)}
+            onRemove={() => drop('coverImage')}
+          />
+        </div>
       </section>
     </>
   );
