@@ -95,6 +95,9 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
   const stack = offerTags
     .filter((ot) => ot.tag.category === 'skill' || ot.tag.category === 'tech')
     .map((ot) => ot.tag.label);
+  const benefits = offerTags
+    .filter((ot) => ot.tag.category === 'benefit')
+    .map((ot) => ot.tag.label);
   const toK = (value: number | null) => (value != null ? Math.round(value / 1000) : '?');
   const salary =
     salaryMin != null || salaryMax != null
@@ -155,6 +158,19 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
           <SectionTitle>Salaire</SectionTitle>
           <p className="text-base font-bold text-ink">{salary}</p>
         </div>
+
+        {benefits.length > 0 && (
+          <div className="mt-6 flex flex-col gap-3">
+            <SectionTitle>Avantages</SectionTitle>
+            <div className="flex flex-wrap gap-2">
+              {benefits.map((benefit) => (
+                <span key={benefit} className={chipVariants({ size: 'sm' })}>
+                  {benefit}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {offer.description && (
           <div className="mt-6 flex flex-col gap-2">

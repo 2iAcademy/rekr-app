@@ -92,7 +92,7 @@ describe('Company (e2e)', () => {
     },
   );
 
-  it('creates the company, the linked recruiter profile and its benefits', async () => {
+  it('creates the company and the linked recruiter profile', async () => {
     const recruiter = await createUser('recruiter');
 
     await asRecruiter(recruiter.id)
@@ -106,15 +106,12 @@ describe('Company (e2e)', () => {
         firstName: 'Rick',
         lastName: 'Deckard',
         jobTitle: 'Responsable RH',
-        benefits: ['Mutuelle', 'Télétravail'],
       })
       .expect(201);
 
     const profile = await prisma.recruiterProfile.findUnique({
       where: { userId: recruiter.id },
-      include: {
-        company: { include: { companyTags: { include: { tag: true } } } },
-      },
+      include: { company: true },
     });
 
     expect(profile).toMatchObject({
@@ -127,12 +124,24 @@ describe('Company (e2e)', () => {
       size: 'PME',
       city: 'Lyon',
     });
-    expect(
-      profile?.company.companyTags.map((ct) => ct.tag.label).sort(),
-    ).toEqual(['Mutuelle', 'Télétravail']);
-    expect(
-      profile?.company.companyTags.every((ct) => ct.tag.category === 'benefit'),
-    ).toBe(true);
+  });
+
+  /**
+   * The perks belong to the offer now. The field is not merely ignored: the
+   * validation pipe runs in whitelist mode, so a payload still carrying it is
+   * refused outright rather than silently dropping what the caller sent.
+   */
+  it('refuses a benefits field on the company payload (400)', async () => {
+    const recruiter = await createUser('recruiter');
+
+    await asRecruiter(recruiter.id)
+      .send({
+        name: 'Acme',
+        firstName: 'Rick',
+        lastName: 'Deckard',
+        benefits: ['Mutuelle'],
+      })
+      .expect(400);
   });
 
   it('rejects a second company for the same recruiter with 409', async () => {
@@ -256,15 +265,12 @@ describe('Company (e2e)', () => {
         jobTitle: 'CTO',
         sectorId: sector.id,
         size: 'TPE',
-        benefits: ['Télétravail'],
       })
       .expect(200);
 
     const profile = await prisma.recruiterProfile.findUniqueOrThrow({
       where: { userId: recruiter.id },
-      include: {
-        company: { include: { companyTags: { include: { tag: true } } } },
-      },
+      include: { company: true },
     });
 
     expect(profile.firstName).toBe('Rachael');
@@ -273,9 +279,6 @@ describe('Company (e2e)', () => {
     expect(profile.company.name).toBe('Acme Renamed');
     expect(profile.company.sectorId).toBe(sector.id);
     expect(profile.company.size).toBe('TPE');
-    expect(profile.company.companyTags.map((link) => link.tag.label)).toEqual([
-      'Télétravail',
-    ]);
   });
 
   // A partial update must not blank the identity: Prisma skips `undefined`, and
@@ -312,15 +315,6 @@ describe('Company (e2e)', () => {
       httpRequest(app)
         .get('/api/companies/mine')
         .set('Authorization', bearerFor(app, userId, 'recruiter'));
-
-    const linkTag = async (
-      companyId: number,
-      label: string,
-      category: 'benefit' | 'skill',
-    ) => {
-      const tag = await prisma.tag.create({ data: { label, category } });
-      await prisma.companyTag.create({ data: { companyId, tagId: tag.id } });
-    };
 
     const createRecruiterWithCompany = async (options?: {
       company?: Prisma.CompanyUncheckedCreateInput;
@@ -400,7 +394,6 @@ describe('Company (e2e)', () => {
         },
         jobTitle: 'CTO',
       });
-      await linkTag(company.id, 'Mutuelle', 'benefit');
 
       const res = await readMine(user.id).expect(200);
 
@@ -419,7 +412,6 @@ describe('Company (e2e)', () => {
         postalCode: '69002',
         latitude: expect.any(String) as string,
         longitude: expect.any(String) as string,
-        benefits: ['Mutuelle'],
         recruiter: {
           firstName: 'Rick',
           lastName: 'Deckard',
@@ -438,48 +430,27 @@ describe('Company (e2e)', () => {
       expect(body.longitude).toBe('4.8320114');
     });
 
-    /**
-     * `company_tag` is only ever written with benefits today, but it is a plain
-     * pivot on the shared `tag` dictionary: nothing in the schema stops another
-     * category from being linked. The read filters on the category rather than
-     * trusting the writer.
-     */
-    it('returns benefits only, sorted by label', async () => {
-      const { user, company } = await createRecruiterWithCompany();
-      await linkTag(company.id, 'Mutuelle', 'benefit');
-      await linkTag(company.id, 'Conciergerie', 'benefit');
-      await linkTag(company.id, 'React', 'skill');
-
-      const res = await readMine(user.id).expect(200);
-
-      expect(res.body).toMatchObject({
-        benefits: ['Conciergerie', 'Mutuelle'],
-      });
-    });
-
     it("never returns another recruiter's company", async () => {
       const alice = await createRecruiterWithCompany({
         company: { name: 'Alice Corp', description: 'desc-alice' },
         firstName: 'Alice',
       });
-      const bob = await createRecruiterWithCompany({
+      // Seeded and deliberately not held: the point is that nothing of Bob's
+      // reaches Alice's read, asserted on the payload below.
+      await createRecruiterWithCompany({
         company: { name: 'Bob Corp', description: 'desc-bob' },
         firstName: 'Bob',
       });
-      await linkTag(alice.company.id, 'Mutuelle', 'benefit');
-      await linkTag(bob.company.id, 'Voiture de fonction', 'benefit');
 
       const res = await readMine(alice.user.id).expect(200);
 
       expect(res.body).toMatchObject({
         id: alice.company.id,
         name: 'Alice Corp',
-        benefits: ['Mutuelle'],
         recruiter: { firstName: 'Alice' },
       });
       expect(JSON.stringify(res.body)).not.toContain('Bob');
       expect(JSON.stringify(res.body)).not.toContain('desc-bob');
-      expect(JSON.stringify(res.body)).not.toContain('Voiture de fonction');
     });
 
     /**
@@ -505,7 +476,6 @@ describe('Company (e2e)', () => {
         postalCode: null,
         latitude: null,
         longitude: null,
-        benefits: [],
         recruiter: {
           firstName: 'Rick',
           lastName: 'Deckard',

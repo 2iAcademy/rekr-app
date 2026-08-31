@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { offerSalaryLabel } from './labels';
 
-// `contractLabel` and `metaLine` are covered through the recruiter-feed
+// `contractLabel` and `metaLine` are covered through the recruiter-candidates
 // re-export; only the salary wording, now shared by the two feeds, was left
 // without a test of its own.
 describe('offerSalaryLabel', () => {

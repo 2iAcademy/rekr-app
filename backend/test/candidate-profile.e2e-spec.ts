@@ -433,6 +433,45 @@ describe('CandidateProfile (e2e)', () => {
       .expect(400);
   });
 
+  /**
+   * The recruiter deck is gone: a recruiter publishes an offer and reads who
+   * applied to it rather than swiping through the whole pool of candidates.
+   *
+   * Asserted as a 404 on the route itself, for both roles. A leftover handler
+   * would answer 200 or 403 — either way it would still be exposing the pool.
+   */
+  describe('the retired recruiter deck', () => {
+    it.each(['recruiter', 'candidate'] as const)(
+      'no longer serves the candidate deck to a %s (404)',
+      async (userType) => {
+        const user = await createUser(userType);
+
+        await httpRequest(app)
+          .get('/api/candidate-profiles/feed')
+          .set('Authorization', bearerFor(app, user.id, userType))
+          .expect(404);
+      },
+    );
+
+    /**
+     * The collection root, guarded too. It is where a « list the candidates »
+     * handler would naturally land — and it would inherit the class-level
+     * `@Roles('candidate')`, serving the whole pool to every candidate. Nothing
+     * else in the suite holds that address.
+     */
+    it.each(['recruiter', 'candidate'] as const)(
+      'does not list the candidate pool from the collection root to a %s (404)',
+      async (userType) => {
+        const user = await createUser(userType);
+
+        await httpRequest(app)
+          .get('/api/candidate-profiles')
+          .set('Authorization', bearerFor(app, user.id, userType))
+          .expect(404);
+      },
+    );
+  });
+
   describe('GET /api/candidate-profiles/me', () => {
     const readMine = (userId: number) =>
       httpRequest(app)

@@ -1,86 +1,57 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { EmptyDeck } from './EmptyDeck';
 
-const RESET = 'Élargir la recherche';
-const likedLabel = (count: number): string =>
-  count === 0 ? 'Aucun profil liké' : count === 1 ? '1 profil liké' : `${count} profils likés`;
-
-const renderEmptyDeck = (props: Partial<React.ComponentProps<typeof EmptyDeck>> = {}) =>
+const renderDeck = (overrides: Partial<Parameters<typeof EmptyDeck>[0]> = {}) =>
   render(
-    <EmptyDeck
-      reason="no-match"
-      title="Aucun profil ne passe vos filtres"
-      itemPlural="candidats"
-      likedCount={0}
-      likedLabel={likedLabel}
-      onResetFilters={vi.fn()}
-      {...props}
-    />,
+    <MemoryRouter>
+      <EmptyDeck
+        title="Tu as tout vu"
+        itemPlural="offres"
+        likedCount={0}
+        likedLabel={(count) => `${count} likées`}
+        {...overrides}
+      />
+    </MemoryRouter>,
   );
 
 describe('EmptyDeck', () => {
-  it('impute le vide aux filtres quand ils écartent tout le reste', () => {
-    renderEmptyDeck({ likedCount: 2 });
+  it('annonce la fin du paquet avec le titre reçu', () => {
+    renderDeck();
 
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Aucun profil ne passe vos filtres' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/élargissez vos critères/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tu as tout vu' })).toBeInTheDocument();
   });
 
-  it('propose de vider les filtres quand ils sont la cause', async () => {
-    const user = userEvent.setup();
-    const onResetFilters = vi.fn();
-    renderEmptyDeck({ onResetFilters });
+  it('emprunte le vocabulaire du feed pour le corps du message', () => {
+    renderDeck({ itemPlural: 'profils' });
 
-    await user.click(screen.getByRole('button', { name: RESET }));
-
-    expect(onResetFilters).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/la liste des profils se met à jour/)).toBeInTheDocument();
   });
 
-  it('annonce la fin du deck quand tous les profils ont été traités', () => {
-    renderEmptyDeck({ reason: 'exhausted', title: 'Vous avez vu tous les profils', likedCount: 3 });
+  /**
+   * Le paquet est constitué côté serveur à partir du profil : il n'y a plus de
+   * filtre d'écran à réinitialiser, donc la seule façon de l'élargir est
+   * d'aller changer ses critères.
+   */
+  it('renvoie vers le profil pour élargir la recherche', () => {
+    renderDeck();
 
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Vous avez vu tous les profils' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('3 profils likés')).toBeInTheDocument();
-    expect(
-      screen.getByText('Revenez plus tard, la liste des candidats se met à jour chaque jour.'),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ajuster mes critères' })).toHaveAttribute(
+      'href',
+      '/profil',
+    );
   });
 
-  it('n’offre pas de réinitialisation sur un deck épuisé', () => {
-    renderEmptyDeck({ reason: 'exhausted', title: 'Vous avez vu tous les profils', likedCount: 3 });
+  it('ne propose plus de réinitialiser des filtres', () => {
+    renderDeck();
 
-    expect(screen.queryByRole('button', { name: RESET })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Élargir la recherche' })).not.toBeInTheDocument();
   });
 
-  it('n’expose qu’une seule action, sans échappatoire sans destination', () => {
-    renderEmptyDeck();
+  it('rappelle le nombre d’éléments likés', () => {
+    renderDeck({ likedCount: 3 });
 
-    expect(screen.getAllByRole('button')).toHaveLength(1);
-    expect(screen.getByRole('button', { name: RESET })).toBeInTheDocument();
-  });
-
-  it('garde l’illustration décorative', () => {
-    renderEmptyDeck({ reason: 'exhausted', title: 'Vous avez vu tous les profils' });
-
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
-  });
-
-  it('accorde le récapitulatif au singulier', () => {
-    renderEmptyDeck({ reason: 'exhausted', title: 'Vous avez vu tous les profils', likedCount: 1 });
-
-    expect(screen.getByText('1 profil liké')).toBeInTheDocument();
-  });
-
-  it('récapitule une absence de like sans afficher un zéro', () => {
-    renderEmptyDeck({ reason: 'exhausted', title: 'Vous avez vu tous les profils' });
-
-    expect(screen.getByText('Aucun profil liké')).toBeInTheDocument();
-    expect(screen.queryByText('0 profil liké')).not.toBeInTheDocument();
+    expect(screen.getByText('3 likées')).toBeInTheDocument();
   });
 });

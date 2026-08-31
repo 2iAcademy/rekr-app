@@ -15,20 +15,23 @@ export interface ShellUser {
 /**
  * Main navigation items, in the order the chromes render them.
  *
- * Until now the two roles were served the same three items with only the feed
- * re-targeted; offer management is the first entry one role has and the other
- * does not. It is left out for a candidate rather than shown and refused: the
- * screen is guarded recruiter-side, so the item would lead a candidate straight
- * back to the home page.
+ * The two roles no longer share a shape. A candidate swipes a deck of offers
+ * and follows the matches it produces; a recruiter publishes an offer and reads
+ * who applied to it, on the offer itself. « Profil », the account item, is now
+ * the only entry they have in common, and it stays last for both.
  *
- * Inserted after « Matches » so the pair both roles share keeps its order and
- * « Profil », the account item, stays last.
+ * Each entry is left out of the role it does not serve rather than shown and
+ * refused: every screen guards itself, so the item would only lead straight
+ * back to the home page.
  */
 export function navigationItems(isRecruiter: boolean): NavigationItem[] {
   return [
-    { label: 'Feed', to: isRecruiter ? '/recruteur/candidats' : '/candidat/offres' },
-    { label: 'Matches', to: '/matches' },
-    ...(isRecruiter ? [{ label: 'Mes offres', to: '/recruteur/offres' }] : []),
+    ...(isRecruiter
+      ? [{ label: 'Mes offres', to: '/recruteur/offres' }]
+      : [
+          { label: 'Feed', to: '/candidat/offres' },
+          { label: 'Matches', to: '/matches' },
+        ]),
     { label: 'Profil', to: '/profil' },
   ];
 }

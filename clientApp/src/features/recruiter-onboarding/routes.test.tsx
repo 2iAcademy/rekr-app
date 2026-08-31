@@ -15,6 +15,9 @@ vi.mock('@/api/generated', () => ({
   companyControllerCreate: vi.fn(),
   companyControllerUpdateMine: vi.fn(),
   offerControllerCreate: vi.fn(),
+  offerControllerFindFeed: vi.fn().mockResolvedValue({ data: [] }),
+  offerControllerLike: vi.fn(),
+  offerControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   sectorControllerFindAll: vi.fn(),
 }));
 

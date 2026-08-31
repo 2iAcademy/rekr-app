@@ -15,6 +15,7 @@ type PrismaMock = {
     update: jest.Mock;
   };
   recruiterProfile: { findUnique: jest.Mock };
+  candidateProfile: { findUnique: jest.Mock };
   offerTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
@@ -29,6 +30,7 @@ const buildPrismaMock = (): PrismaMock => {
       update: jest.fn(),
     },
     recruiterProfile: { findUnique: jest.fn() },
+    candidateProfile: { findUnique: jest.fn().mockResolvedValue(null) },
     offerTag: { deleteMany: jest.fn(), createMany: jest.fn() },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
@@ -235,6 +237,83 @@ describe('OfferService', () => {
     });
   });
 
+  /**
+   * Skills and benefits share the `offer_tag` pivot and are told apart by the
+   * category of the tag they point at. Every write here therefore has to name
+   * the category it owns: a wipe scoped on the offer alone would make saving
+   * one list erase the other.
+   */
+  describe('offer tags', () => {
+    const ownedOffer = (): void => {
+      prisma.offer.findUnique.mockResolvedValue({ id: 50, companyId: 10 });
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      prisma.offer.update.mockResolvedValue({ id: 50 });
+    };
+
+    it('stores the benefits of a new offer under the benefit category', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      prisma.offer.create.mockResolvedValue({ id: 50, companyId: 10 });
+      prisma.tag.findMany.mockResolvedValue([{ id: 3 }]);
+
+      await service.create(7, { title: 'Dev', benefits: ['Mutuelle'] });
+
+      expect(prisma.tag.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [{ label: 'Mutuelle', category: 'benefit' }],
+        }),
+      );
+      expect(prisma.offerTag.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: [{ offerId: 50, tagId: 3 }] }),
+      );
+    });
+
+    it('leaves the benefits alone when only the skills are rewritten', async () => {
+      ownedOffer();
+      prisma.tag.findMany.mockResolvedValue([{ id: 4 }]);
+
+      await service.update(7, 50, { skills: ['React'] });
+
+      expect(prisma.offerTag.deleteMany).toHaveBeenCalledWith({
+        where: { offerId: 50, tag: { category: 'skill' } },
+      });
+      expect(prisma.offerTag.deleteMany).not.toHaveBeenCalledWith({
+        where: { offerId: 50 },
+      });
+    });
+
+    it('leaves the skills alone when only the benefits are rewritten', async () => {
+      ownedOffer();
+      prisma.tag.findMany.mockResolvedValue([{ id: 3 }]);
+
+      await service.update(7, 50, { benefits: ['Mutuelle'] });
+
+      expect(prisma.offerTag.deleteMany).toHaveBeenCalledWith({
+        where: { offerId: 50, tag: { category: 'benefit' } },
+      });
+    });
+
+    it('clears the benefits of an offer when an empty list is sent', async () => {
+      ownedOffer();
+
+      await service.update(7, 50, { benefits: [] });
+
+      expect(prisma.offerTag.deleteMany).toHaveBeenCalledWith({
+        where: { offerId: 50, tag: { category: 'benefit' } },
+      });
+      expect(prisma.offerTag.createMany).not.toHaveBeenCalled();
+    });
+
+    // An omitted list is not an empty one: it means « do not touch », so the
+    // wipe must not run at all.
+    it('touches neither list when the patch mentions no tags', async () => {
+      ownedOffer();
+
+      await service.update(7, 50, { title: 'Dev Senior' });
+
+      expect(prisma.offerTag.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findMine', () => {
     const listQuery = (
       overrides: Partial<OfferListQueryDto> = {},
@@ -242,7 +321,10 @@ describe('OfferService', () => {
 
     it("lists the offers of the recruiter's company, newest first", async () => {
       prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
-      prisma.offer.findMany.mockResolvedValue([{ id: 50 }, { id: 49 }]);
+      prisma.offer.findMany.mockResolvedValue([
+        { id: 50, _count: { candidateLikes: 2 } },
+        { id: 49, _count: { candidateLikes: 0 } },
+      ]);
 
       const result = await service.findMine(7, listQuery());
 
@@ -252,7 +334,12 @@ describe('OfferService', () => {
           orderBy: { createdAt: 'desc' },
         }),
       );
-      expect(result).toEqual([{ id: 50 }, { id: 49 }]);
+      // `_count` is a Prisma shape and must not reach the contract: the
+      // figure travels as a plain column of the item.
+      expect(result).toEqual([
+        { id: 50, applicantCount: 2 },
+        { id: 49, applicantCount: 0 },
+      ]);
     });
 
     it('turns page and limit into skip and take', async () => {
@@ -307,6 +394,58 @@ describe('OfferService', () => {
 
     const whereOf = (): Record<string, unknown> => argsOf().where;
 
+    const withPreferences = (profile: {
+      contractTypes?: string[];
+      remotePolicy?: string | null;
+    }): void => {
+      prisma.candidateProfile.findUnique.mockResolvedValue({
+        contractTypes: [],
+        remotePolicy: null,
+        ...profile,
+      });
+    };
+
+    /**
+     * The preferences come from the stored profile, never from the query: the
+     * screen has no filter bar, and letting a caller resend them would give one
+     * fact two sources.
+     */
+    it('reads the preferences from the profile of the caller', async () => {
+      withPreferences({ contractTypes: ['CDI'] });
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(prisma.candidateProfile.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 7 } }),
+      );
+    });
+
+    // Two `OR` keys at the same level would overwrite each other, silently
+    // dropping one of the two preferences — hence the `AND`.
+    it('collects both preferences without either overwriting the other', async () => {
+      withPreferences({ contractTypes: ['CDI'], remotePolicy: 'HYBRID' });
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf().AND).toHaveLength(2);
+    });
+
+    it('narrows nothing when the profile carries no preference', async () => {
+      withPreferences({});
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf()).not.toHaveProperty('AND');
+    });
+
+    it('narrows nothing when the caller has no profile yet', async () => {
+      prisma.candidateProfile.findUnique.mockResolvedValue(null);
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf()).not.toHaveProperty('AND');
+    });
+
     it('keeps open offers the candidate has neither liked nor passed', async () => {
       await service.findFeed(candidate, new OfferFeedQueryDto());
 
@@ -325,39 +464,6 @@ describe('OfferService', () => {
       expect(where).not.toHaveProperty('minExperienceLevel');
       expect(where).not.toHaveProperty('remotePolicy');
       expect(where).not.toHaveProperty('city');
-    });
-
-    it('maps the experience filter onto the minimum level of the offer', async () => {
-      await service.findFeed(candidate, {
-        ...new OfferFeedQueryDto(),
-        experienceLevel: 'SENIOR',
-      });
-
-      expect(whereOf()).toMatchObject({ minExperienceLevel: 'SENIOR' });
-    });
-
-    it('carries the contract and remote filters straight through', async () => {
-      await service.findFeed(candidate, {
-        ...new OfferFeedQueryDto(),
-        contractType: 'CDI',
-        remotePolicy: 'FULL_REMOTE',
-      });
-
-      expect(whereOf()).toMatchObject({
-        contractType: 'CDI',
-        remotePolicy: 'FULL_REMOTE',
-      });
-    });
-
-    it('compares the city without regard to case', async () => {
-      await service.findFeed(candidate, {
-        ...new OfferFeedQueryDto(),
-        city: 'lYoN',
-      });
-
-      expect(whereOf()).toMatchObject({
-        city: { equals: 'lYoN', mode: 'insensitive' },
-      });
     });
 
     // `createdAt` is not unique, so the id break is what keeps two reads of

@@ -14,7 +14,7 @@ interface RenderOptions {
  * state against the location, so the spec only needs the router to sit at the
  * screen under test — not the real route tree.
  */
-const renderSidebar = ({ path = '/matches', isRecruiter = true }: RenderOptions = {}) => {
+const renderSidebar = ({ path = '/recruteur/offres', isRecruiter = true }: RenderOptions = {}) => {
   const router = createMemoryRouter(
     [
       {
@@ -52,20 +52,17 @@ describe('AppSidebar', () => {
 
     expect(screen.getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument();
     expect(navLinks()).toEqual([
-      { label: 'Feed', href: '/recruteur/candidats', current: null },
-      { label: 'Matches', href: '/matches', current: 'page' },
-      { label: 'Mes offres', href: '/recruteur/offres', current: null },
+      { label: 'Mes offres', href: '/recruteur/offres', current: 'page' },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });
 
   it('reflète l’écran courant sur la seule entrée correspondante', () => {
-    renderSidebar({ path: '/recruteur/candidats' });
+    renderSidebar({ isRecruiter: false, path: '/candidat/offres' });
 
     expect(navLinks()).toEqual([
-      { label: 'Feed', href: '/recruteur/candidats', current: 'page' },
+      { label: 'Feed', href: '/candidat/offres', current: 'page' },
       { label: 'Matches', href: '/matches', current: null },
-      { label: 'Mes offres', href: '/recruteur/offres', current: null },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });
@@ -77,15 +74,13 @@ describe('AppSidebar', () => {
     renderSidebar({ path: '/recruteur/offres/12/edition' });
 
     expect(navLinks()).toEqual([
-      { label: 'Feed', href: '/recruteur/candidats', current: null },
-      { label: 'Matches', href: '/matches', current: null },
       { label: 'Mes offres', href: '/recruteur/offres', current: 'page' },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });
 
   it('n’active pas le feed candidat depuis un autre écran', () => {
-    renderSidebar({ isRecruiter: false });
+    renderSidebar({ isRecruiter: false, path: '/matches' });
 
     expect(navLinks()).toEqual([
       { label: 'Feed', href: '/candidat/offres', current: null },

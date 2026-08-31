@@ -88,14 +88,6 @@ export class CompanyResponseDto {
   @ApiProperty({ type: String, nullable: true, example: '4.835' })
   longitude!: string | null;
 
-  /**
-   * Benefits only, sorted by label. `company_tag` is a plain pivot on the
-   * shared tag dictionary, so the category is filtered on read instead of
-   * trusting that only benefits were ever linked.
-   */
-  @ApiProperty({ type: [String], example: ['Mutuelle', 'Télétravail'] })
-  benefits!: string[];
-
   @ApiProperty({ type: () => CompanyRecruiterDto })
   recruiter!: CompanyRecruiterDto;
 

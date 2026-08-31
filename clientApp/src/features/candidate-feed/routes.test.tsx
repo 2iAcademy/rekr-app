@@ -14,6 +14,9 @@ vi.mock('@/api/generated', () => ({
   companyControllerUpdateMine: vi.fn(),
   matchControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerCreate: vi.fn(),
+  offerControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
+  offerControllerFindFeed: vi.fn().mockResolvedValue({ data: [] }),
+  offerControllerLike: vi.fn(),
   sectorControllerFindAll: vi.fn(),
 }));
 
@@ -75,11 +78,13 @@ describe('navigation vers le feed candidat', () => {
    * Vers son propre feed, pas vers le Splash : se tromper d'écran n'est pas une
    * raison de renvoyer un utilisateur connecté à la porte d'entrée publique.
    */
-  it('renvoie un recruteur connecté vers son propre feed', async () => {
+  it('renvoie un recruteur connecté vers ses offres', async () => {
     authenticateAs('recruiter');
     renderAt('/candidat/offres');
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Vos offres' }),
+    ).toBeInTheDocument();
     expect(feedHeading()).not.toBeInTheDocument();
   });
 

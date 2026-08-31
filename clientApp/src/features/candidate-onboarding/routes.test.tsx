@@ -15,6 +15,9 @@ vi.mock('@/api/generated', () => ({
   companyControllerCreate: vi.fn(),
   companyControllerUpdateMine: vi.fn(),
   offerControllerCreate: vi.fn(),
+  offerControllerFindFeed: vi.fn().mockResolvedValue({ data: [] }),
+  offerControllerLike: vi.fn(),
+  offerControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   sectorControllerFindAll: vi.fn(),
 }));
 
@@ -95,11 +98,13 @@ describe('navigation création de profil candidat', () => {
    * Not to the public splash, which is where this used to lead: a recruiter has
    * a home of their own, and being on the wrong wizard is no reason to sign out.
    */
-  it('renvoie un recruteur connecté vers son propre feed', async () => {
+  it('renvoie un recruteur connecté vers ses offres', async () => {
     authenticateAs('recruiter');
     renderAt('/candidat/onboarding');
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Vos offres' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Étape 1 sur 4')).not.toBeInTheDocument();
   });
 

@@ -54,10 +54,13 @@ describe('AccountPage', () => {
     expect(screen.getByText('Section candidat')).toBeInTheDocument();
   });
 
-  it('propose de se déconnecter', () => {
+  // La déconnexion a rejoint le chrome, à côté de l'identité qu'elle termine :
+  // elle n'attend plus au bas d'un formulaire qu'il faut dérouler pour la
+  // trouver.
+  it('ne porte plus la déconnexion, désormais dans le chrome', () => {
     renderPage();
 
-    expect(screen.getByRole('button', { name: 'Se déconnecter' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Se déconnecter' })).not.toBeInTheDocument();
   });
 
   it('n’annonce plus un profil à venir', () => {

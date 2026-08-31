@@ -18,6 +18,7 @@ const offer: OfferListItemDto = {
   salaryMax: 55000,
   createdAt: '2026-02-01T00:00:00.000Z',
   updatedAt: '2026-02-01T00:00:00.000Z',
+  applicantCount: 0,
 };
 
 const renderRow = (over: Partial<OfferListItemDto> = {}, pending = false) => {
@@ -38,6 +39,47 @@ const renderRow = (over: Partial<OfferListItemDto> = {}, pending = false) => {
 };
 
 describe('OfferRow', () => {
+  /**
+   * Un lien nommé par son contenu, et visible sans survol : c'est ce que le
+   * recruteur vient chercher dans cette liste, et un lien qui n'apparaît qu'au
+   * survol du titre est inatteignable sur un écran tactile.
+   */
+  it('mène aux candidats intéressés depuis un lien nommé', () => {
+    renderRow({ applicantCount: 3 });
+
+    expect(screen.getByRole('link', { name: /3 candidats intéressés/ })).toHaveAttribute(
+      'href',
+      '/recruteur/offres/12/candidats',
+    );
+  });
+
+  it('accorde le libellé au singulier', () => {
+    renderRow({ applicantCount: 1 });
+
+    expect(screen.getByRole('link', { name: /1 candidat intéressé/ })).toBeInTheDocument();
+  });
+
+  /**
+   * Affiché même à zéro : masqué, plus rien sur la ligne ne disait que l'offre
+   * menait quelque part, et un recruteur dont aucune offre n'a encore de
+   * candidat ne pouvait pas découvrir l'écran.
+   */
+  it('reste accessible quand personne n’a encore manifesté d’intérêt', () => {
+    renderRow({ applicantCount: 0 });
+
+    expect(screen.getByRole('link', { name: /Aucun candidat intéressé/ })).toHaveAttribute(
+      'href',
+      '/recruteur/offres/12/candidats',
+    );
+  });
+
+  it('ne fait plus du titre un lien, pour ne pas doubler la même cible', () => {
+    renderRow();
+
+    expect(screen.queryByRole('link', { name: 'Développeuse backend' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Développeuse backend' })).toBeInTheDocument();
+  });
+
   it('affiche le titre, le statut et la ligne de contexte de l’offre', () => {
     renderRow();
 

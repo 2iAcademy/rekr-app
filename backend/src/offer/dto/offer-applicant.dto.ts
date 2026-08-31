@@ -7,13 +7,12 @@ import {
 } from '../../../generated/prisma/client';
 
 /**
- * One card of the recruiter deck.
+ * One candidate who applied to an offer, as their recruiter reads them.
  *
- * A deliberately narrower shape than `CandidateProfileResponseDto`: the deck is
- * read by strangers, so it carries what a recruiter needs to swipe and nothing
- * that identifies or prices the person. The surname stays back until a match,
- * and the salary expectations stay private to the candidate — unlike an
- * offer's, which are published.
+ * A deliberately narrower shape than `CandidateProfileResponseDto`: the person
+ * behind it has shown interest, not agreed to be identified. The surname stays
+ * back until a match, and the salary expectations stay private to the
+ * candidate — unlike an offer's, which are published.
  *
  * Nullables are `@ApiProperty({ nullable: true })` rather than
  * `@ApiPropertyOptional`, per `CandidateProfileResponseDto`: the key is always
@@ -21,14 +20,13 @@ import {
  *
  * Every enum carries `enumName`, which is what makes the generated client reuse
  * the shared `ContractType` / `ExperienceLevel` / … schemas instead of minting a
- * per-DTO copy. Without it the two feeds end up with two incompatible types for
+ * per-DTO copy. Without it two endpoints end up with two incompatible types for
  * the same business enum.
  */
-export class CandidateFeedItemDto {
+export class OfferApplicantDto {
   /**
-   * The only identifier exposed, and the one a swipe is keyed on:
-   * `RecruiterLikesCandidate` and `RecruiterPassesCandidate` both point at the
-   * user, not at the profile row.
+   * The only identifier exposed, and the one a like is keyed on:
+   * `RecruiterLikesCandidate` points at the user, not at the profile row.
    */
   @ApiProperty({ example: 42 })
   userId!: number;

@@ -242,7 +242,7 @@ describe('buildCandidateAccountPayload', () => {
 
 describe('firstInvalidCandidateField', () => {
   const complete = (overrides: Partial<CandidateAccountForm> = {}): CandidateAccountForm =>
-    form({ city: 'Lyon', postalCode: '69003', ...overrides });
+    form({ city: 'Lyon', postalCode: '69003', contractTypes: ['CDI'], ...overrides });
 
   it('accepte un formulaire dont les champs obligatoires sont renseignés', () => {
     expect(firstInvalidCandidateField(complete())).toBeNull();
@@ -267,6 +267,17 @@ describe('firstInvalidCandidateField', () => {
   // Half a pair is no address either, and the API refuses it with a 400.
   it('refuse une commune sans code postal', () => {
     expect(firstInvalidCandidateField(complete({ postalCode: '' }))?.field).toBe('city');
+  });
+
+  /**
+   * Exigé à l'inscription, la fiche de compte l'avait laissé filer. La liste
+   * décide des offres qui arrivent dans le deck : vide, elle laisserait un feed
+   * façonné par rien.
+   */
+  it('refuse une liste de contrats vide', () => {
+    expect(firstInvalidCandidateField(complete({ contractTypes: [] }))?.field).toBe(
+      'contractTypes',
+    );
   });
 
   it('refuse un code postal sans commune', () => {

@@ -55,7 +55,6 @@ const company: CompanyResponseDto = {
   postalCode: '69003',
   latitude: '45.7510000',
   longitude: '4.8690000',
-  benefits: ['Mutuelle'],
   recruiter: { firstName: 'Camille', lastName: 'Martin', jobTitle: 'Responsable RH' },
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-02T00:00:00.000Z',
@@ -94,9 +93,24 @@ const renderSection = () =>
     </MemoryRouter>,
   );
 
+/**
+ * The screen is folded into sections, and a folded panel is inert — its fields
+ * are out of reach for a screen reader and for these specs alike. Most cases
+ * are about the form, not about the folding, so they start with everything
+ * open; the folding itself is asserted on its own below.
+ */
+const openEverySection = async (user: ReturnType<typeof userEvent.setup>) => {
+  for (const section of screen.getAllByRole('button', { expanded: false })) {
+    await user.click(section);
+  }
+};
+
 const renderLoaded = async () => {
   const rendered = renderSection();
-  await screen.findByLabelText('Nom de la société');
+  // A field of the section that is open on arrival: the others are unmounted
+  // until their own header is clicked, just below.
+  await screen.findByLabelText('Prénom');
+  await openEverySection(userEvent.setup());
 
   return rendered;
 };
@@ -113,7 +127,7 @@ describe('RecruiterAccountSection', () => {
       answer(company) as unknown as Awaited<ReturnType<typeof companyControllerFindMine>>,
     );
     updateMine.mockResolvedValue(
-      answer({ ...company, recruiter: undefined, benefits: undefined }) as unknown as Awaited<
+      answer({ ...company, recruiter: undefined }) as unknown as Awaited<
         ReturnType<typeof companyControllerUpdateMine>
       >,
     );
@@ -141,7 +155,26 @@ describe('RecruiterAccountSection', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Chargement de vos informations…');
 
-    await screen.findByLabelText('Nom de la société');
+    await screen.findByLabelText('Prénom');
+  });
+
+  /**
+   * Le formulaire faisait onze champs à la suite : il fallait le parcourir en
+   * entier pour atteindre le bouton d'enregistrement. Replié, il s'ouvre sur
+   * l'identité et laisse le reste de côté.
+   */
+  it('n’ouvre que la première section à l’arrivée', async () => {
+    renderSection();
+    await screen.findByLabelText('Prénom');
+
+    expect(screen.getByRole('button', { name: new RegExp('Mon identité') })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: new RegExp('Ma société') })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
   });
 
   it('affiche l’identité du recruteur et les informations de la société', async () => {
@@ -154,8 +187,15 @@ describe('RecruiterAccountSection', () => {
     expect(screen.getByLabelText('Site web (optionnel)')).toHaveValue('https://studiolumen.fr');
     expect(screen.getByRole('combobox', { name: 'Ville' })).toHaveValue('Lyon (69003)');
     expect(screen.getByRole('radio', { name: 'PME' })).toBeChecked();
-    expect(screen.getByRole('button', { name: 'Retirer Mutuelle' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Secteur')).toHaveValue('4'));
+  });
+
+  // Les avantages se saisissent désormais sur l'offre, où ils diffèrent d'un
+  // poste à l'autre. Les laisser ici les rattacherait à la société.
+  it('ne propose plus les avantages sur la fiche société', async () => {
+    await renderLoaded();
+
+    expect(screen.queryByLabelText('Avantages (optionnel)')).not.toBeInTheDocument();
   });
 
   // `AppShell` already renders the only `main` of the page.
@@ -198,7 +238,9 @@ describe('RecruiterAccountSection', () => {
 
     await user.click(screen.getByRole('button', { name: 'Réessayer' }));
 
-    expect(await screen.findByLabelText('Nom de la société')).toHaveValue('Studio Lumen');
+    // Un champ de la section ouverte : la fiche société est repliée à l'arrivée,
+    // et le formulaire rempli suffit à prouver que la relecture a abouti.
+    expect(await screen.findByLabelText('Prénom')).toHaveValue('Camille');
   });
 
   /** A recruiter who skipped the wizard has no company at all: there is nothing
@@ -239,7 +281,6 @@ describe('RecruiterAccountSection', () => {
       size: 'PME',
       siteUrl: 'https://studiolumen.fr',
       description: 'On éclaire les scènes.',
-      benefits: ['Mutuelle'],
       city: 'Lyon',
       postalCode: '69003',
     });
@@ -273,8 +314,6 @@ describe('RecruiterAccountSection', () => {
     await user.click(screen.getByRole('radio', { name: 'TPE' }));
     await user.clear(screen.getByLabelText('Site web (optionnel)'));
     await user.type(screen.getByLabelText('Site web (optionnel)'), 'https://lumen.dev');
-    await user.click(screen.getByRole('button', { name: 'Retirer Mutuelle' }));
-    await user.type(screen.getByLabelText('Avantages (optionnel)'), 'RTT{Enter}');
     await user.type(screen.getByLabelText('Présentation de la société'), ' Vraiment.');
     await save(user);
 
@@ -284,7 +323,6 @@ describe('RecruiterAccountSection', () => {
         sectorId: 9,
         size: 'TPE',
         siteUrl: 'https://lumen.dev',
-        benefits: ['RTT'],
         description: expect.stringContaining('Vraiment.') as unknown as string,
       }),
     );

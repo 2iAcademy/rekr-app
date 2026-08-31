@@ -17,6 +17,8 @@ import { RichTextField } from '@/components/form/RichTextField';
 import { SalaryRange } from '@/components/form/SalaryRange';
 import { TagInput } from '@/components/form/TagInput';
 import { TextField } from '@/components/form/TextField';
+import { ProfileSection, ProfileSections } from '@/components/ui/accordion';
+import { candidateSummaries } from '@/features/profile/candidateSummaries';
 import { Button } from '@/components/ui/button';
 import {
   AVAILABILITY_OPTIONS,
@@ -89,7 +91,6 @@ const storedKey = (body: unknown, column: keyof StoredFiles): string | null => {
 
 export function CandidateAccountSection() {
   const errorId = useId();
-  const headingId = useId();
   const [state, setState] = useState<SectionState>({ status: 'loading' });
   const [invalid, setInvalid] = useState<CandidateAccountInvalidField | null>(null);
   const [saving, setSaving] = useState(false);
@@ -228,232 +229,266 @@ export function CandidateAccountSection() {
   }
 
   const { form } = state;
+  const summaries = candidateSummaries(form);
 
   return (
-    <section aria-labelledby={headingId} className="mt-8 flex flex-col gap-6">
-      <h2 id={headingId} className="font-heading text-lg font-semibold text-ink">
-        Mon profil
-      </h2>
+    // Pas de titre ici : « Mon compte » en tête de page nomme déjà l'écran, et
+    // « Mon profil » juste en dessous ne disait rien de plus.
+    <section aria-label="Mon profil" className="flex flex-col">
+      <form onSubmit={(event) => void save(event)}>
+        <ProfileSections defaultOpen={['identity']}>
+          <ProfileSection
+            value="identity"
+            title="Identité et documents"
+            summary={summaries.identity}
+          >
+            {/* Côte à côte dès `sm` : empilées, les deux zones de téléversement
+                repoussaient le premier champ de texte hors de l'écran. */}
+            <div className="grid gap-5 sm:grid-cols-2">
+              <FileField
+                label={PICTURE_LABEL}
+                constraint={FILE_CONSTRAINTS.picture}
+                previewUrl={fileUrl(state.picture)}
+                emptyLabel="Aucune photo enregistrée"
+                presentLabel="Photo enregistrée"
+                busy={busy.picture}
+                busyLabel="Envoi de la photo…"
+                onSelect={(file) =>
+                  void writeFile(
+                    'picture',
+                    () => candidateProfileControllerReplacePicture({ file }),
+                    FILE_REPLACE_SUCCESS,
+                    fileReplaceBusiness,
+                  )
+                }
+                onRemove={() =>
+                  void writeFile(
+                    'picture',
+                    candidateProfileControllerRemovePicture,
+                    FILE_REMOVE_SUCCESS,
+                    fileRemoveBusiness,
+                  )
+                }
+              />
 
-      <div className="flex flex-col gap-5 rounded-2xl border border-line bg-card p-5">
-        <FileField
-          label={PICTURE_LABEL}
-          constraint={FILE_CONSTRAINTS.picture}
-          previewUrl={fileUrl(state.picture)}
-          emptyLabel="Aucune photo enregistrée"
-          presentLabel="Photo enregistrée"
-          busy={busy.picture}
-          busyLabel="Envoi de la photo…"
-          onSelect={(file) =>
-            void writeFile(
-              'picture',
-              () => candidateProfileControllerReplacePicture({ file }),
-              FILE_REPLACE_SUCCESS,
-              fileReplaceBusiness,
-            )
-          }
-          onRemove={() =>
-            void writeFile(
-              'picture',
-              candidateProfileControllerRemovePicture,
-              FILE_REMOVE_SUCCESS,
-              fileRemoveBusiness,
-            )
-          }
-        />
-
-        {/* No preview and no read link: `/api/files` refuses the `cv` kind, and
+              {/* No preview and no read link: `/api/files` refuses the `cv` kind, and
             the only route that serves one cannot be consumed through the
             generated client, which reads every response as text. */}
-        <FileField
-          label={CV_LABEL}
-          constraint={FILE_CONSTRAINTS.cv}
-          previewUrl={null}
-          hasFile={state.cvUrl !== null}
-          presentLabel="CV enregistré"
-          emptyLabel="Aucun CV enregistré"
-          busy={busy.cv}
-          busyLabel="Envoi du CV…"
-          onSelect={(file) =>
-            void writeFile(
-              'cv',
-              () => candidateProfileControllerReplaceCv({ file }),
-              FILE_REPLACE_SUCCESS,
-              fileReplaceBusiness,
-            )
-          }
-          onRemove={() =>
-            void writeFile(
-              'cv',
-              candidateProfileControllerRemoveCv,
-              FILE_REMOVE_SUCCESS,
-              fileRemoveBusiness,
-            )
-          }
-        />
-      </div>
+              <FileField
+                label={CV_LABEL}
+                constraint={FILE_CONSTRAINTS.cv}
+                previewUrl={null}
+                hasFile={state.cvUrl !== null}
+                presentLabel="CV enregistré"
+                emptyLabel="Aucun CV enregistré"
+                busy={busy.cv}
+                busyLabel="Envoi du CV…"
+                onSelect={(file) =>
+                  void writeFile(
+                    'cv',
+                    () => candidateProfileControllerReplaceCv({ file }),
+                    FILE_REPLACE_SUCCESS,
+                    fileReplaceBusiness,
+                  )
+                }
+                onRemove={() =>
+                  void writeFile(
+                    'cv',
+                    candidateProfileControllerRemoveCv,
+                    FILE_REMOVE_SUCCESS,
+                    fileRemoveBusiness,
+                  )
+                }
+              />
 
-      <form onSubmit={(event) => void save(event)} className="flex flex-col gap-5">
-        <TextField
-          label="Prénom"
-          aria-required
-          aria-invalid={invalid?.field === 'firstName'}
-          aria-describedby={invalid?.field === 'firstName' ? errorId : undefined}
-          autoComplete="given-name"
-          maxLength={100}
-          value={form.firstName}
-          onChange={(event) => change({ firstName: event.target.value })}
-        />
+              <TextField
+                label="Prénom"
+                aria-required
+                aria-invalid={invalid?.field === 'firstName'}
+                aria-describedby={invalid?.field === 'firstName' ? errorId : undefined}
+                autoComplete="given-name"
+                maxLength={100}
+                value={form.firstName}
+                onChange={(event) => change({ firstName: event.target.value })}
+              />
 
-        <TextField
-          label="Nom"
-          aria-required
-          aria-invalid={invalid?.field === 'lastName'}
-          aria-describedby={invalid?.field === 'lastName' ? errorId : undefined}
-          autoComplete="family-name"
-          maxLength={100}
-          value={form.lastName}
-          onChange={(event) => change({ lastName: event.target.value })}
-        />
+              <TextField
+                label="Nom"
+                aria-required
+                aria-invalid={invalid?.field === 'lastName'}
+                aria-describedby={invalid?.field === 'lastName' ? errorId : undefined}
+                autoComplete="family-name"
+                maxLength={100}
+                value={form.lastName}
+                onChange={(event) => change({ lastName: event.target.value })}
+              />
+            </div>
 
-        <CityField
-          label="Ville"
-          selected={
-            form.city && form.postalCode ? { name: form.city, postalCode: form.postalCode } : null
-          }
-          onSelect={(city) => change({ city: city.name, postalCode: city.postalCode })}
-          onClear={() => change({ city: '', postalCode: '' })}
-        />
+            <CityField
+              label="Ville"
+              selected={
+                form.city && form.postalCode
+                  ? { name: form.city, postalCode: form.postalCode }
+                  : null
+              }
+              onSelect={(city) => change({ city: city.name, postalCode: city.postalCode })}
+              onClear={() => change({ city: '', postalCode: '' })}
+            />
+          </ProfileSection>
 
-        <TextField
-          label="Poste recherché"
-          maxLength={255}
-          value={form.desiredJobTitle}
-          onChange={(event) => change({ desiredJobTitle: event.target.value })}
-          placeholder="Développeuse Front React"
-        />
+          <ProfileSection value="project" title="Mon projet" summary={summaries.project}>
+            <TextField
+              label="Poste recherché"
+              maxLength={255}
+              value={form.desiredJobTitle}
+              onChange={(event) => change({ desiredJobTitle: event.target.value })}
+              placeholder="Développeuse Front React"
+            />
 
-        <OptionChips
-          legend="Type(s) de contrat"
-          name="account-contract-types"
-          options={CONTRACT_TYPE_OPTIONS}
-          values={form.contractTypes}
-          onChange={(contractTypes) => change({ contractTypes })}
-        />
+            <OptionChips
+              legend="Type(s) de contrat"
+              name="account-contract-types"
+              options={CONTRACT_TYPE_OPTIONS}
+              values={form.contractTypes}
+              onChange={(contractTypes) => change({ contractTypes })}
+              invalid={invalid?.field === 'contractTypes'}
+              describedBy={invalid?.field === 'contractTypes' ? errorId : undefined}
+            />
 
-        <OptionCards
-          legend="Niveau d’expérience"
-          name="account-experience-level"
-          options={EXPERIENCE_LEVEL_OPTIONS}
-          value={form.experienceLevel}
-          onChange={(experienceLevel) => change({ experienceLevel })}
-        />
+            <OptionCards
+              legend="Niveau d’expérience"
+              name="account-experience-level"
+              options={EXPERIENCE_LEVEL_OPTIONS}
+              value={form.experienceLevel}
+              onChange={(experienceLevel) => change({ experienceLevel })}
+            />
 
-        <OptionCards
-          legend="Disponibilité"
-          name="account-availability"
-          options={AVAILABILITY_OPTIONS}
-          value={form.availability}
-          onChange={(availability) => change({ availability })}
-        />
+            <OptionCards
+              legend="Disponibilité"
+              name="account-availability"
+              options={AVAILABILITY_OPTIONS}
+              value={form.availability}
+              onChange={(availability) => change({ availability })}
+            />
 
-        {form.availability === 'WITHIN_DELAY' && (
-          <TextField
-            label="Disponible dans (mois)"
-            inputMode="numeric"
-            maxLength={2}
-            value={form.availabilityDelayMonths}
-            onChange={(event) =>
-              change({ availabilityDelayMonths: digitsOnly(event.target.value) })
-            }
-            placeholder="3"
-          />
-        )}
+            {form.availability === 'WITHIN_DELAY' && (
+              <TextField
+                label="Disponible dans (mois)"
+                inputMode="numeric"
+                maxLength={2}
+                value={form.availabilityDelayMonths}
+                onChange={(event) =>
+                  change({ availabilityDelayMonths: digitsOnly(event.target.value) })
+                }
+                placeholder="3"
+              />
+            )}
 
-        {form.availability === 'SPECIFIC_DATE' && (
-          <TextField
-            label="Date de disponibilité"
-            type="date"
-            value={form.availabilityDate}
-            onChange={(event) => change({ availabilityDate: event.target.value })}
-          />
-        )}
+            {form.availability === 'SPECIFIC_DATE' && (
+              <TextField
+                label="Date de disponibilité"
+                type="date"
+                value={form.availabilityDate}
+                onChange={(event) => change({ availabilityDate: event.target.value })}
+              />
+            )}
+          </ProfileSection>
 
-        <OptionCards
-          legend="Télétravail"
-          name="account-remote-policy"
-          options={REMOTE_POLICY_OPTIONS}
-          value={form.remotePolicy}
-          onChange={(remotePolicy) => change({ remotePolicy })}
-        />
+          <ProfileSection
+            value="preferences"
+            title="Mes préférences"
+            summary={summaries.preferences}
+          >
+            <OptionCards
+              legend="Télétravail"
+              name="account-remote-policy"
+              options={REMOTE_POLICY_OPTIONS}
+              value={form.remotePolicy}
+              onChange={(remotePolicy) => change({ remotePolicy })}
+            />
 
-        <OptionCards
-          legend="Mobilité"
-          name="account-mobility-scope"
-          options={MOBILITY_SCOPE_OPTIONS}
-          value={form.mobilityScope}
-          onChange={(mobilityScope) => change({ mobilityScope })}
-          columns={2}
-        />
+            <OptionCards
+              legend="Mobilité"
+              name="account-mobility-scope"
+              options={MOBILITY_SCOPE_OPTIONS}
+              value={form.mobilityScope}
+              onChange={(mobilityScope) => change({ mobilityScope })}
+              columns={2}
+            />
 
-        {form.mobilityScope === 'RADIUS' && (
-          <TextField
-            label="Rayon de mobilité (km)"
-            inputMode="numeric"
-            maxLength={4}
-            value={form.mobilityRadiusKm}
-            onChange={(event) => change({ mobilityRadiusKm: digitsOnly(event.target.value) })}
-            placeholder="30"
-          />
-        )}
+            {form.mobilityScope === 'RADIUS' && (
+              <TextField
+                label="Rayon de mobilité (km)"
+                inputMode="numeric"
+                maxLength={4}
+                value={form.mobilityRadiusKm}
+                onChange={(event) => change({ mobilityRadiusKm: digitsOnly(event.target.value) })}
+                placeholder="30"
+              />
+            )}
 
-        <SalaryRange
-          min={form.salaryMin}
-          max={form.salaryMax}
-          onMinChange={(salaryMin) => change({ salaryMin })}
-          onMaxChange={(salaryMax) => change({ salaryMax })}
-        />
+            <SalaryRange
+              min={form.salaryMin}
+              max={form.salaryMax}
+              onMinChange={(salaryMin) => change({ salaryMin })}
+              onMaxChange={(salaryMax) => change({ salaryMax })}
+            />
+          </ProfileSection>
 
-        <TagInput
-          label="Compétences"
-          placeholder="React, TypeScript, Figma…"
-          values={form.skills}
-          onChange={(skills) => change({ skills })}
-        />
+          <ProfileSection value="showcase" title="Ma vitrine" summary={summaries.showcase}>
+            <TagInput
+              label="Compétences"
+              placeholder="React, TypeScript, Figma…"
+              values={form.skills}
+              onChange={(skills) => change({ skills })}
+            />
 
-        <TagInput
-          label="Langues"
-          placeholder="Anglais, Espagnol…"
-          values={form.languages}
-          onChange={(languages) => change({ languages })}
-        />
+            <TagInput
+              label="Langues"
+              placeholder="Anglais, Espagnol…"
+              values={form.languages}
+              onChange={(languages) => change({ languages })}
+            />
 
-        <RichTextField
-          label="À propos de moi"
-          maxLength={MAX_FREE_TEXT_LENGTH}
-          value={form.bio}
-          onChange={(bio) => change({ bio })}
-          placeholder="Votre parcours, ce que vous cherchez, ce qui vous motive…"
-        />
+            <RichTextField
+              label="À propos de moi"
+              maxLength={MAX_FREE_TEXT_LENGTH}
+              value={form.bio}
+              onChange={(bio) => change({ bio })}
+              placeholder="Votre parcours, ce que vous cherchez, ce qui vous motive…"
+            />
 
-        <TextField
-          label="Profil LinkedIn"
-          type="url"
-          autoComplete="url"
-          maxLength={255}
-          value={form.linkedinUrl}
-          onChange={(event) => change({ linkedinUrl: event.target.value })}
-          placeholder="https://linkedin.com/in/camille-martin"
-        />
+            <TextField
+              label="Profil LinkedIn"
+              type="url"
+              autoComplete="url"
+              maxLength={255}
+              value={form.linkedinUrl}
+              onChange={(event) => change({ linkedinUrl: event.target.value })}
+              placeholder="https://linkedin.com/in/camille-martin"
+            />
+          </ProfileSection>
+        </ProfileSections>
 
         {invalid && (
-          <p id={errorId} role="alert" className="text-xs text-destructive">
+          <p id={errorId} role="alert" className="mt-4 text-xs text-destructive">
             {invalid.message}
           </p>
         )}
 
-        <div className="flex justify-start">
-          <Button type="submit" variant="role" size="xl" disabled={saving}>
+        {/* Sticky, and opaque across the full width: the folded form is still
+            tall enough that a button at the very bottom means scrolling past
+            everything to commit. A gradient let the content read through it and
+            the button sat on top of whatever happened to be behind — the page
+            reserves `pb-28` so the bar floats over empty space instead. */}
+        <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-line bg-background px-4 py-3 sm:-mx-6 sm:px-6">
+          <Button
+            type="submit"
+            variant="role"
+            size="xl"
+            disabled={saving}
+            className="w-full sm:w-auto"
+          >
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </Button>
         </div>

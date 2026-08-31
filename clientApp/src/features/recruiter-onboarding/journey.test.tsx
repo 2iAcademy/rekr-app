@@ -105,12 +105,12 @@ const completeWizard = async (user: User) => {
     screen.getByLabelText('Présentation de la société'),
     'On construit le matching qui respecte les candidats.',
   );
-  await user.type(screen.getByLabelText('Avantages (optionnel)'), 'Mutuelle, RTT{Enter}');
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 
   await user.type(screen.getByLabelText('Titre du poste'), 'Développeur Front React');
   await user.type(screen.getByLabelText('Missions'), 'Construire les écrans du swipe.');
   await user.type(screen.getByLabelText('Compétences recherchées'), 'React, TypeScript{Enter}');
+  await user.type(screen.getByLabelText('Avantages (optionnel)'), 'Mutuelle, RTT{Enter}');
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 
   await user.click(await screen.findByRole('radio', { name: 'CDI' }));
@@ -147,7 +147,9 @@ describe('parcours recruteur de bout en bout', () => {
      * On the feed, not on the splash: completing the wizard is what makes the
      * account whole, so it is where the journey lands.
      */
-    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Vos offres' }),
+    ).toBeInTheDocument();
 
     const company = callTo('/api/companies');
     expect(company.method).toBe('POST');
@@ -163,7 +165,6 @@ describe('parcours recruteur de bout en bout', () => {
       postalCode: '69003',
       siteUrl: 'https://rekr.fr',
       description: 'On construit le matching qui respecte les candidats.',
-      benefits: ['Mutuelle', 'RTT'],
     });
 
     const offer = callTo('/api/offers');
@@ -175,6 +176,7 @@ describe('parcours recruteur de bout en bout', () => {
       city: 'Lyon',
       postalCode: '69003',
       skills: ['React', 'TypeScript'],
+      benefits: ['Mutuelle', 'RTT'],
       contractType: 'CDI',
       minExperienceLevel: 'CONFIRME',
       remotePolicy: 'HYBRID',
@@ -215,9 +217,17 @@ describe('parcours recruteur de bout en bout', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Publier mon offre' }));
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
-    const offerCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/offers'));
-    expect(offerCalls).toHaveLength(2);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Vos offres' }),
+    ).toBeInTheDocument();
+    // Filtré sur la méthode, pas seulement sur l'URL : le recruteur atterrit
+    // désormais sur ses annonces, dont le chargement appelle la même route en
+    // lecture.
+    const offerWrites = fetchMock.mock.calls.filter(
+      ([url, init]) =>
+        String(url).includes('/api/offers') && (init as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(offerWrites).toHaveLength(2);
 
     const update = callTo('/api/companies/mine');
     expect(update.method).toBe('PATCH');

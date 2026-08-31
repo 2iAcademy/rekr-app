@@ -15,6 +15,10 @@ vi.mock('@/api/generated', () => ({
   companyControllerUpdateMine: vi.fn(),
   matchControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerCreate: vi.fn(),
+  offerControllerFindFeed: vi.fn().mockResolvedValue({ data: [] }),
+  offerControllerFindLiked: vi.fn().mockResolvedValue({ data: [] }),
+  offerControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
+  offerControllerLike: vi.fn(),
   sectorControllerFindAll: vi.fn(),
 }));
 
@@ -77,11 +81,14 @@ describe('navigation vers le match', () => {
     expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
   });
 
-  it('affiche la liste des matches pour un recruteur connecté', async () => {
+  // La vue du recruteur est son annonce : il lit qui s'y intéresse depuis
+  // « Mes offres », pas depuis une liste de matches tous postes confondus.
+  it('écarte un recruteur de la liste des matches, vers ses offres', async () => {
     authenticateAs('recruiter');
     renderAt('/matches');
 
-    expect(await screen.findByRole('heading', { name: 'Tes matches' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Vos offres' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
   });
 
   it('n’affiche pas la liste des matches tant que la session est en cours de vérification', () => {

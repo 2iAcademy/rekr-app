@@ -200,6 +200,94 @@ describe('Offer feed (e2e)', () => {
     });
   });
 
+  /**
+   * The deck is shaped by the profile, not by a filter bar.
+   *
+   * Read server-side from the caller's own profile rather than passed as query
+   * parameters: the preferences are already stored, so making the client resend
+   * them would give the same fact two sources — and let anyone widen their own
+   * deck past what they told the product they were looking for.
+   */
+  describe('shaped by the candidate profile', () => {
+    const seedProfile = (overrides: Record<string, unknown> = {}) =>
+      prisma.candidateProfile.create({
+        data: {
+          userId: candidate.id,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          ...overrides,
+        },
+      });
+
+    const titlesOf = (res: request.Response): string[] =>
+      (res.body as { title: string }[]).map((offer) => offer.title);
+
+    it('keeps only the contract types the candidate is looking for', async () => {
+      await seedProfile({ contractTypes: ['ALTERNANCE'] });
+      await seedOffer({ title: 'Alternance', contractType: 'ALTERNANCE' });
+      await seedOffer({ title: 'CDI', contractType: 'CDI' });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res)).toEqual(['Alternance']);
+    });
+
+    it('keeps every contract type the candidate accepts', async () => {
+      await seedProfile({ contractTypes: ['ALTERNANCE', 'CDI'] });
+      await seedOffer({ title: 'Alternance', contractType: 'ALTERNANCE' });
+      await seedOffer({ title: 'CDI', contractType: 'CDI' });
+      await seedOffer({ title: 'Stage', contractType: 'STAGE' });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res).sort()).toEqual(['Alternance', 'CDI']);
+    });
+
+    it('keeps only the remote policy the candidate is looking for', async () => {
+      await seedProfile({ remotePolicy: 'FULL_REMOTE' });
+      await seedOffer({ title: 'Remote', remotePolicy: 'FULL_REMOTE' });
+      await seedOffer({ title: 'Sur site', remotePolicy: 'ON_SITE' });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res)).toEqual(['Remote']);
+    });
+
+    // An unset preference is not a preference for nothing: the candidate simply
+    // did not say, so the deck stays wide rather than emptying itself.
+    it('narrows nothing on a preference the candidate left unset', async () => {
+      await seedProfile({ contractTypes: [] });
+      await seedOffer({ title: 'Alternance', contractType: 'ALTERNANCE' });
+      await seedOffer({ title: 'CDI', contractType: 'CDI' });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res).sort()).toEqual(['Alternance', 'CDI']);
+    });
+
+    // Signup writes the user, the wizard writes the profile: between the two,
+    // there is nothing to narrow the deck with.
+    it('serves the whole deck to a candidate who has no profile yet', async () => {
+      await seedOffer({ title: 'Alternance', contractType: 'ALTERNANCE' });
+      await seedOffer({ title: 'CDI', contractType: 'CDI' });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res).sort()).toEqual(['Alternance', 'CDI']);
+    });
+
+    // An offer that never said is not an offer that says no: dropping it would
+    // hide posts from every candidate who did fill the preference in.
+    it('keeps an offer whose own field is unset', async () => {
+      await seedProfile({ contractTypes: ['CDI'] });
+      await seedOffer({ title: 'Non précisé', contractType: null });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res)).toEqual(['Non précisé']);
+    });
+  });
+
   describe('payload', () => {
     it('exposes the showcase fields and nothing else', async () => {
       const offer = await seedOffer();
@@ -228,6 +316,30 @@ describe('Offer feed (e2e)', () => {
         company: { id: company.id, name: 'Acme' },
         tags: ['React'],
       });
+    });
+
+    /**
+     * `offer_tag` carries the skills AND the benefits of an offer, told apart
+     * by the category of the tag. `tags` advertises the skills alone, so the
+     * read has to filter on the category rather than assume the pivot only
+     * ever holds one kind — which stopped being true when the benefits moved
+     * from the company onto the offer.
+     */
+    it('advertises the skills alone, never the benefits', async () => {
+      const offer = await seedOffer();
+      const link = async (label: string, category: 'skill' | 'benefit') => {
+        const tag = await prisma.tag.create({ data: { label, category } });
+        await prisma.offerTag.create({
+          data: { offerId: offer.id, tagId: tag.id },
+        });
+      };
+      await link('React', 'skill');
+      await link('Mutuelle', 'benefit');
+
+      const res = await getFeed().expect(200);
+      const [item] = feedOf(res);
+
+      expect(item.tags).toEqual(['React']);
     });
 
     it('leaks no account data, internal key or geolocation', async () => {
@@ -300,68 +412,24 @@ describe('Offer feed (e2e)', () => {
     });
   });
 
-  describe('filters', () => {
-    it('filters on the contract type', async () => {
-      const cdi = await seedOffer({ contractType: 'CDI' });
-      await seedOffer({ contractType: 'FREELANCE' });
+  /**
+   * The deck no longer takes filters. The two axes it used to accept — contract
+   * type and remote policy — are read from the candidate's profile instead
+   * (`shaped by the candidate profile` above), and keeping the query parameters
+   * would advertise a second way to say the same thing, with a different
+   * meaning: a query filter drops the offers whose column is null where a
+   * preference keeps them.
+   */
+  describe('the retired query filters', () => {
+    it.each([
+      'contractType=CDI',
+      'experienceLevel=JUNIOR',
+      'remotePolicy=HYBRID',
+      'city=Lyon',
+    ])('refuses %s as an unknown parameter (400)', async (query) => {
+      await seedOffer();
 
-      const res = await getFeed('?contractType=CDI').expect(200);
-
-      expect(idsOf(res)).toEqual([cdi.id]);
-    });
-
-    it('filters on the minimum experience level', async () => {
-      const senior = await seedOffer({ minExperienceLevel: 'SENIOR' });
-      await seedOffer({ minExperienceLevel: 'JUNIOR' });
-
-      const res = await getFeed('?experienceLevel=SENIOR').expect(200);
-
-      expect(idsOf(res)).toEqual([senior.id]);
-    });
-
-    it('filters on the remote policy', async () => {
-      const remote = await seedOffer({ remotePolicy: 'FULL_REMOTE' });
-      await seedOffer({ remotePolicy: 'ON_SITE' });
-
-      const res = await getFeed('?remotePolicy=FULL_REMOTE').expect(200);
-
-      expect(idsOf(res)).toEqual([remote.id]);
-    });
-
-    it('filters on the city', async () => {
-      const lyon = await seedOffer({ city: 'Lyon' });
-      await seedOffer({ city: 'Marseille' });
-
-      const res = await getFeed('?city=Lyon').expect(200);
-
-      expect(idsOf(res)).toEqual([lyon.id]);
-    });
-
-    it('matches the city whatever the case', async () => {
-      const lyon = await seedOffer({ city: 'Lyon' });
-      await seedOffer({ city: 'Marseille' });
-
-      const res = await getFeed('?city=lYoN').expect(200);
-
-      expect(idsOf(res)).toEqual([lyon.id]);
-    });
-
-    it('combines two filters', async () => {
-      const wanted = await seedOffer({
-        contractType: 'CDI',
-        remotePolicy: 'FULL_REMOTE',
-      });
-      await seedOffer({ contractType: 'CDI', remotePolicy: 'ON_SITE' });
-      await seedOffer({
-        contractType: 'FREELANCE',
-        remotePolicy: 'FULL_REMOTE',
-      });
-
-      const res = await getFeed(
-        '?contractType=CDI&remotePolicy=FULL_REMOTE',
-      ).expect(200);
-
-      expect(idsOf(res)).toEqual([wanted.id]);
+      await getFeed(`?${query}`).expect(400);
     });
   });
 

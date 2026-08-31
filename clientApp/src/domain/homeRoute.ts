@@ -23,7 +23,9 @@ export function homePathFor(user: AuthenticatedUser | null): string {
   }
 
   if (isRecruiter(user.userType)) {
-    return user.hasProfile ? '/recruteur/candidats' : '/recruteur/onboarding';
+    // Their offers, not a deck of candidates: a recruiter publishes a post and
+    // reads who applied to it, on the post itself.
+    return user.hasProfile ? '/recruteur/offres' : '/recruteur/onboarding';
   }
 
   /*
@@ -31,8 +33,12 @@ export function homePathFor(user: AuthenticatedUser | null): string {
    * and owns neither profile table. Sending it to an onboarding it can never
    * complete would bounce it forever against that wizard's own role guard, so
    * it lands on the one screen open to every session instead.
+   *
+   * `/profil` and not `/matches`: the match list is a candidate route now, and
+   * its guard sends a refused visitor back to `homePathFor` — which would send
+   * an admin straight back to it, forever.
    */
-  return '/matches';
+  return '/profil';
 }
 
 /**

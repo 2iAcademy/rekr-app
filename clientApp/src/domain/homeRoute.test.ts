@@ -13,12 +13,12 @@ const userOf = (overrides: Partial<AuthenticatedUser>): AuthenticatedUser => ({
 });
 
 describe('homePathFor', () => {
-  it('envoie un candidat instruit vers son feed', () => {
+  it('envoie un candidat instruit vers ses offres', () => {
     expect(homePathFor(userOf({ userType: 'candidate' }))).toBe('/candidat/offres');
   });
 
-  it('envoie un recruteur instruit vers son feed', () => {
-    expect(homePathFor(userOf({ userType: 'recruiter' }))).toBe('/recruteur/candidats');
+  it('envoie un recruteur instruit vers ses offres', () => {
+    expect(homePathFor(userOf({ userType: 'recruiter' }))).toBe('/recruteur/offres');
   });
 
   /*
@@ -52,7 +52,7 @@ describe('homePathFor', () => {
    * entre la garde de rôle du wizard et cette destination.
    */
   it('envoie un type de compte sans parcours dédié vers les matches', () => {
-    expect(homePathFor(userOf({ userType: 'admin', hasProfile: false }))).toBe('/matches');
+    expect(homePathFor(userOf({ userType: 'admin', hasProfile: false }))).toBe('/profil');
   });
 });
 

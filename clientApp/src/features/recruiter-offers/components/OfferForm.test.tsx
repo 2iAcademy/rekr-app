@@ -23,6 +23,7 @@ const filled: OfferFormValue = {
   city: 'Lyon',
   postalCode: '69003',
   skills: ['React'],
+  benefits: ['Mutuelle'],
   contractType: 'CDI',
   minExperienceLevel: 'CONFIRME',
   remotePolicy: 'HYBRID',
@@ -80,6 +81,21 @@ describe('OfferForm', () => {
     expect(screen.getByRole('radio', { name: 'CDI' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Confirmé' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Hybride' })).toBeChecked();
+  });
+
+  it('affiche les avantages déjà retenus', () => {
+    renderForm();
+
+    expect(screen.getByRole('button', { name: 'Retirer Mutuelle' })).toBeInTheDocument();
+  });
+
+  it('remonte un avantage ajouté', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderForm();
+
+    await user.type(screen.getByLabelText('Avantages (optionnel)'), 'RTT{Enter}');
+
+    expect(onChange).toHaveBeenCalledWith({ benefits: ['Mutuelle', 'RTT'] });
   });
 
   it('affiche les compétences déjà retenues', () => {

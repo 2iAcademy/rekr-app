@@ -41,6 +41,7 @@ const offer = (over: Partial<OfferListItemDto> = {}): OfferListItemDto => ({
   salaryMax: 55000,
   createdAt: '2026-02-01T00:00:00.000Z',
   updatedAt: '2026-02-01T00:00:00.000Z',
+  applicantCount: 0,
   ...over,
 });
 

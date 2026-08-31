@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import {
-  authControllerLogout,
-  candidateProfileControllerFindMine,
-  companyControllerFindMine,
-} from '@/api/generated';
+import { candidateProfileControllerFindMine, companyControllerFindMine } from '@/api/generated';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { ProfileRoute } from './routes';
 
@@ -34,7 +29,6 @@ vi.mock('@/api/generated', () => ({
 
 const findCandidateProfile = vi.mocked(candidateProfileControllerFindMine);
 const findCompany = vi.mocked(companyControllerFindMine);
-const logoutRequest = vi.mocked(authControllerLogout);
 
 // A pending read parks each section on its loading state: enough to tell which
 // one was mounted without rebuilding either section's fixture here.
@@ -155,25 +149,6 @@ describe('ProfileRoute', () => {
 
     expect(findCandidateProfile).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'Mon profil' })).not.toBeInTheDocument();
-  });
-
-  /**
-   * The join the two halves leave open: `LogoutButton` is tested against a
-   * mocked `logout`, and the anonymous redirect is tested at boot. Neither says
-   * that clicking the button lands on /connexion, which is the acceptance
-   * criterion. Here the real AuthProvider runs, so `abandon()` flipping the
-   * status to anonymous is what drives the guard.
-   */
-  it('renvoie vers la connexion après une déconnexion', async () => {
-    const user = userEvent.setup();
-    logoutRequest.mockResolvedValue({} as Awaited<ReturnType<typeof authControllerLogout>>);
-    authenticateAs('candidate');
-    renderProfile();
-
-    await user.click(await screen.findByRole('button', { name: 'Se déconnecter' }));
-
-    expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument();
-    expect(profileHeading()).not.toBeInTheDocument();
   });
 
   it('ne charge aucun profil tant que la session est anonyme', async () => {

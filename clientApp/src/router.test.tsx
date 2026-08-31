@@ -64,10 +64,10 @@ const shellChildren = shellRoutes.flatMap((route) => route.children ?? []);
 // completeness case below turns a child missing from this table into a failure,
 // so declaring a route is not enough to slip past the guard-rail.
 const ALLOWED_USER_TYPES: Record<string, readonly UserType[]> = {
-  '/matches': USER_TYPES,
+  '/matches': ['candidate'],
   '/profil': USER_TYPES,
-  '/recruteur/candidats': ['recruiter'],
   '/candidat/offres': ['candidate'],
+  '/recruteur/offres/:id/candidats': ['recruiter'],
   '/recruteur/offres': ['recruiter'],
   '/recruteur/offres/nouvelle': ['recruiter'],
   '/recruteur/offres/:id/edition': ['recruiter'],
@@ -120,8 +120,8 @@ describe('table de routage', () => {
       '/candidat/offres',
       '/matches',
       '/profil',
-      '/recruteur/candidats',
       '/recruteur/offres',
+      '/recruteur/offres/:id/candidats',
       '/recruteur/offres/:id/edition',
       '/recruteur/offres/nouvelle',
     ]);
@@ -145,6 +145,22 @@ describe('table de routage', () => {
 
   it('déclare une seule route attrape-tout', () => {
     expect(declaredPaths(entries).filter((path) => path === '*')).toHaveLength(1);
+  });
+
+  /**
+   * Le deck de swipe recruteur a été retiré : un recruteur travaille depuis ses
+   * annonces. L'ancienne adresse ne doit plus être servie, et c'est le
+   * catch-all qui la reprend — pas une route laissée en place « au cas où ».
+   */
+  it('ne sert plus le deck de swipe recruteur', async () => {
+    expect(insideShell).not.toContain('/recruteur/candidats');
+    authenticateAs('recruiter');
+
+    const router = renderAt('/recruteur/candidats');
+
+    // Reprise par le catch-all, qui renvoie chaque session chez elle : pour un
+    // recruteur, ses annonces.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/recruteur/offres'));
   });
 });
 
@@ -207,7 +223,7 @@ describe('protection des écrans du shell', () => {
 
       await waitFor(() => {
         expect(router.state.location.pathname).toBe(
-          userType === 'recruiter' ? '/recruteur/candidats' : '/candidat/offres',
+          userType === 'recruiter' ? '/recruteur/offres' : '/candidat/offres',
         );
       });
     },
@@ -237,7 +253,7 @@ describe('écrans publics face à une session établie', () => {
     expect(publicPaths.every((path) => outsideShell.includes(path))).toBe(true);
   });
 
-  it.each(publicPaths)('renvoie un candidat instruit de %s vers son feed', async (path) => {
+  it.each(publicPaths)('renvoie un candidat instruit de %s vers ses offres', async (path) => {
     authenticateAs('candidate');
     const router = renderAt(path);
 
@@ -246,12 +262,12 @@ describe('écrans publics face à une session établie', () => {
     });
   });
 
-  it.each(publicPaths)('renvoie un recruteur instruit de %s vers son feed', async (path) => {
+  it.each(publicPaths)('renvoie un recruteur instruit de %s vers ses offres', async (path) => {
     authenticateAs('recruiter');
     const router = renderAt(path);
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/recruteur/candidats');
+      expect(router.state.location.pathname).toBe('/recruteur/offres');
     });
   });
 
@@ -320,7 +336,7 @@ describe('parcours d’onboarding inachevé', () => {
 
   it('renvoie un recruteur sans profil vers son wizard', async () => {
     authenticateAs('recruiter', false);
-    const router = renderAt('/recruteur/candidats');
+    const router = renderAt('/recruteur/offres');
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/recruteur/onboarding');
@@ -365,7 +381,7 @@ describe('route inconnue', () => {
     sessionStorage.clear();
   });
 
-  it('renvoie un candidat instruit vers son feed', async () => {
+  it('renvoie un candidat instruit vers ses offres', async () => {
     authenticateAs('candidate');
     const router = renderAt('/une-page-qui-n-existe-pas');
 
@@ -374,12 +390,12 @@ describe('route inconnue', () => {
     });
   });
 
-  it('renvoie un recruteur instruit vers son feed', async () => {
+  it('renvoie un recruteur instruit vers ses offres', async () => {
     authenticateAs('recruiter');
     const router = renderAt('/une-page-qui-n-existe-pas');
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/recruteur/candidats');
+      expect(router.state.location.pathname).toBe('/recruteur/offres');
     });
   });
 
