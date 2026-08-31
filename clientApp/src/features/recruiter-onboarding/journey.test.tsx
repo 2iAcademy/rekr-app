@@ -147,7 +147,9 @@ describe('parcours recruteur de bout en bout', () => {
      * On the feed, not on the splash: completing the wizard is what makes the
      * account whole, so it is where the journey lands.
      */
-    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Vos offres' }),
+    ).toBeInTheDocument();
 
     const company = callTo('/api/companies');
     expect(company.method).toBe('POST');
@@ -215,9 +217,17 @@ describe('parcours recruteur de bout en bout', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Publier mon offre' }));
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Candidats' })).toBeInTheDocument();
-    const offerCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/offers'));
-    expect(offerCalls).toHaveLength(2);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Vos offres' }),
+    ).toBeInTheDocument();
+    // Filtré sur la méthode, pas seulement sur l'URL : le recruteur atterrit
+    // désormais sur ses annonces, dont le chargement appelle la même route en
+    // lecture.
+    const offerWrites = fetchMock.mock.calls.filter(
+      ([url, init]) =>
+        String(url).includes('/api/offers') && (init as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(offerWrites).toHaveLength(2);
 
     const update = callTo('/api/companies/mine');
     expect(update.method).toBe('PATCH');

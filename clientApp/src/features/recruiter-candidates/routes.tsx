@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router';
-import { isRecruiter } from '@/domain/userType';
-import { useAuth } from '@/features/auth/useAuth';
+import { RouteGuard } from '@/features/auth/RouteGuard';
 import { OfferApplicantsPage } from './pages/OfferApplicantsPage';
 
 // The profile is a state of the list, not a route: the list lives in the page,
@@ -22,8 +21,20 @@ const parseId = (raw: string | null): number | null => {
   return id > 0 ? id : null;
 };
 
+/**
+ * Recruiter-only, through the shared guard: the access rule lives in one place
+ * for every feature route, and this screen adds only the reading of its own two
+ * URL parts on top of it.
+ */
 export function OfferApplicantsRoute() {
-  const { status, user } = useAuth();
+  return (
+    <RouteGuard allowedUserTypes={['recruiter']} forbiddenRedirectTo="/">
+      <OfferApplicants />
+    </RouteGuard>
+  );
+}
+
+function OfferApplicants() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -39,14 +50,12 @@ export function OfferApplicantsRoute() {
    */
   const canonicalProfile = openApplicantId === null ? null : String(openApplicantId);
   const isProfileCanonical = rawProfile === canonicalProfile;
-  const recruiter = status === 'authenticated' && isRecruiter(user?.userType);
 
-  // Declared above the redirects below so the hook is always called, and
-  // guarded inside rather than around: rewriting the search params of a visitor
-  // who is being sent elsewhere would only add a navigation before the
-  // redirect.
+  // Declared above the redirect below so the hook is always called, and guarded
+  // inside rather than around: rewriting the search params of a visitor who is
+  // being sent elsewhere would only add a navigation before the redirect.
   useEffect(() => {
-    if (!recruiter || isProfileCanonical) {
+    if (isProfileCanonical) {
       return;
     }
 
@@ -66,19 +75,7 @@ export function OfferApplicantsRoute() {
       // should have to walk back through.
       { replace: true },
     );
-  }, [canonicalProfile, isProfileCanonical, recruiter, setSearchParams]);
-
-  if (status === 'loading') {
-    return null;
-  }
-
-  if (status !== 'authenticated') {
-    return <Navigate to="/connexion" replace />;
-  }
-
-  if (!isRecruiter(user?.userType)) {
-    return <Navigate to="/" replace />;
-  }
+  }, [canonicalProfile, isProfileCanonical, setSearchParams]);
 
   // An unreadable offer id in the path is not a screen to word: there is no
   // offer to show, so the recruiter goes back to the list they came from.
