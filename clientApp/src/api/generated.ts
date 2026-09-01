@@ -272,35 +272,19 @@ export const TagCategory = {
 } as const;
 
 export interface OfferDetailTagDto {
-  id: number;
   /** @maxLength 100 */
   label: string;
   category: TagCategory;
 }
 
-export interface OfferDetailTagLinkDto {
-  offerId: number;
-  tagId: number;
-  tag: OfferDetailTagDto;
-}
-
 export interface OfferDetailDto {
   id: number;
-  companyId: number;
-  /** @nullable */
-  createdById: number | null;
   /** @maxLength 255 */
   title: string;
   /** @nullable */
   description: string | null;
   /** @nullable */
   city: string | null;
-  /** @nullable */
-  postalCode: string | null;
-  /** @nullable */
-  latitude: string | null;
-  /** @nullable */
-  longitude: string | null;
   contractType: ContractType | null;
   minExperienceLevel: ExperienceLevel | null;
   remotePolicy: RemotePolicy | null;
@@ -308,11 +292,12 @@ export interface OfferDetailDto {
   salaryMin: number | null;
   /** @nullable */
   salaryMax: number | null;
-  status: OfferStatus;
   createdAt: string;
-  updatedAt: string;
   company: OfferDetailCompanyDto;
-  offerTags: OfferDetailTagLinkDto[];
+  tags: OfferDetailTagDto[];
+  /** @nullable */
+  postalCode?: string | null;
+  status?: OfferStatus;
 }
 
 export interface CreateOfferDto {

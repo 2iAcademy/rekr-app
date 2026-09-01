@@ -9,6 +9,7 @@ import { OfferFeedItemDto } from './dto/offer-feed-item.dto';
 import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
 import { OfferApplicantDto } from './dto/offer-applicant.dto';
 import { OfferApplicantsQueryDto } from './dto/offer-applicants-query.dto';
+import { OfferDetailDto } from './dto/offer-detail.dto';
 import { OfferListItemDto } from './dto/offer-list-item.dto';
 import { OfferListQueryDto } from './dto/offer-list-query.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
@@ -75,6 +76,53 @@ const SHOWCASE_OFFER_COLUMNS = {
   },
 } as const;
 
+/**
+ * The showcase projection of a single offer: the same columns the feed serves,
+ * plus the ones the detail screen has room for. Declared as a `select` and not
+ * an `include` so that a column added to `offer` tomorrow stays off the wire
+ * until someone puts it here.
+ */
+const DETAIL_OFFER_COLUMNS = {
+  id: true,
+  title: true,
+  description: true,
+  city: true,
+  contractType: true,
+  minExperienceLevel: true,
+  remotePolicy: true,
+  salaryMin: true,
+  salaryMax: true,
+  createdAt: true,
+  company: {
+    select: {
+      id: true,
+      name: true,
+      logo: true,
+      size: true,
+      description: true,
+      city: true,
+    },
+  },
+  // Every category, unlike the feed: the detail screen tells the skills from
+  // the perks itself, and needs both.
+  offerTags: {
+    orderBy: { tag: { label: 'asc' } },
+    select: { tag: { select: { label: true, category: true } } },
+  },
+} as const;
+
+/**
+ * What the company carrying the offer reads on top: the postcode places the
+ * office and the status says where the offer stands in its life cycle, both
+ * read by the management screen and by no one else. The coordinates are read
+ * by no screen at all, so they are in neither projection.
+ */
+const OWNER_DETAIL_OFFER_COLUMNS = {
+  ...DETAIL_OFFER_COLUMNS,
+  postalCode: true,
+  status: true,
+} as const;
+
 /** The columns of an applicant a recruiter may read, and no others. */
 const APPLICANT_COLUMNS = {
   userId: true,
@@ -100,6 +148,23 @@ const toShowcaseOffer = <T extends ShowcaseOfferRow>({
 }: T): Omit<T, 'offerTags'> & { tags: string[] } => ({
   ...offer,
   tags: offerTags.map((link) => link.tag.label),
+});
+
+type DetailTag = { label: string; category: TagCategory };
+
+type DetailOfferRow = { offerTags: { tag: DetailTag }[] };
+
+/**
+ * Flattens the tag pivot the detail screen reads. Unlike the showcase one it
+ * keeps the category: the recruiter form splits the labels on it, and the
+ * candidate screen tells a skill from a perk the same way.
+ */
+const toDetailOffer = <T extends DetailOfferRow>({
+  offerTags,
+  ...offer
+}: T): Omit<T, 'offerTags'> & { tags: DetailTag[] } => ({
+  ...offer,
+  tags: offerTags.map((link) => link.tag),
 });
 
 @Injectable()
@@ -450,7 +515,7 @@ export class OfferService {
     }
   }
 
-  async findOneById(user: AuthUser, id: number) {
+  async findOneById(user: AuthUser, id: number): Promise<OfferDetailDto> {
     const profile =
       user.userType === 'recruiter'
         ? await this.prisma.recruiterProfile.findUnique({
@@ -458,44 +523,44 @@ export class OfferService {
           })
         : null;
 
-    const offer = await this.prisma.offer.findFirst({
-      where: {
-        id,
-        OR: [
-          { status: 'open' },
-          ...(profile ? [{ companyId: profile.companyId }] : []),
-        ],
-      },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-            logo: true,
-            size: true,
-            description: true,
-            city: true,
-          },
-        },
-        offerTags: {
-          include: {
-            tag: {
-              select: {
-                id: true,
-                label: true,
-                category: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    // An offer is readable while it is published; a recruiter reads every offer
+    // of their own company, whatever its status.
+    const where = {
+      id,
+      OR: [
+        { status: 'open' as const },
+        ...(profile ? [{ companyId: profile.companyId }] : []),
+      ],
+    };
+
+    // Which projection applies depends on the company carrying the offer, so
+    // ownership is settled on a read of its own. Claiming the owner columns
+    // first and dropping them afterwards would have taken them out of the
+    // database, and the next spread would put them back on the wire.
+    const owned =
+      profile !== null &&
+      (
+        await this.prisma.offer.findFirst({
+          where,
+          select: { companyId: true },
+        })
+      )?.companyId === profile.companyId;
+
+    const offer = owned
+      ? await this.prisma.offer.findFirst({
+          where,
+          select: OWNER_DETAIL_OFFER_COLUMNS,
+        })
+      : await this.prisma.offer.findFirst({
+          where,
+          select: DETAIL_OFFER_COLUMNS,
+        });
 
     if (!offer) {
       throw new NotFoundException('Offer not found');
     }
 
-    return offer;
+    return toDetailOffer(offer);
   }
 
   /**

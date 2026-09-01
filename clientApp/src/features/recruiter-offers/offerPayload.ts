@@ -96,19 +96,32 @@ export const buildOfferPayload = (form: OfferFormValue, intent: OfferWriteIntent
   });
 
 const labelsOfCategory = (offer: OfferDetailDto, category: 'skill' | 'benefit'): string[] =>
-  offer.offerTags.filter((link) => link.tag.category === category).map((link) => link.tag.label);
+  offer.tags.filter((tag) => tag.category === category).map((tag) => tag.label);
 
 /**
- * The detail endpoint is shared with the candidate screen, so it answers with
- * the joined row: both lists arrive as tag links on the same pivot, told apart
- * by their category. Anything in a third category is left out — it is not the
- * recruiter's to edit here.
+ * The detail endpoint is shared with the candidate screen, and it withholds the
+ * postcode and the status from anyone but the company carrying the offer. This
+ * form needs both, so their absence is not a value to fall back on: it means
+ * the API did not recognise the caller as the owner, and filling the gap with a
+ * default would silently rewrite where the offer stands on the next save.
+ */
+const ownerFieldsOf = (offer: OfferDetailDto): { postalCode: string; status: OfferStatus } => {
+  if (offer.status === undefined) {
+    throw new Error("L'offre a été servie sans ses champs de gestion.");
+  }
+
+  return { postalCode: offer.postalCode ?? '', status: offer.status };
+};
+
+/**
+ * Both lists arrive as tags on the same offer, told apart by their category.
+ * Anything in a third category is left out — it is not the recruiter's to edit
+ * here.
  */
 export const offerFormFromDetail = (offer: OfferDetailDto): OfferFormValue => ({
   title: offer.title,
   description: offer.description ?? '',
   city: offer.city ?? '',
-  postalCode: offer.postalCode ?? '',
   skills: labelsOfCategory(offer, 'skill'),
   benefits: labelsOfCategory(offer, 'benefit'),
   contractType: offer.contractType ?? '',
@@ -116,5 +129,5 @@ export const offerFormFromDetail = (offer: OfferDetailDto): OfferFormValue => ({
   remotePolicy: offer.remotePolicy ?? '',
   salaryMin: offer.salaryMin === null ? '' : String(offer.salaryMin),
   salaryMax: offer.salaryMax === null ? '' : String(offer.salaryMax),
-  status: offer.status,
+  ...ownerFieldsOf(offer),
 });

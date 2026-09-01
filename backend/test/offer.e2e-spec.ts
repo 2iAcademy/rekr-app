@@ -5,7 +5,14 @@ import request from 'supertest';
 import { httpRequest } from './http-client';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import type { OfferStatus } from '../generated/prisma/client';
+import type {
+  CompanySize,
+  ContractType,
+  ExperienceLevel,
+  OfferStatus,
+  RemotePolicy,
+  TagCategory,
+} from '../generated/prisma/client';
 import { configureApp } from '../src/setup-app';
 import { bearerFor } from './auth-header';
 import { stubCityReference } from './city-reference';
@@ -446,17 +453,10 @@ describe('Offer (e2e)', () => {
         .expect(200);
 
       const body = res.body as {
-        offerTags: { tag: { label: string; category: string } }[];
+        tags: { label: string; category: string }[];
       };
-      expect(body.offerTags).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            tag: expect.objectContaining({
-              label: 'Mutuelle',
-              category: 'benefit',
-            }) as object,
-          }),
-        ]),
+      expect(body.tags).toEqual(
+        expect.arrayContaining([{ label: 'Mutuelle', category: 'benefit' }]),
       );
     });
 
@@ -1172,10 +1172,370 @@ describe('Offer (e2e)', () => {
     });
   });
 
-  describe('GET /offers/:id seen by a candidate', () => {
-    // #135 will build the candidate feed on top of this endpoint. Until then
-    // the invariant it relies on is pinned here: a candidate reaches an offer
-    // only while it is `open`, whatever the reason it left that state.
+  describe('GET /offers/:id', () => {
+    type OfferDetailBody = {
+      id: number;
+      title: string;
+      description: string | null;
+      city: string | null;
+      contractType: ContractType | null;
+      minExperienceLevel: ExperienceLevel | null;
+      remotePolicy: RemotePolicy | null;
+      salaryMin: number | null;
+      salaryMax: number | null;
+      createdAt: string;
+      company: {
+        id: number;
+        name: string;
+        logo: string | null;
+        size: CompanySize | null;
+        description: string | null;
+        city: string | null;
+      };
+      tags: { label: string; category: TagCategory }[];
+    };
+
+    type OfferOwnerDetailBody = OfferDetailBody & {
+      postalCode: string | null;
+      status: OfferStatus;
+    };
+
+    const DETAIL_KEYS = [
+      'city',
+      'company',
+      'contractType',
+      'createdAt',
+      'description',
+      'id',
+      'minExperienceLevel',
+      'remotePolicy',
+      'salaryMax',
+      'salaryMin',
+      'tags',
+      'title',
+    ];
+
+    const OWNER_KEYS = [
+      'city',
+      'company',
+      'contractType',
+      'createdAt',
+      'description',
+      'id',
+      'minExperienceLevel',
+      'postalCode',
+      'remotePolicy',
+      'salaryMax',
+      'salaryMin',
+      'status',
+      'tags',
+      'title',
+    ];
+
+    const COMPANY_KEYS = ['city', 'description', 'id', 'logo', 'name', 'size'];
+
+    const TAG_KEYS = ['category', 'label'];
+
+    // Probe values, not fixtures: they are picked so that finding them anywhere
+    // in the serialised answer can only mean the column itself leaked. None of
+    // them is a fragment of an id, of a salary, of the pinned creation date or
+    // of the city name seeded alongside.
+    const PROBE_POSTAL_CODE = '97531';
+    const PROBE_LATITUDE = '12.3456789';
+    const PROBE_LONGITUDE = '98.7654321';
+    const PINNED_CREATED_AT = new Date('2026-03-04T05:06:07.000Z');
+
+    type DetailOfferOverrides = {
+      status?: OfferStatus;
+      title?: string;
+    };
+
+    const seedShowcaseCompany = async (name: string) => {
+      const seeded = await seedRecruiterWithCompany(name);
+      const company = await prisma.company.update({
+        where: { id: seeded.company.id },
+        data: {
+          logo: 'companies/1/logo/acme.webp',
+          size: 'PME',
+          description: 'Une belle boîte.',
+          city: 'Lyon',
+        },
+      });
+
+      return { user: seeded.user, company };
+    };
+
+    const seedDetailOffer = (
+      companyId: number,
+      createdById: number,
+      overrides: DetailOfferOverrides = {},
+    ) =>
+      prisma.offer.create({
+        data: {
+          title: 'Développeur Front',
+          description: 'Belle mission.',
+          status: 'open',
+          city: 'Lyon',
+          postalCode: PROBE_POSTAL_CODE,
+          latitude: PROBE_LATITUDE,
+          longitude: PROBE_LONGITUDE,
+          contractType: 'CDI',
+          minExperienceLevel: 'CONFIRME',
+          remotePolicy: 'HYBRID',
+          salaryMin: 45000,
+          salaryMax: 60000,
+          createdAt: PINNED_CREATED_AT,
+          companyId,
+          createdById,
+          ...overrides,
+        },
+      });
+
+    const attachSkill = async (offerId: number, label: string) => {
+      const tag = await prisma.tag.create({
+        data: { label, category: 'skill' },
+      });
+      await prisma.offerTag.create({ data: { offerId, tagId: tag.id } });
+    };
+
+    const getDetail = (
+      offerId: number,
+      userId: number,
+      userType: 'candidate' | 'recruiter',
+    ) =>
+      httpRequest(app)
+        .get(`/api/offers/${offerId}`)
+        .set('Authorization', bearerFor(app, userId, userType));
+
+    it('serves a candidate the showcase fields and nothing else', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const candidate = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+      await attachSkill(offer.id, 'React');
+
+      const res = await getDetail(offer.id, candidate.id, 'candidate').expect(
+        200,
+      );
+      const body = res.body as OfferDetailBody;
+
+      expect(Object.keys(body).sort()).toEqual(DETAIL_KEYS);
+      expect(Object.keys(body.company).sort()).toEqual(COMPANY_KEYS);
+      expect(Object.keys(body.tags[0]).sort()).toEqual(TAG_KEYS);
+      expect(body).toMatchObject({
+        id: offer.id,
+        title: 'Développeur Front',
+        description: 'Belle mission.',
+        city: 'Lyon',
+        contractType: 'CDI',
+        minExperienceLevel: 'CONFIRME',
+        remotePolicy: 'HYBRID',
+        salaryMin: 45000,
+        salaryMax: 60000,
+        company: { id: company.id, name: 'Acme', size: 'PME', city: 'Lyon' },
+        tags: [{ label: 'React', category: 'skill' }],
+      });
+    });
+
+    // The pivot row is an internal join: `offerId` and `tagId` say nothing to
+    // the screen and hand an enumerator two more id spaces to walk.
+    it('flattens the tag pivot, exposing no join key', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const candidate = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+      await attachSkill(offer.id, 'React');
+
+      const res = await getDetail(offer.id, candidate.id, 'candidate').expect(
+        200,
+      );
+      const body = res.body as OfferDetailBody;
+
+      expect(body).not.toHaveProperty('offerTags');
+      expect(body.tags[0]).not.toHaveProperty('offerId');
+      expect(body.tags[0]).not.toHaveProperty('tagId');
+      expect(body.tags[0]).not.toHaveProperty('id');
+    });
+
+    // Attached in reverse: an order that only holds because the read asks for
+    // it, and not because the pivot happened to be written that way.
+    it('serves the tags in alphabetical order, whatever the order they were attached in', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const candidate = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+      await attachSkill(offer.id, 'Vue');
+      await attachSkill(offer.id, 'Angular');
+
+      const res = await getDetail(offer.id, candidate.id, 'candidate').expect(
+        200,
+      );
+      const body = res.body as OfferDetailBody;
+
+      expect(body.tags.map((tag) => tag.label)).toEqual(['Angular', 'Vue']);
+    });
+
+    it('leaks no account data, internal key or geolocation to a candidate', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const candidate = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+
+      const res = await getDetail(offer.id, candidate.id, 'candidate').expect(
+        200,
+      );
+      const body = res.body as OfferDetailBody;
+
+      expect(body).not.toHaveProperty('createdById');
+      expect(body).not.toHaveProperty('companyId');
+      expect(body).not.toHaveProperty('postalCode');
+      expect(body).not.toHaveProperty('latitude');
+      expect(body).not.toHaveProperty('longitude');
+      expect(body).not.toHaveProperty('status');
+      expect(body).not.toHaveProperty('updatedAt');
+    });
+
+    // Absent keys are not enough: a value moved under another name, nested in
+    // `company`, or serialised inside a string would pass the checks above and
+    // still be on the wire. The probe values are searched in the whole payload.
+    it('keeps the postcode, the geolocation and the recruiter email off the wire for a candidate', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const candidate = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+
+      const res = await getDetail(offer.id, candidate.id, 'candidate').expect(
+        200,
+      );
+      const payload = JSON.stringify(res.body);
+
+      expect(payload).not.toContain(PROBE_POSTAL_CODE);
+      expect(payload).not.toContain(PROBE_LATITUDE);
+      expect(payload).not.toContain(PROBE_LONGITUDE);
+      expect(payload).not.toContain(user.email);
+    });
+
+    it('serves the owning recruiter the postcode and the status, and nothing more', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const offer = await seedDetailOffer(company.id, user.id, {
+        status: 'draft',
+      });
+      await attachSkill(offer.id, 'React');
+
+      const res = await getDetail(offer.id, user.id, 'recruiter').expect(200);
+      const body = res.body as OfferOwnerDetailBody;
+
+      expect(Object.keys(body).sort()).toEqual(OWNER_KEYS);
+      expect(Object.keys(body.company).sort()).toEqual(COMPANY_KEYS);
+      expect(Object.keys(body.tags[0]).sort()).toEqual(TAG_KEYS);
+      expect(body).toMatchObject({
+        id: offer.id,
+        postalCode: PROBE_POSTAL_CODE,
+        status: 'draft',
+      });
+    });
+
+    // The management screen reads the postcode and the status; it never reads
+    // the coordinates, so ownership is no reason to ship them either.
+    it('keeps the geolocation off the wire for the owning recruiter', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const offer = await seedDetailOffer(company.id, user.id);
+
+      const res = await getDetail(offer.id, user.id, 'recruiter').expect(200);
+      const payload = JSON.stringify(res.body);
+
+      expect(payload).not.toContain(PROBE_LATITUDE);
+      expect(payload).not.toContain(PROBE_LONGITUDE);
+      expect(payload).not.toContain(user.email);
+    });
+
+    // Ownership is the company, never the author: a recruiter of another firm
+    // reads an open offer exactly as a candidate does.
+    it('serves a recruiter of another company the candidate shape of an open offer', async () => {
+      const owner = await seedShowcaseCompany('Owner Corp');
+      const intruder = await seedShowcaseCompany('Intruder Corp');
+      const offer = await seedDetailOffer(owner.company.id, owner.user.id);
+
+      const res = await getDetail(
+        offer.id,
+        intruder.user.id,
+        'recruiter',
+      ).expect(200);
+      const body = res.body as OfferDetailBody;
+
+      expect(Object.keys(body).sort()).toEqual(DETAIL_KEYS);
+      expect(body).not.toHaveProperty('postalCode');
+      expect(body).not.toHaveProperty('status');
+      expect(JSON.stringify(res.body)).not.toContain(PROBE_POSTAL_CODE);
+      expect(JSON.stringify(res.body)).not.toContain(PROBE_LATITUDE);
+      expect(JSON.stringify(res.body)).not.toContain(PROBE_LONGITUDE);
+    });
+
+    /**
+     * The one cell where the ownership read is skipped altogether: a recruiter
+     * attached to no company reads the showcase, like anyone else. Pinned here
+     * because nothing else would notice an `owned` that defaulted to true.
+     */
+    it('serves a recruiter without a company the candidate shape of an open offer', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const orphan = await createUser('recruiter');
+      const offer = await seedDetailOffer(company.id, user.id);
+      await attachSkill(offer.id, 'React');
+
+      const res = await getDetail(offer.id, orphan.id, 'recruiter').expect(200);
+      const body = res.body as OfferDetailBody;
+
+      expect(Object.keys(body).sort()).toEqual(DETAIL_KEYS);
+      expect(JSON.stringify(res.body)).not.toContain(PROBE_POSTAL_CODE);
+    });
+
+    it('hides a draft offer from a recruiter without a company behind a 404', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const orphan = await createUser('recruiter');
+      const offer = await seedDetailOffer(company.id, user.id, {
+        status: 'draft',
+      });
+
+      await getDetail(offer.id, orphan.id, 'recruiter').expect(404);
+    });
+
+    it('returns 404 when reading a missing offer', async () => {
+      const candidate = await createUser('candidate');
+
+      await getDetail(999999, candidate.id, 'candidate').expect(404);
+    });
+
+    // 404 and not 403 throughout: a 403 on an offer the caller may not read
+    // already confirms the id exists, which is the whole of what an enumeration
+    // needs. A missing offer and a forbidden one must answer the same.
+    it('hides a draft offer from a candidate behind a 404', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const candidate = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id, {
+        status: 'draft',
+      });
+
+      const res = await getDetail(offer.id, candidate.id, 'candidate');
+
+      expect(res.status).toBe(404);
+    });
+
+    it("hides another company's draft offer from a recruiter behind a 404", async () => {
+      const owner = await seedShowcaseCompany('Owner Corp');
+      const intruder = await seedShowcaseCompany('Intruder Corp');
+      const offer = await seedDetailOffer(owner.company.id, owner.user.id, {
+        status: 'draft',
+      });
+
+      const res = await getDetail(offer.id, intruder.user.id, 'recruiter');
+
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects an unauthenticated read with 401', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const offer = await seedDetailOffer(company.id, user.id);
+
+      await httpRequest(app).get(`/api/offers/${offer.id}`).expect(401);
+    });
+
+    // A candidate reaches an offer only while it is `open`, whatever the reason
+    // it left that state.
     it.each(['draft', 'paused', 'filled', 'closed'] as OfferStatus[])(
       'hides a %s offer from a candidate behind a 404',
       async (status) => {
@@ -1189,61 +1549,5 @@ describe('Offer (e2e)', () => {
           .expect(404);
       },
     );
-
-    it('shows an open offer to a candidate, with its company and its skills', async () => {
-      const { user, company } = await seedRecruiterWithCompany('Acme');
-      const created = await postOffer(user.id)
-        .send({
-          title: 'Dev',
-          city: 'Lyon',
-          postalCode: '69001',
-          status: 'open',
-          skills: ['React'],
-        })
-        .expect(201);
-      const candidate = await createUser('candidate');
-
-      const res = await httpRequest(app)
-        .get(`/api/offers/${offerIdOf(created)}`)
-        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
-        .expect(200);
-
-      expect(res.body).toMatchObject({
-        id: offerIdOf(created),
-        title: 'Dev',
-        status: 'open',
-        company: { id: company.id, name: 'Acme' },
-        offerTags: [{ tag: { label: 'React', category: 'skill' } }],
-      });
-    });
-
-    // `Decimal(10, 7)` crosses JSON as a string, and the detail page parses it
-    // as such. Pinned here because the DTO declares it that way.
-    it('serialises the coordinates of an offer as strings', async () => {
-      const { user } = await seedRecruiterWithCompany('Acme');
-      const created = await postOffer(user.id)
-        .send({
-          title: 'Dev',
-          city: 'Lyon',
-          postalCode: '69001',
-          status: 'open',
-        })
-        .expect(201);
-      const candidate = await createUser('candidate');
-
-      const res = await httpRequest(app)
-        .get(`/api/offers/${offerIdOf(created)}`)
-        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
-        .expect(200);
-
-      const { latitude, longitude } = res.body as {
-        latitude: unknown;
-        longitude: unknown;
-      };
-      expect(typeof latitude).toBe('string');
-      expect(typeof longitude).toBe('string');
-      expect(Number(latitude)).toBeCloseTo(45.758);
-      expect(Number(longitude)).toBeCloseTo(4.835);
-    });
   });
 });
