@@ -3,10 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
-import { resolveTagIds } from '../common/tags/tag-sync';
 import { PrismaService } from '../prisma/prisma.service';
+import { CompanyResponseDto } from './dto/company-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 
@@ -18,7 +17,7 @@ export class CompanyService {
   ) {}
 
   async create(userId: number, dto: CreateCompanyDto) {
-    const { firstName, lastName, jobTitle, benefits, ...companyData } = dto;
+    const { firstName, lastName, jobTitle, ...companyData } = dto;
 
     // Conflict first, same as `updateMine` checks the company exists before
     // judging its location: a recruiter who already has one deserves the 409,
@@ -49,16 +48,67 @@ export class CompanyService {
         data: { userId, companyId: company.id, firstName, lastName, jobTitle },
       });
 
-      if (benefits) {
-        await this.syncBenefits(tx, company.id, benefits);
-      }
-
       return company;
     });
   }
 
+  /**
+   * Reads the company of the caller, resolved through their recruiter profile.
+   * No request ever names the company it reads, so there is nothing to forge —
+   * the same property `updateMine` and the file slots rely on.
+   *
+   * The columns are spelled out instead of relying on a bare `findUnique`: this
+   * is the row the account screen renders, and a column added to `company`
+   * later must not reach a client just because it was added.
+   */
+  async findMine(userId: number): Promise<CompanyResponseDto> {
+    const profile = await this.prisma.recruiterProfile.findUnique({
+      where: { userId },
+      select: {
+        firstName: true,
+        lastName: true,
+        jobTitle: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            size: true,
+            sectorId: true,
+            description: true,
+            siteUrl: true,
+            coverImage: true,
+            city: true,
+            postalCode: true,
+            latitude: true,
+            longitude: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Recruiter has no company');
+    }
+
+    const { latitude, longitude, ...company } = profile.company;
+
+    return {
+      ...company,
+      latitude: latitude?.toString() ?? null,
+      longitude: longitude?.toString() ?? null,
+      recruiter: {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        jobTitle: profile.jobTitle,
+      },
+    };
+  }
+
   async updateMine(userId: number, dto: UpdateCompanyDto) {
-    const { firstName, lastName, jobTitle, benefits, ...companyData } = dto;
+    const { firstName, lastName, jobTitle, ...companyData } = dto;
     let coordinates: Coordinates | null = null;
 
     if (dto.city !== undefined || dto.postalCode !== undefined) {
@@ -99,32 +149,7 @@ export class CompanyService {
         data: { ...companyData, ...(coordinates ?? {}) },
       });
 
-      if (benefits) {
-        await this.syncBenefits(tx, company.id, benefits);
-      }
-
       return company;
-    });
-  }
-
-  private async syncBenefits(
-    tx: Prisma.TransactionClient,
-    companyId: number,
-    benefits: string[],
-  ): Promise<void> {
-    // `companyTag` rows are only ever written here, and benefits are the only
-    // category a company links, so wiping the set and re-creating it from the
-    // payload is the symmetric operation.
-    await tx.companyTag.deleteMany({ where: { companyId } });
-
-    const tagIds = await resolveTagIds(tx, benefits, 'benefit');
-    if (tagIds.length === 0) {
-      return;
-    }
-
-    await tx.companyTag.createMany({
-      data: tagIds.map((tagId) => ({ companyId, tagId })),
-      skipDuplicates: true,
     });
   }
 }

@@ -3,10 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
+import { Prisma, TagCategory } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
 import { resolveTagIds } from '../common/tags/tag-sync';
 import { PrismaService } from '../prisma/prisma.service';
+import { CandidateProfileResponseDto } from './dto/candidate-profile-response.dto';
 import { CreateCandidateProfileDto } from './dto/create-candidate-profile.dto';
 import { UpdateCandidateProfileDto } from './dto/update-candidate-profile.dto';
 
@@ -52,6 +53,77 @@ export class CandidateProfileService {
 
       return profile;
     });
+  }
+
+  /**
+   * Reads the caller's own profile. There is no parameter to tamper with: the
+   * row is keyed on the token subject, so no other profile is addressable.
+   *
+   * The columns are spelled out instead of relying on a bare `findUnique`. This
+   * is the row the account screen renders, and a column added to
+   * `candidate_profile` later must not reach a client just because it was added.
+   */
+  async findMine(userId: number): Promise<CandidateProfileResponseDto> {
+    const profile = await this.prisma.candidateProfile.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        firstName: true,
+        lastName: true,
+        picture: true,
+        bio: true,
+        city: true,
+        postalCode: true,
+        latitude: true,
+        longitude: true,
+        desiredJobTitle: true,
+        contractTypes: true,
+        experienceLevel: true,
+        availability: true,
+        availabilityDelayMonths: true,
+        availabilityDate: true,
+        remotePolicy: true,
+        mobilityRadiusKm: true,
+        mobilityNationwide: true,
+        salaryMin: true,
+        salaryMax: true,
+        linkedinUrl: true,
+        cvUrl: true,
+        createdAt: true,
+        updatedAt: true,
+        // `candidate_tag` is keyed on the user, not on the profile, so the tags
+        // hang off the `user` relation. Reaching them from here keeps the read
+        // to a single query, and selecting nothing else off that relation keeps
+        // the account columns — `passwordHash` first — out of reach.
+        user: {
+          select: {
+            candidateTags: {
+              orderBy: { tag: { label: 'asc' } },
+              select: { tag: { select: { label: true, category: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Candidate profile not found');
+    }
+
+    const { user, latitude, longitude, ...fields } = profile;
+    const labelsOf = (category: TagCategory): string[] =>
+      user.candidateTags
+        .filter((link) => link.tag.category === category)
+        .map((link) => link.tag.label);
+
+    return {
+      ...fields,
+      latitude: latitude?.toString() ?? null,
+      longitude: longitude?.toString() ?? null,
+      skills: labelsOf('skill'),
+      languages: labelsOf('language'),
+    };
   }
 
   async update(userId: number, dto: UpdateCandidateProfileDto) {

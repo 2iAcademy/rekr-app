@@ -33,6 +33,103 @@ export interface LoginDto {
   password: string;
 }
 
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface ResetPasswordDto {
+  /** Jeton reçu par e-mail, tel qu’il figure dans le lien. */
+  token: string;
+  /**
+   * @minLength 8
+   * @maxLength 512
+   */
+  password: string;
+}
+
+export type ContractType = (typeof ContractType)[keyof typeof ContractType];
+
+export const ContractType = {
+  CDI: 'CDI',
+  CDD: 'CDD',
+  ALTERNANCE: 'ALTERNANCE',
+  STAGE: 'STAGE',
+  FREELANCE: 'FREELANCE',
+  INTERIM: 'INTERIM',
+} as const;
+
+export type ExperienceLevel = (typeof ExperienceLevel)[keyof typeof ExperienceLevel];
+
+export const ExperienceLevel = {
+  JUNIOR: 'JUNIOR',
+  CONFIRME: 'CONFIRME',
+  SENIOR: 'SENIOR',
+  EXPERT: 'EXPERT',
+} as const;
+
+export type Availability = (typeof Availability)[keyof typeof Availability];
+
+export const Availability = {
+  IMMEDIATE: 'IMMEDIATE',
+  WITHIN_DELAY: 'WITHIN_DELAY',
+  SPECIFIC_DATE: 'SPECIFIC_DATE',
+} as const;
+
+export type RemotePolicy = (typeof RemotePolicy)[keyof typeof RemotePolicy];
+
+export const RemotePolicy = {
+  ON_SITE: 'ON_SITE',
+  HYBRID: 'HYBRID',
+  FULL_REMOTE: 'FULL_REMOTE',
+} as const;
+
+export interface CandidateProfileResponseDto {
+  id: number;
+  userId: number;
+  /** @maxLength 100 */
+  firstName: string;
+  /** @maxLength 100 */
+  lastName: string;
+  /** @nullable */
+  picture: string | null;
+  /** @nullable */
+  bio: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  postalCode: string | null;
+  /** @nullable */
+  latitude: string | null;
+  /** @nullable */
+  longitude: string | null;
+  /** @nullable */
+  desiredJobTitle: string | null;
+  contractTypes: ContractType[];
+  experienceLevel: ExperienceLevel | null;
+  availability: Availability | null;
+  /** @nullable */
+  availabilityDelayMonths: number | null;
+  /** @nullable */
+  availabilityDate: string | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  mobilityRadiusKm: number | null;
+  /** @nullable */
+  mobilityNationwide: boolean | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  /** @nullable */
+  linkedinUrl: string | null;
+  /** @nullable */
+  cvUrl: string | null;
+  skills: string[];
+  languages: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateCandidateProfileDto {
   [key: string]: unknown;
 }
@@ -50,6 +147,53 @@ export interface CityDto {
   longitude: number;
 }
 
+export type CompanySize = (typeof CompanySize)[keyof typeof CompanySize];
+
+export const CompanySize = {
+  TPE: 'TPE',
+  PME: 'PME',
+} as const;
+
+export interface CompanyRecruiterDto {
+  /** @maxLength 100 */
+  firstName: string;
+  /** @maxLength 100 */
+  lastName: string;
+  /**
+   * @maxLength 150
+   * @nullable
+   */
+  jobTitle: string | null;
+}
+
+export interface CompanyResponseDto {
+  id: number;
+  /** @maxLength 255 */
+  name: string;
+  /** @nullable */
+  logo: string | null;
+  size: CompanySize | null;
+  /** @nullable */
+  sectorId: number | null;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  siteUrl: string | null;
+  /** @nullable */
+  coverImage: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  postalCode: string | null;
+  /** @nullable */
+  latitude: string | null;
+  /** @nullable */
+  longitude: string | null;
+  recruiter: CompanyRecruiterDto;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateCompanyDto {
   [key: string]: unknown;
 }
@@ -58,12 +202,226 @@ export interface UpdateCompanyDto {
   [key: string]: unknown;
 }
 
+export type OfferStatus = (typeof OfferStatus)[keyof typeof OfferStatus];
+
+export const OfferStatus = {
+  draft: 'draft',
+  open: 'open',
+  paused: 'paused',
+  filled: 'filled',
+  closed: 'closed',
+} as const;
+
+export interface OfferListItemDto {
+  id: number;
+  /** @maxLength 255 */
+  title: string;
+  status: OfferStatus;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  postalCode: string | null;
+  contractType: ContractType | null;
+  minExperienceLevel: ExperienceLevel | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @minimum 0 */
+  applicantCount: number;
+}
+
+export interface OfferFeedCompanyDto {
+  id: number;
+  name: string;
+  /** @nullable */
+  logo: string | null;
+}
+
+export interface OfferFeedItemDto {
+  id: number;
+  title: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  city: string | null;
+  contractType: ContractType | null;
+  minExperienceLevel: ExperienceLevel | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  createdAt: string;
+  company: OfferFeedCompanyDto;
+  tags: string[];
+}
+
+export interface OfferDetailCompanyDto {
+  id: number;
+  /** @maxLength 255 */
+  name: string;
+  /** @nullable */
+  logo: string | null;
+  size: CompanySize | null;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  city: string | null;
+}
+
+export type TagCategory = (typeof TagCategory)[keyof typeof TagCategory];
+
+export const TagCategory = {
+  skill: 'skill',
+  tech: 'tech',
+  contract: 'contract',
+  theme: 'theme',
+  other: 'other',
+  language: 'language',
+  benefit: 'benefit',
+} as const;
+
+export interface OfferDetailTagDto {
+  /** @maxLength 100 */
+  label: string;
+  category: TagCategory;
+}
+
+export interface OfferDetailDto {
+  id: number;
+  /** @maxLength 255 */
+  title: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  city: string | null;
+  contractType: ContractType | null;
+  minExperienceLevel: ExperienceLevel | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  createdAt: string;
+  company: OfferDetailCompanyDto;
+  tags: OfferDetailTagDto[];
+  /** @nullable */
+  postalCode?: string | null;
+  status?: OfferStatus;
+}
+
 export interface CreateOfferDto {
-  [key: string]: unknown;
+  /** @maxLength 255 */
+  title: string;
+  /** @maxLength 5000 */
+  description?: string;
+  /** @maxLength 100 */
+  city?: string;
+  /** @maxLength 10 */
+  postalCode?: string;
+  contractType?: ContractType;
+  minExperienceLevel?: ExperienceLevel;
+  remotePolicy?: RemotePolicy;
+  /**
+   * @minimum 0
+   * @maximum 2147483647
+   * @nullable
+   */
+  salaryMin?: number | null;
+  /**
+   * @minimum 0
+   * @maximum 2147483647
+   * @nullable
+   */
+  salaryMax?: number | null;
+  status?: OfferStatus;
+  /** @maxItems 50 */
+  skills?: string[];
+  /** @maxItems 50 */
+  benefits?: string[];
+}
+
+export interface OfferDto {
+  id: number;
+  companyId: number;
+  /** @nullable */
+  createdById: number | null;
+  /** @maxLength 255 */
+  title: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  postalCode: string | null;
+  /** @nullable */
+  latitude: string | null;
+  /** @nullable */
+  longitude: string | null;
+  contractType: ContractType | null;
+  minExperienceLevel: ExperienceLevel | null;
+  remotePolicy: RemotePolicy | null;
+  /** @nullable */
+  salaryMin: number | null;
+  /** @nullable */
+  salaryMax: number | null;
+  status: OfferStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UpdateOfferDto {
-  [key: string]: unknown;
+  /** @maxLength 255 */
+  title?: string;
+  /** @maxLength 5000 */
+  description?: string;
+  /** @maxLength 100 */
+  city?: string;
+  /** @maxLength 10 */
+  postalCode?: string;
+  contractType?: ContractType;
+  minExperienceLevel?: ExperienceLevel;
+  remotePolicy?: RemotePolicy;
+  /**
+   * @minimum 0
+   * @maximum 2147483647
+   * @nullable
+   */
+  salaryMin?: number | null;
+  /**
+   * @minimum 0
+   * @maximum 2147483647
+   * @nullable
+   */
+  salaryMax?: number | null;
+  status?: OfferStatus;
+  /** @maxItems 50 */
+  skills?: string[];
+  /** @maxItems 50 */
+  benefits?: string[];
+}
+
+export interface OfferApplicantDto {
+  userId: number;
+  /** @maxLength 100 */
+  firstName: string;
+  /** @nullable */
+  picture: string | null;
+  /** @nullable */
+  bio: string | null;
+  /** @nullable */
+  city: string | null;
+  /** @nullable */
+  desiredJobTitle: string | null;
+  contractTypes: ContractType[];
+  experienceLevel: ExperienceLevel | null;
+  availability: Availability | null;
+  remotePolicy: RemotePolicy | null;
+  tags: string[];
 }
 
 export interface SectorDto {
@@ -86,7 +444,6 @@ export type MatchCounterpartDtoKind =
 
 export const MatchCounterpartDtoKind = {
   company: 'company',
-  candidate: 'candidate',
 } as const;
 
 export interface MatchCounterpartDto {
@@ -103,8 +460,7 @@ export interface MatchListItemDto {
   id: number;
   matchedAt: string;
   offer: MatchOfferDto;
-  /** @nullable */
-  counterpart?: MatchCounterpartDto | null;
+  counterpart: MatchCounterpartDto;
 }
 
 export type CandidateProfileControllerReplacePictureBody = {
@@ -129,6 +485,64 @@ export type CompanyControllerReplaceLogoBody = {
 
 export type CompanyControllerReplaceCoverImageBody = {
   file: Blob;
+};
+
+export type OfferControllerFindMineParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   * @maximum 2147483647
+   */
+  page?: number;
+  /**
+   * Nombre maximum d’offres par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * Ne renvoie que les offres de ce statut.
+   */
+  status?: OfferStatus;
+};
+
+export type OfferControllerFindFeedParams = {
+  /**
+   * Nombre maximum de cartes renvoyées.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type OfferControllerFindLikedParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   * @maximum 2147483647
+   */
+  page?: number;
+  /**
+   * Nombre maximum de candidats par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type OfferControllerFindApplicantsParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   * @maximum 2147483647
+   */
+  page?: number;
+  /**
+   * Nombre maximum de candidats par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type MatchControllerFindMineParams = {
@@ -227,12 +641,18 @@ export const logsControllerPublishError = async (
   publishErrorLogDto: PublishErrorLogDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<logsControllerPublishErrorResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<logsControllerPublishErrorResponseSuccess>(
     getLogsControllerPublishErrorUrl(),
     {
       ...options,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(publishErrorLogDto),
     },
   );
@@ -254,10 +674,16 @@ export const authControllerSignup = async (
   signupDto: SignupDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerSignupResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<authControllerSignupResponseSuccess>(getAuthControllerSignupUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(signupDto),
   });
 };
@@ -278,10 +704,16 @@ export const authControllerLogin = async (
   loginDto: LoginDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerLoginResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<authControllerLoginResponseSuccess>(getAuthControllerLoginUrl(), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(loginDto),
   });
 };
@@ -328,6 +760,73 @@ export const authControllerLogout = async (
   });
 };
 
+export type authControllerForgotPasswordResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type authControllerForgotPasswordResponseSuccess =
+  authControllerForgotPasswordResponse204 & {
+    headers: Headers;
+  };
+export const getAuthControllerForgotPasswordUrl = () => {
+  return `/api/auth/password/forgot`;
+};
+
+export const authControllerForgotPassword = async (
+  forgotPasswordDto: ForgotPasswordDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<authControllerForgotPasswordResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+  return customFetch<authControllerForgotPasswordResponseSuccess>(
+    getAuthControllerForgotPasswordUrl(),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(forgotPasswordDto),
+    },
+  );
+};
+
+export type authControllerResetPasswordResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type authControllerResetPasswordResponseSuccess = authControllerResetPasswordResponse204 & {
+  headers: Headers;
+};
+export const getAuthControllerResetPasswordUrl = () => {
+  return `/api/auth/password/reset`;
+};
+
+export const authControllerResetPassword = async (
+  resetPasswordDto: ResetPasswordDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<authControllerResetPasswordResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+  return customFetch<authControllerResetPasswordResponseSuccess>(
+    getAuthControllerResetPasswordUrl(),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(resetPasswordDto),
+    },
+  );
+};
+
 export type authControllerMeResponse200 = {
   data: void;
   status: 200;
@@ -349,30 +848,27 @@ export const authControllerMe = async (
   });
 };
 
-export type candidateProfileControllerCreateResponse201 = {
-  data: void;
-  status: 201;
+export type candidateProfileControllerFindMineResponse200 = {
+  data: CandidateProfileResponseDto;
+  status: 200;
 };
 
-export type candidateProfileControllerCreateResponseSuccess =
-  candidateProfileControllerCreateResponse201 & {
+export type candidateProfileControllerFindMineResponseSuccess =
+  candidateProfileControllerFindMineResponse200 & {
     headers: Headers;
   };
-export const getCandidateProfileControllerCreateUrl = () => {
-  return `/api/candidate-profiles`;
+export const getCandidateProfileControllerFindMineUrl = () => {
+  return `/api/candidate-profiles/me`;
 };
 
-export const candidateProfileControllerCreate = async (
-  createCandidateProfileDto: CreateCandidateProfileDto,
+export const candidateProfileControllerFindMine = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<candidateProfileControllerCreateResponseSuccess> => {
-  return customFetch<candidateProfileControllerCreateResponseSuccess>(
-    getCandidateProfileControllerCreateUrl(),
+): Promise<candidateProfileControllerFindMineResponseSuccess> => {
+  return customFetch<candidateProfileControllerFindMineResponseSuccess>(
+    getCandidateProfileControllerFindMineUrl(),
     {
       ...options,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
-      body: JSON.stringify(createCandidateProfileDto),
+      method: 'GET',
     },
   );
 };
@@ -394,13 +890,53 @@ export const candidateProfileControllerUpdate = async (
   updateCandidateProfileDto: UpdateCandidateProfileDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<candidateProfileControllerUpdateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<candidateProfileControllerUpdateResponseSuccess>(
     getCandidateProfileControllerUpdateUrl(),
     {
       ...options,
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(updateCandidateProfileDto),
+    },
+  );
+};
+
+export type candidateProfileControllerCreateResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type candidateProfileControllerCreateResponseSuccess =
+  candidateProfileControllerCreateResponse201 & {
+    headers: Headers;
+  };
+export const getCandidateProfileControllerCreateUrl = () => {
+  return `/api/candidate-profiles`;
+};
+
+export const candidateProfileControllerCreate = async (
+  createCandidateProfileDto: CreateCandidateProfileDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<candidateProfileControllerCreateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+  return customFetch<candidateProfileControllerCreateResponseSuccess>(
+    getCandidateProfileControllerCreateUrl(),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(createCandidateProfileDto),
     },
   );
 };
@@ -605,27 +1141,24 @@ export const filesControllerRead = async (
   );
 };
 
-export type companyControllerCreateResponse201 = {
-  data: void;
-  status: 201;
+export type companyControllerFindMineResponse200 = {
+  data: CompanyResponseDto;
+  status: 200;
 };
 
-export type companyControllerCreateResponseSuccess = companyControllerCreateResponse201 & {
+export type companyControllerFindMineResponseSuccess = companyControllerFindMineResponse200 & {
   headers: Headers;
 };
-export const getCompanyControllerCreateUrl = () => {
-  return `/api/companies`;
+export const getCompanyControllerFindMineUrl = () => {
+  return `/api/companies/mine`;
 };
 
-export const companyControllerCreate = async (
-  createCompanyDto: CreateCompanyDto,
+export const companyControllerFindMine = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<companyControllerCreateResponseSuccess> => {
-  return customFetch<companyControllerCreateResponseSuccess>(getCompanyControllerCreateUrl(), {
+): Promise<companyControllerFindMineResponseSuccess> => {
+  return customFetch<companyControllerFindMineResponseSuccess>(getCompanyControllerFindMineUrl(), {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(createCompanyDto),
+    method: 'GET',
   });
 };
 
@@ -645,15 +1178,51 @@ export const companyControllerUpdateMine = async (
   updateCompanyDto: UpdateCompanyDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<companyControllerUpdateMineResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<companyControllerUpdateMineResponseSuccess>(
     getCompanyControllerUpdateMineUrl(),
     {
       ...options,
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
       body: JSON.stringify(updateCompanyDto),
     },
   );
+};
+
+export type companyControllerCreateResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type companyControllerCreateResponseSuccess = companyControllerCreateResponse201 & {
+  headers: Headers;
+};
+export const getCompanyControllerCreateUrl = () => {
+  return `/api/companies`;
+};
+
+export const companyControllerCreate = async (
+  createCompanyDto: CreateCompanyDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<companyControllerCreateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+  return customFetch<companyControllerCreateResponseSuccess>(getCompanyControllerCreateUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createCompanyDto),
+  });
 };
 
 export type companyControllerReplaceLogoResponse200 = {
@@ -765,14 +1334,254 @@ export const companyControllerRemoveCoverImage = async (
   );
 };
 
-export type offerControllerFindOneByIdResponse200 = {
-  data: void;
+export type offerControllerFindMineResponse200 = {
+  data: OfferListItemDto[];
   status: 200;
+};
+
+export type offerControllerFindMineResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindMineResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindMineResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerFindMineResponseSuccess = offerControllerFindMineResponse200 & {
+  headers: Headers;
+};
+export type offerControllerFindMineResponseError = (
+  | offerControllerFindMineResponse401
+  | offerControllerFindMineResponse403
+  | offerControllerFindMineResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerFindMineUrl = (params?: OfferControllerFindMineParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/offers?${stringifiedParams}` : `/api/offers`;
+};
+
+export const offerControllerFindMine = async (
+  params?: OfferControllerFindMineParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerFindMineResponseSuccess> => {
+  return customFetch<offerControllerFindMineResponseSuccess>(
+    getOfferControllerFindMineUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type offerControllerCreateResponse201 = {
+  data: OfferDto;
+  status: 201;
+};
+
+export type offerControllerCreateResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerCreateResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerCreateResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerCreateResponseSuccess = offerControllerCreateResponse201 & {
+  headers: Headers;
+};
+export type offerControllerCreateResponseError = (
+  | offerControllerCreateResponse401
+  | offerControllerCreateResponse403
+  | offerControllerCreateResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerCreateUrl = () => {
+  return `/api/offers`;
+};
+
+export const offerControllerCreate = async (
+  createOfferDto: CreateOfferDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerCreateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+  return customFetch<offerControllerCreateResponseSuccess>(getOfferControllerCreateUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createOfferDto),
+  });
+};
+
+export type offerControllerFindFeedResponse200 = {
+  data: OfferFeedItemDto[];
+  status: 200;
+};
+
+export type offerControllerFindFeedResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindFeedResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindFeedResponseSuccess = offerControllerFindFeedResponse200 & {
+  headers: Headers;
+};
+export type offerControllerFindFeedResponseError = (
+  offerControllerFindFeedResponse401 | offerControllerFindFeedResponse403
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerFindFeedUrl = (params?: OfferControllerFindFeedParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/offers/feed?${stringifiedParams}`
+    : `/api/offers/feed`;
+};
+
+export const offerControllerFindFeed = async (
+  params?: OfferControllerFindFeedParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerFindFeedResponseSuccess> => {
+  return customFetch<offerControllerFindFeedResponseSuccess>(
+    getOfferControllerFindFeedUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type offerControllerFindLikedResponse200 = {
+  data: OfferFeedItemDto[];
+  status: 200;
+};
+
+export type offerControllerFindLikedResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindLikedResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindLikedResponseSuccess = offerControllerFindLikedResponse200 & {
+  headers: Headers;
+};
+export type offerControllerFindLikedResponseError = (
+  offerControllerFindLikedResponse401 | offerControllerFindLikedResponse403
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerFindLikedUrl = (params?: OfferControllerFindLikedParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/offers/liked?${stringifiedParams}`
+    : `/api/offers/liked`;
+};
+
+export const offerControllerFindLiked = async (
+  params?: OfferControllerFindLikedParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerFindLikedResponseSuccess> => {
+  return customFetch<offerControllerFindLikedResponseSuccess>(
+    getOfferControllerFindLikedUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type offerControllerFindOneByIdResponse200 = {
+  data: OfferDetailDto;
+  status: 200;
+};
+
+export type offerControllerFindOneByIdResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindOneByIdResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindOneByIdResponse404 = {
+  data: void;
+  status: 404;
 };
 
 export type offerControllerFindOneByIdResponseSuccess = offerControllerFindOneByIdResponse200 & {
   headers: Headers;
 };
+export type offerControllerFindOneByIdResponseError = (
+  | offerControllerFindOneByIdResponse401
+  | offerControllerFindOneByIdResponse403
+  | offerControllerFindOneByIdResponse404
+) & {
+  headers: Headers;
+};
+
 export const getOfferControllerFindOneByIdUrl = (id: number) => {
   return `/api/offers/${id}`;
 };
@@ -791,13 +1600,36 @@ export const offerControllerFindOneById = async (
 };
 
 export type offerControllerUpdateResponse200 = {
-  data: void;
+  data: OfferDto;
   status: 200;
+};
+
+export type offerControllerUpdateResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerUpdateResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerUpdateResponse404 = {
+  data: void;
+  status: 404;
 };
 
 export type offerControllerUpdateResponseSuccess = offerControllerUpdateResponse200 & {
   headers: Headers;
 };
+export type offerControllerUpdateResponseError = (
+  | offerControllerUpdateResponse401
+  | offerControllerUpdateResponse403
+  | offerControllerUpdateResponse404
+) & {
+  headers: Headers;
+};
+
 export const getOfferControllerUpdateUrl = (id: number) => {
   return `/api/offers/${id}`;
 };
@@ -807,36 +1639,176 @@ export const offerControllerUpdate = async (
   updateOfferDto: UpdateOfferDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<offerControllerUpdateResponseSuccess> => {
+  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
   return customFetch<offerControllerUpdateResponseSuccess>(getOfferControllerUpdateUrl(id), {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateOfferDto),
   });
 };
 
-export type offerControllerCreateResponse201 = {
+export type offerControllerLikeResponse201 = {
   data: void;
   status: 201;
 };
 
-export type offerControllerCreateResponseSuccess = offerControllerCreateResponse201 & {
-  headers: Headers;
-};
-export const getOfferControllerCreateUrl = () => {
-  return `/api/offers`;
+export type offerControllerLikeResponse401 = {
+  data: void;
+  status: 401;
 };
 
-export const offerControllerCreate = async (
-  createOfferDto: CreateOfferDto,
+export type offerControllerLikeResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerLikeResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerLikeResponseSuccess = offerControllerLikeResponse201 & {
+  headers: Headers;
+};
+export type offerControllerLikeResponseError = (
+  offerControllerLikeResponse401 | offerControllerLikeResponse403 | offerControllerLikeResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerLikeUrl = (id: number) => {
+  return `/api/offers/${id}/like`;
+};
+
+export const offerControllerLike = async (
+  id: number,
   options?: Parameters<typeof customFetch>[1],
-): Promise<offerControllerCreateResponseSuccess> => {
-  return customFetch<offerControllerCreateResponseSuccess>(getOfferControllerCreateUrl(), {
+): Promise<offerControllerLikeResponseSuccess> => {
+  return customFetch<offerControllerLikeResponseSuccess>(getOfferControllerLikeUrl(id), {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(createOfferDto),
   });
+};
+
+export type offerControllerFindApplicantsResponse200 = {
+  data: OfferApplicantDto[];
+  status: 200;
+};
+
+export type offerControllerFindApplicantsResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerFindApplicantsResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerFindApplicantsResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerFindApplicantsResponseSuccess =
+  offerControllerFindApplicantsResponse200 & {
+    headers: Headers;
+  };
+export type offerControllerFindApplicantsResponseError = (
+  | offerControllerFindApplicantsResponse401
+  | offerControllerFindApplicantsResponse403
+  | offerControllerFindApplicantsResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerFindApplicantsUrl = (
+  id: number,
+  params?: OfferControllerFindApplicantsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/offers/${id}/likes?${stringifiedParams}`
+    : `/api/offers/${id}/likes`;
+};
+
+export const offerControllerFindApplicants = async (
+  id: number,
+  params?: OfferControllerFindApplicantsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerFindApplicantsResponseSuccess> => {
+  return customFetch<offerControllerFindApplicantsResponseSuccess>(
+    getOfferControllerFindApplicantsUrl(id, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type offerControllerLikeApplicantResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type offerControllerLikeApplicantResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerLikeApplicantResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerLikeApplicantResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerLikeApplicantResponseSuccess =
+  offerControllerLikeApplicantResponse201 & {
+    headers: Headers;
+  };
+export type offerControllerLikeApplicantResponseError = (
+  | offerControllerLikeApplicantResponse401
+  | offerControllerLikeApplicantResponse403
+  | offerControllerLikeApplicantResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerLikeApplicantUrl = (id: number, candidateUserId: number) => {
+  return `/api/offers/${id}/likes/${candidateUserId}`;
+};
+
+export const offerControllerLikeApplicant = async (
+  id: number,
+  candidateUserId: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerLikeApplicantResponseSuccess> => {
+  return customFetch<offerControllerLikeApplicantResponseSuccess>(
+    getOfferControllerLikeApplicantUrl(id, candidateUserId),
+    {
+      ...options,
+      method: 'POST',
+    },
+  );
 };
 
 export type sectorControllerFindAllResponse200 = {

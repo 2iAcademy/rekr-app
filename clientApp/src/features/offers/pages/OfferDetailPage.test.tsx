@@ -22,7 +22,6 @@ const mockOffer = {
   remotePolicy: 'HYBRID',
   salaryMin: 45000,
   salaryMax: 55000,
-  status: 'open',
   company: {
     id: 1,
     name: 'Acme Corp',
@@ -32,10 +31,12 @@ const mockOffer = {
       'Acme Corp construit des outils SaaS pour PME industrielles. Fondée en 2018, basée à Lyon, 35 personnes.',
     city: 'Lyon',
   },
-  offerTags: [
-    { tag: { id: 1, label: 'React', category: 'tech' } },
-    { tag: { id: 2, label: 'Node', category: 'tech' } },
-    { tag: { id: 3, label: 'TypeScript', category: 'tech' } },
+  tags: [
+    { label: 'React', category: 'tech' },
+    { label: 'Node', category: 'tech' },
+    { label: 'TypeScript', category: 'tech' },
+    { label: 'Mutuelle', category: 'benefit' },
+    { label: 'Tickets restaurant', category: 'benefit' },
   ],
 };
 
@@ -63,6 +64,27 @@ describe('OfferDetailPage', () => {
     });
   });
 
+  // Les avantages sont portés par l'offre : c'est ce que le candidat lit avant
+  // de liker, et ils diffèrent d'un poste à l'autre chez un même employeur.
+  it("affiche les avantages de l'offre", async () => {
+    renderPage();
+
+    expect(await screen.findByText('Avantages')).toBeInTheDocument();
+    expect(screen.getByText('Mutuelle')).toBeInTheDocument();
+    expect(screen.getByText('Tickets restaurant')).toBeInTheDocument();
+  });
+
+  it("masque la section quand l'offre ne propose aucun avantage", async () => {
+    vi.mocked(offerControllerFindOneById).mockResolvedValue({
+      data: { ...mockOffer, tags: [] },
+    } as unknown as Awaited<ReturnType<typeof offerControllerFindOneById>>);
+
+    renderPage();
+
+    await screen.findByRole('heading', { level: 2, name: mockOffer.title });
+    expect(screen.queryByText('Avantages')).not.toBeInTheDocument();
+  });
+
   it("affiche le nom de l'entreprise, taille et localisation", async () => {
     renderPage();
 
@@ -85,8 +107,8 @@ describe('OfferDetailPage', () => {
     renderPage();
 
     await waitFor(() => {
-      for (const ot of mockOffer.offerTags) {
-        expect(screen.getByText(ot.tag.label)).toBeInTheDocument();
+      for (const tag of mockOffer.tags) {
+        expect(screen.getByText(tag.label)).toBeInTheDocument();
       }
     });
   });

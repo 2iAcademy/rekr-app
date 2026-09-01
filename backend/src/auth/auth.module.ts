@@ -2,15 +2,18 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { MailModule } from '../mail/mail.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { PasswordResetService } from './password-reset.service';
 import { RefreshTokenService } from './refresh-token.service';
 
 @Module({
   imports: [
     ConfigModule,
+    MailModule,
     PrismaModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -28,7 +31,12 @@ import { RefreshTokenService } from './refresh-token.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, RefreshTokenService],
+  providers: [
+    AuthService,
+    JwtAuthGuard,
+    PasswordResetService,
+    RefreshTokenService,
+  ],
   exports: [JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}

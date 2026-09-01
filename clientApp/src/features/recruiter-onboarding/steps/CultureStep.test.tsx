@@ -8,11 +8,10 @@ const renderStep = (props: Partial<Parameters<typeof CultureStep>[0]> = {}) =>
   render(<CultureStep state={emptyRecruiterOnboarding} onChange={vi.fn()} {...props} />);
 
 describe('CultureStep', () => {
-  it('rend la présentation et les avantages', () => {
+  it('rend la présentation de la société', () => {
     renderStep();
 
     expect(screen.getByLabelText('Présentation de la société')).toBeInTheDocument();
-    expect(screen.getByLabelText('Avantages (optionnel)')).toBeInTheDocument();
   });
 
   it('remonte la présentation saisie', async () => {
@@ -25,19 +24,12 @@ describe('CultureStep', () => {
     expect(onChange).toHaveBeenCalledWith({ description: 'O' });
   });
 
-  it('affiche les avantages déjà ajoutés', () => {
+  // Les avantages varient d'un poste à l'autre : ils se saisissent sur l'offre,
+  // à l'étape suivante, et n'ont plus rien à faire sur la fiche société.
+  it("ne propose plus les avantages, qui appartiennent à l'offre", () => {
     renderStep({ state: { ...emptyRecruiterOnboarding, benefits: ['Mutuelle'] } });
 
-    expect(screen.getByText('Mutuelle')).toBeInTheDocument();
-  });
-
-  it('remonte un avantage ajouté', async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    renderStep({ onChange });
-
-    await user.type(screen.getByLabelText('Avantages (optionnel)'), 'Tickets resto{Enter}');
-
-    expect(onChange).toHaveBeenCalledWith({ benefits: ['Tickets resto'] });
+    expect(screen.queryByLabelText('Avantages (optionnel)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mutuelle')).not.toBeInTheDocument();
   });
 });

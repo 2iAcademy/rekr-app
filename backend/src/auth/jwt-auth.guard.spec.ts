@@ -20,7 +20,12 @@ describe('JwtAuthGuard', () => {
   let findUnique: jest.Mock;
   let guard: JwtAuthGuard;
 
-  const activeUser = { id: 42, userType: 'recruiter', isActive: true };
+  const activeUser = {
+    id: 42,
+    userType: 'recruiter',
+    isActive: true,
+    passwordChangedAt: null as Date | null,
+  };
 
   beforeEach(() => {
     findUnique = jest.fn().mockResolvedValue(activeUser);
@@ -31,6 +36,11 @@ describe('JwtAuthGuard', () => {
 
   const signToken = (payload: object, subject: string) =>
     jwtService.sign(payload, { subject });
+
+  /** `iat` is honoured when the payload already carries one, which is the only
+   * way to place a token on either side of a password change from a test. */
+  const tokenIssuedAt = (issuedAtSeconds: number) =>
+    signToken({ userType: 'recruiter', iat: issuedAtSeconds }, '42');
 
   const validToken = () =>
     signToken(
@@ -118,6 +128,58 @@ describe('JwtAuthGuard', () => {
     expect(request.user).toEqual({ id: 42, userType: 'candidate' });
   });
 
+  it('refuses a token issued before the last password change', async () => {
+    const changedAt = new Date();
+    findUnique.mockResolvedValue({
+      ...activeUser,
+      passwordChangedAt: changedAt,
+    });
+    const token = tokenIssuedAt(Math.floor(changedAt.getTime() / 1000) - 1);
+
+    await expect(
+      guard.canActivate(contextOf(requestWith(token))),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  /** The boundary the second-granularity of `iat` creates: a token minted just
+   * after the change still reports the second the change happened in, and must
+   * not be mistaken for one that predates it. */
+  it('accepts a token issued in the same second as the password change', async () => {
+    const changedAt = new Date(1_800_000_000_400);
+    findUnique.mockResolvedValue({
+      ...activeUser,
+      passwordChangedAt: changedAt,
+    });
+    const token = tokenIssuedAt(1_800_000_000);
+
+    await expect(
+      guard.canActivate(contextOf(requestWith(token))),
+    ).resolves.toBe(true);
+  });
+
+  it('refuses a token with no issue time once a password change is recorded', async () => {
+    findUnique.mockResolvedValue({
+      ...activeUser,
+      passwordChangedAt: new Date(),
+    });
+    const token = jwtService.sign(
+      { userType: 'recruiter' },
+      { subject: '42', noTimestamp: true },
+    );
+
+    await expect(
+      guard.canActivate(contextOf(requestWith(token))),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('refuses nothing on an account that has never changed its password', async () => {
+    const token = tokenIssuedAt(1);
+
+    await expect(
+      guard.canActivate(contextOf(requestWith(token))),
+    ).resolves.toBe(true);
+  });
+
   it('accepts a valid token and exposes the current user on the request', async () => {
     const request = requestWith(validToken());
 
@@ -125,7 +187,12 @@ describe('JwtAuthGuard', () => {
     expect(request.user).toEqual({ id: 42, userType: 'recruiter' });
     expect(findUnique).toHaveBeenCalledWith({
       where: { id: 42 },
-      select: { id: true, userType: true, isActive: true },
+      select: {
+        id: true,
+        userType: true,
+        isActive: true,
+        passwordChangedAt: true,
+      },
     });
   });
 });

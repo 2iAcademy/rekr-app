@@ -29,6 +29,7 @@ describe('OfferStep', () => {
     expect(screen.getByRole('combobox', { name: 'Ville du poste' })).toBeInTheDocument();
     expect(screen.getByLabelText('Missions')).toBeInTheDocument();
     expect(screen.getByLabelText('Compétences recherchées')).toBeInTheDocument();
+    expect(screen.getByLabelText('Avantages (optionnel)')).toBeInTheDocument();
   });
 
   // The location is pre-filled from the company, so the field must open on the
@@ -92,5 +93,21 @@ describe('OfferStep', () => {
     await user.type(screen.getByLabelText('Compétences recherchées'), 'React{Enter}');
 
     expect(onChange).toHaveBeenCalledWith({ skills: ['React'] });
+  });
+
+  it('affiche les avantages déjà ajoutés', () => {
+    renderStep({ state: { ...emptyRecruiterOnboarding, benefits: ['Mutuelle'] } });
+
+    expect(screen.getByText('Mutuelle')).toBeInTheDocument();
+  });
+
+  it('remonte un avantage ajouté', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderStep({ onChange });
+
+    await user.type(screen.getByLabelText('Avantages (optionnel)'), 'Tickets resto{Enter}');
+
+    expect(onChange).toHaveBeenCalledWith({ benefits: ['Tickets resto'] });
   });
 });
