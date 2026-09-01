@@ -85,11 +85,13 @@ describe('OfferApplicantsRoute', () => {
     expect(await screen.findByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
   });
 
+  // Towards their own feed, not the public splash: `/` has no session, and a
+  // candidate sent there is bounced straight back out by that screen's guard.
   it('écarte un candidat de l’écran', async () => {
     authenticateAs('candidate');
     const router = renderAt(APPLICANTS_PATH);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/candidat/offres'));
   });
 
   it('affiche les candidats intéressés à un recruteur', async () => {
