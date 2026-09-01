@@ -28,7 +28,7 @@ const parseId = (raw: string | null): number | null => {
  */
 export function OfferApplicantsRoute() {
   return (
-    <RouteGuard allowedUserTypes={['recruiter']} forbiddenRedirectTo="/">
+    <RouteGuard allowedUserTypes={['recruiter']}>
       <OfferApplicants />
     </RouteGuard>
   );

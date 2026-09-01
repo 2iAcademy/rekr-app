@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   CompanySize,
   ContractType,
@@ -44,10 +44,12 @@ export class OfferDetailCompanyDto {
   city!: string | null;
 }
 
+/**
+ * A tag as the detail screen reads it: what it says and which list it belongs
+ * to. Its own key is left out — no screen addresses a tag by id, and shipping
+ * one hands a caller another id space to walk.
+ */
 export class OfferDetailTagDto {
-  @ApiProperty({ example: 12 })
-  id!: number;
-
   @ApiProperty({ example: 'React', maxLength: 100 })
   label!: string;
 
@@ -57,22 +59,6 @@ export class OfferDetailTagDto {
     example: 'skill',
   })
   category!: TagCategory;
-}
-
-/**
- * A row of the `offer_tag` pivot, returned as it is stored rather than
- * flattened to a list of labels: the detail page reads `offerTags[].tag`, and
- * reshaping it here would break it.
- */
-export class OfferDetailTagLinkDto {
-  @ApiProperty({ example: 50 })
-  offerId!: number;
-
-  @ApiProperty({ example: 12 })
-  tagId!: number;
-
-  @ApiProperty({ type: () => OfferDetailTagDto })
-  tag!: OfferDetailTagDto;
 }
 
 /**
@@ -162,14 +148,84 @@ export class OfferDto {
 }
 
 /**
- * The read shape of `GET /offers/:id`, documented as it already is: the whole
- * `offer` row plus the two relations the service includes. The candidate detail
- * page depends on that shape — this DTO describes it, it does not redefine it.
+ * The read shape of `GET /offers/:id`: an explicit projection, not the `offer`
+ * row. Deliberately not extending `OfferDto` — that class describes what the
+ * write endpoints echo back to the recruiter who owns the offer, and inheriting
+ * it here is how the internal columns reached a candidate in the first place.
  */
-export class OfferDetailDto extends OfferDto {
+export class OfferDetailDto {
+  @ApiProperty({ example: 50 })
+  id!: number;
+
+  @ApiProperty({ example: 'Développeur Front', maxLength: 255 })
+  title!: string;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Belle mission.' })
+  description!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Lyon' })
+  city!: string | null;
+
+  @ApiProperty({
+    enum: ContractType,
+    enumName: 'ContractType',
+    nullable: true,
+    example: 'CDI',
+  })
+  contractType!: ContractType | null;
+
+  @ApiProperty({
+    enum: ExperienceLevel,
+    enumName: 'ExperienceLevel',
+    nullable: true,
+    example: 'CONFIRME',
+  })
+  minExperienceLevel!: ExperienceLevel | null;
+
+  @ApiProperty({
+    enum: RemotePolicy,
+    enumName: 'RemotePolicy',
+    nullable: true,
+    example: 'HYBRID',
+  })
+  remotePolicy!: RemotePolicy | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: 45000 })
+  salaryMin!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: 60000 })
+  salaryMax!: number | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    example: '2026-08-01T09:12:00.000Z',
+  })
+  createdAt!: Date;
+
   @ApiProperty({ type: () => OfferDetailCompanyDto })
   company!: OfferDetailCompanyDto;
 
-  @ApiProperty({ type: () => OfferDetailTagLinkDto, isArray: true })
-  offerTags!: OfferDetailTagLinkDto[];
+  @ApiProperty({ type: () => OfferDetailTagDto, isArray: true })
+  tags!: OfferDetailTagDto[];
+
+  /**
+   * Served only to a recruiter of the company carrying the offer: the postcode
+   * places the office and belongs to the management screen. Absent from the
+   * answer given to anyone else — not null, absent.
+   */
+  @ApiPropertyOptional({ type: String, nullable: true, example: '69001' })
+  postalCode?: string | null;
+
+  /**
+   * Served only to the company carrying the offer. A candidate reaches an offer
+   * only while it is published, so the value would be a constant for them —
+   * and how a company runs its hiring is not theirs to read.
+   */
+  @ApiPropertyOptional({
+    enum: OfferStatus,
+    enumName: 'OfferStatus',
+    example: 'open',
+  })
+  status?: OfferStatus;
 }

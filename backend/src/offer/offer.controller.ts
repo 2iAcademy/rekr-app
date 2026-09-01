@@ -90,7 +90,7 @@ export class OfferController {
   findOneById(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseIntPipe) id: number,
-  ) {
+  ): Promise<OfferDetailDto> {
     return this.service.findOneById(user, id);
   }
 

@@ -4,7 +4,7 @@ import { RecruiterOffersPage } from '@/features/recruiter-offers/pages/Recruiter
 
 export function RecruiterOffersRoute() {
   return (
-    <RouteGuard allowedUserTypes={['recruiter']} forbiddenRedirectTo="/">
+    <RouteGuard allowedUserTypes={['recruiter']}>
       <RecruiterOffersPage />
     </RouteGuard>
   );
@@ -17,7 +17,7 @@ export function RecruiterOffersRoute() {
  */
 export function OfferFormRoute() {
   return (
-    <RouteGuard allowedUserTypes={['recruiter']} forbiddenRedirectTo="/">
+    <RouteGuard allowedUserTypes={['recruiter']}>
       <OfferFormPage />
     </RouteGuard>
   );

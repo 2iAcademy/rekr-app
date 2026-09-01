@@ -10,6 +10,7 @@ import { OfferListQueryDto } from './dto/offer-list-query.dto';
 type PrismaMock = {
   offer: {
     create: jest.Mock;
+    findFirst: jest.Mock;
     findUnique: jest.Mock;
     findMany: jest.Mock;
     update: jest.Mock;
@@ -25,6 +26,7 @@ const buildPrismaMock = (): PrismaMock => {
   const mock: PrismaMock = {
     offer: {
       create: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn(),
@@ -43,6 +45,42 @@ type FeedFindManyArgs = {
   orderBy: unknown;
   take: number;
 };
+
+type SelectSpec = Record<string, unknown>;
+
+type OfferFindFirstArgs = {
+  where: Record<string, unknown>;
+  select?: SelectSpec;
+};
+
+/**
+ * Stands in for Prisma's own projection: the mock answers with the fields the
+ * service claimed and nothing else, so what a payload does not carry is what
+ * the `select` did not ask for. A call without a `select` gets the whole row,
+ * which is what a bare `include` reads.
+ */
+function projectValue(value: unknown, spec: unknown): unknown {
+  if (spec === true) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => projectValue(item, spec));
+  }
+  const nested =
+    (spec as { select?: SelectSpec }).select ?? (spec as SelectSpec);
+  return projectRow(value as Record<string, unknown>, nested);
+}
+
+function projectRow(
+  row: Record<string, unknown>,
+  select: SelectSpec,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(select)
+      .filter(([field]) => field in row)
+      .map(([field, spec]) => [field, projectValue(row[field], spec)]),
+  );
+}
 
 describe('OfferService', () => {
   let service: OfferService;
@@ -504,6 +542,284 @@ describe('OfferService', () => {
           tags: ['React', 'TypeScript'],
         },
       ]);
+    });
+  });
+
+  describe('findOneById', () => {
+    const candidate: AuthUser = { id: 7, userType: 'candidate' };
+    const recruiter: AuthUser = { id: 7, userType: 'recruiter' };
+
+    const CREATED_AT = new Date('2026-01-15T09:00:00.000Z');
+
+    const offerRow = (
+      overrides: Record<string, unknown> = {},
+    ): Record<string, unknown> => ({
+      id: 50,
+      companyId: 10,
+      createdById: 3,
+      title: 'Dev Front',
+      description: 'Une offre',
+      city: 'Lyon',
+      postalCode: '69001',
+      latitude: 45.75,
+      longitude: 4.85,
+      contractType: 'CDI',
+      minExperienceLevel: 'SENIOR',
+      remotePolicy: 'FULL_REMOTE',
+      salaryMin: 40000,
+      salaryMax: 55000,
+      status: 'open',
+      createdAt: CREATED_AT,
+      updatedAt: new Date('2026-02-01T09:00:00.000Z'),
+      company: {
+        id: 10,
+        name: 'Acme',
+        logo: null,
+        size: 'PME',
+        description: 'Une société de service',
+        city: 'Lyon',
+        postalCode: '69002',
+        siteUrl: 'https://acme.test',
+        coverImage: null,
+        sectorId: 4,
+      },
+      offerTags: [
+        {
+          offerId: 50,
+          tagId: 3,
+          tag: { id: 3, label: 'React', category: 'tech' },
+        },
+        {
+          offerId: 50,
+          tagId: 8,
+          tag: { id: 8, label: 'Autonomie', category: 'skill' },
+        },
+      ],
+      ...overrides,
+    });
+
+    const EXPECTED_PAYLOAD = {
+      id: 50,
+      title: 'Dev Front',
+      description: 'Une offre',
+      city: 'Lyon',
+      contractType: 'CDI',
+      minExperienceLevel: 'SENIOR',
+      remotePolicy: 'FULL_REMOTE',
+      salaryMin: 40000,
+      salaryMax: 55000,
+      createdAt: CREATED_AT,
+      company: {
+        id: 10,
+        name: 'Acme',
+        logo: null,
+        size: 'PME',
+        description: 'Une société de service',
+        city: 'Lyon',
+      },
+      tags: [
+        { label: 'React', category: 'tech' },
+        { label: 'Autonomie', category: 'skill' },
+      ],
+    };
+
+    const EXPECTED_SELECT = {
+      id: true,
+      title: true,
+      description: true,
+      city: true,
+      contractType: true,
+      minExperienceLevel: true,
+      remotePolicy: true,
+      salaryMin: true,
+      salaryMax: true,
+      createdAt: true,
+      company: {
+        select: {
+          id: true,
+          name: true,
+          logo: true,
+          size: true,
+          description: true,
+          city: true,
+        },
+      },
+      offerTags: expect.objectContaining({
+        select: { tag: { select: { label: true, category: true } } },
+      }) as object,
+    };
+
+    const EXPECTED_OWNER_SELECT = {
+      ...EXPECTED_SELECT,
+      postalCode: true,
+      status: true,
+    };
+
+    const serveRow = (row: Record<string, unknown> | null): void => {
+      prisma.offer.findFirst.mockImplementation((args: OfferFindFirstArgs) => {
+        if (row === null) {
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(
+          args.select ? projectRow(row, args.select) : row,
+        );
+      });
+    };
+
+    const callsOf = (): OfferFindFirstArgs[] =>
+      (prisma.offer.findFirst.mock.calls as OfferFindFirstArgs[][]).map(
+        (call) => call[0],
+      );
+
+    // The payload comes from the last read: an implementation that first probes
+    // the company carrying the offer still ends on the selective one.
+    const argsOf = (): OfferFindFirstArgs => {
+      const calls = callsOf();
+      return calls[calls.length - 1];
+    };
+
+    const whereOf = (): Record<string, unknown> => callsOf()[0].where;
+
+    it('returns the public payload of an offer to a candidate', async () => {
+      serveRow(offerRow());
+
+      const result = await service.findOneById(candidate, 50);
+
+      expect(result).toEqual(EXPECTED_PAYLOAD);
+    });
+
+    /**
+     * The postcode places the office, the status says how the company runs its
+     * hiring: both belong to the recruiter screen and to no one else. The
+     * database keys and the coordinates are read by no screen at all.
+     */
+    it('withholds the internals of the offer from a candidate', async () => {
+      serveRow(offerRow());
+
+      const result = await service.findOneById(candidate, 50);
+
+      expect(result).not.toHaveProperty('postalCode');
+      expect(result).not.toHaveProperty('status');
+      expect(result).not.toHaveProperty('createdById');
+      expect(result).not.toHaveProperty('companyId');
+      expect(result).not.toHaveProperty('latitude');
+      expect(result).not.toHaveProperty('longitude');
+      expect(result).not.toHaveProperty('updatedAt');
+    });
+
+    it('returns the owner payload to a recruiter of the company carrying the offer', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      serveRow(offerRow({ status: 'draft' }));
+
+      const result = await service.findOneById(recruiter, 50);
+
+      expect(result).toEqual({
+        ...EXPECTED_PAYLOAD,
+        postalCode: '69001',
+        status: 'draft',
+      });
+    });
+
+    /**
+     * A recruiter is a stranger to every offer but their own: on someone
+     * else's open offer they read what a candidate reads, and the postcode and
+     * the status stay behind.
+     */
+    it('returns the public payload to a recruiter of another company', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 99 });
+      serveRow(offerRow());
+
+      const result = await service.findOneById(recruiter, 50);
+
+      expect(result).toEqual(EXPECTED_PAYLOAD);
+      expect(result).not.toHaveProperty('postalCode');
+      expect(result).not.toHaveProperty('status');
+    });
+
+    /**
+     * The `select` is what actually holds the line: a payload trimmed after the
+     * read would still have pulled the withheld columns out of the database,
+     * and the next spread would put them back on the wire.
+     */
+    it('claims only the public columns when the caller does not carry the offer', async () => {
+      serveRow(offerRow());
+
+      await service.findOneById(candidate, 50);
+
+      expect(argsOf().select).toEqual(EXPECTED_SELECT);
+      expect(argsOf()).not.toHaveProperty('include');
+    });
+
+    it('claims the postcode and the status only for the company carrying the offer', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      serveRow(offerRow({ status: 'draft' }));
+
+      await service.findOneById(recruiter, 50);
+
+      expect(argsOf().select).toEqual(EXPECTED_OWNER_SELECT);
+      expect(argsOf()).not.toHaveProperty('include');
+    });
+
+    it('flattens the offer tags into their label and category', async () => {
+      serveRow(offerRow());
+
+      const result = await service.findOneById(candidate, 50);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          tags: [
+            { label: 'React', category: 'tech' },
+            { label: 'Autonomie', category: 'skill' },
+          ],
+        }),
+      );
+    });
+
+    /**
+     * A recruiter attached to no company reads the showcase, and the ownership
+     * read is not even attempted: there is nothing to compare the offer to.
+     * Pinned on the call count because that is what tells the short-circuit
+     * from an ownership check that silently answered false.
+     */
+    it('claims the public columns without reading ownership when the recruiter has no company', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(null);
+      serveRow(offerRow());
+
+      const result = await service.findOneById(recruiter, 50);
+
+      expect(callsOf()).toHaveLength(1);
+      expect(argsOf().select).toEqual(EXPECTED_SELECT);
+      expect(result).toEqual(EXPECTED_PAYLOAD);
+    });
+
+    it('answers 404 when no offer answers the read', async () => {
+      serveRow(null);
+
+      await expect(service.findOneById(candidate, 50)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('reads only open offers for a candidate', async () => {
+      serveRow(offerRow());
+
+      await service.findOneById(candidate, 50);
+
+      expect(whereOf()).toEqual({ id: 50, OR: [{ status: 'open' }] });
+    });
+
+    // A recruiter reads the drafts of their own company, and nothing else that
+    // is not open.
+    it('widens the read of a recruiter to every offer of their company', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      serveRow(offerRow({ status: 'draft' }));
+
+      await service.findOneById(recruiter, 50);
+
+      expect(whereOf()).toEqual({
+        id: 50,
+        OR: [{ status: 'open' }, { companyId: 10 }],
+      });
     });
   });
 });

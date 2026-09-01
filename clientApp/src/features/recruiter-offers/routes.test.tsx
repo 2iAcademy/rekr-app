@@ -116,14 +116,17 @@ describe('routes des offres recruteur', () => {
     },
   );
 
+  // Refused, and sent to their own feed rather than to the public splash: `/`
+  // belongs to a visitor without a session, and a candidate who lands there is
+  // bounced straight back out by the guard that screen carries.
   it.each(OFFER_SCREENS)(
-    'renvoie un candidat connecté de $path vers l’accueil',
+    'renvoie un candidat connecté de $path vers son feed',
     async ({ path, heading }) => {
       authenticateAs('candidate');
       const router = renderAt(path);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe('/');
+        expect(router.state.location.pathname).toBe('/candidat/offres');
       });
       expect(headings()).not.toContain(heading);
     },
