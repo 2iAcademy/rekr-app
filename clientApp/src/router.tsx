@@ -8,6 +8,7 @@ import { CandidateFeedRoute } from '@/features/candidate-feed/routes';
 import { MatchRoute, MatchesRoute } from '@/features/matches/routes';
 import {
   ForgotPasswordRoute,
+  ResetPasswordRoute,
   SigninRoute,
   SignupRoute,
   SplashRoute,
@@ -26,6 +27,7 @@ export const routes = [
       { path: '/inscription', element: <SignupRoute /> },
       { path: '/connexion', element: <SigninRoute /> },
       { path: '/mot-de-passe-oublie', element: <ForgotPasswordRoute /> },
+      { path: '/reinitialiser-mot-de-passe', element: <ResetPasswordRoute /> },
     ],
   },
 

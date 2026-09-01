@@ -4,12 +4,11 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import { createHash } from 'node:crypto';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { hashPassword, verifyPassword } from './password-hash';
 import { SignupDto } from './dto/signup.dto';
 import { RefreshTokenService } from './refresh-token.service';
 import type { PublicUser, Session, SessionContext } from './session.interface';
@@ -32,8 +31,6 @@ type UserWithProfiles = User & {
 
 @Injectable()
 export class AuthService {
-  private static readonly PASSWORD_SALT_ROUNDS = 12;
-
   /**
    * bcrypt hash of a random string nobody holds, compared against when the
    * e-mail is unknown.
@@ -52,29 +49,11 @@ export class AuthService {
     private readonly refreshTokens: RefreshTokenService,
   ) {}
 
-  /**
-   * bcrypt only hashes the first 72 bytes of its input and drops the rest
-   * without raising: two passwords sharing a 72-byte prefix would open the same
-   * account, and a long passphrase would be silently cut down. Folding the
-   * password into a fixed-size digest first removes the ceiling entirely
-   * instead of making the user carry it.
-   *
-   * The digest is base64-encoded, never passed as raw bytes: bcrypt treats a
-   * NUL byte as end-of-string, so a binary digest containing one would truncate
-   * the effective secret to whatever precedes it.
-   */
-  private static preHashPassword(password: string): string {
-    return createHash('sha256').update(password, 'utf8').digest('base64');
-  }
-
   async signup(
     signupDto: SignupDto,
     context: SessionContext,
   ): Promise<Session> {
-    const passwordHash = await bcrypt.hash(
-      AuthService.preHashPassword(signupDto.password),
-      AuthService.PASSWORD_SALT_ROUNDS,
-    );
+    const passwordHash = await hashPassword(signupDto.password);
 
     let user: User;
     try {
@@ -107,15 +86,15 @@ export class AuthService {
     });
 
     if (!user) {
-      await bcrypt.compare(
-        AuthService.preHashPassword(loginDto.password),
+      await verifyPassword(
+        loginDto.password,
         AuthService.ABSENT_USER_PASSWORD_HASH,
       );
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      AuthService.preHashPassword(loginDto.password),
+    const isPasswordValid = await verifyPassword(
+      loginDto.password,
       user.passwordHash,
     );
 

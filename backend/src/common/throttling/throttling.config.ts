@@ -42,6 +42,14 @@ const DEFAULT_LIMITS: Record<ThrottleBudgetName, number> = {
   // once. The answers are cached server-side, so the cost of a burst is low.
   cities: 200,
   files: 600,
+  // Tighter than `login`, and for a different reason: each accepted request
+  // sends an e-mail to an address the caller chose, so an unbounded budget
+  // turns the endpoint into a mailer aimed at anyone.
+  passwordForgot: 5,
+  // Looser, because nothing leaves the system here — the ceiling only has to
+  // keep the token space from being walked, and 256 bits of randomness put
+  // that far out of reach anyway.
+  passwordReset: 10,
 };
 
 export function buildThrottlerOptions(
@@ -105,6 +113,16 @@ function readLimits(
       configService,
       'THROTTLE_FILES_LIMIT',
       DEFAULT_LIMITS.files,
+    ),
+    passwordForgot: readPositiveInt(
+      configService,
+      'THROTTLE_PASSWORD_FORGOT_LIMIT',
+      DEFAULT_LIMITS.passwordForgot,
+    ),
+    passwordReset: readPositiveInt(
+      configService,
+      'THROTTLE_PASSWORD_RESET_LIMIT',
+      DEFAULT_LIMITS.passwordReset,
     ),
   };
 }
