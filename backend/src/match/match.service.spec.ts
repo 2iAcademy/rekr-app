@@ -70,68 +70,26 @@ describe('MatchService', () => {
     );
   });
 
-  it('returns a recruiter’s matched candidates only from their company offers', async () => {
-    const matchedAt = new Date('2026-08-18T10:00:00.000Z');
-    prisma.match.findMany.mockResolvedValue([
-      {
-        id: 12,
-        matchedAt,
-        offer: { id: 4, title: 'Développeur Full-Stack' },
-        candidate: {
-          id: 3,
-          candidateProfile: {
-            firstName: 'Ada',
-            lastName: 'Lovelace',
-            picture: 'candidates/3/picture/ada.webp',
-            desiredJobTitle: 'Ingénieure logiciel',
-          },
-        },
-      },
-    ]);
+  /**
+   * Scoped on the caller, whatever the query asks. The pagination is read from
+   * the DTO but the candidate never is: a match list is only ever the caller's
+   * own, and the recruiter branch this method used to carry is gone with the
+   * screen it served.
+   */
+  it('reads the matches of the caller and of nobody else', async () => {
+    prisma.match.findMany.mockResolvedValue([]);
 
-    await expect(
-      service.findMine({ id: 9, userType: 'recruiter' }),
-    ).resolves.toEqual([
-      {
-        id: 12,
-        matchedAt,
-        offer: { id: 4, title: 'Développeur Full-Stack' },
-        counterpart: {
-          kind: 'candidate',
-          id: 3,
-          name: 'Ada Lovelace',
-          avatarUrl: 'candidates/3/picture/ada.webp',
-          headline: 'Ingénieure logiciel',
-        },
-      },
-    ]);
+    await service.findMine(
+      { id: 7, userType: 'candidate' },
+      { page: 3, limit: 10 },
+    );
 
     expect(prisma.match.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          offer: {
-            company: {
-              recruiter: { some: { userId: 9 } },
-            },
-          },
-        },
-        orderBy: { matchedAt: 'desc' },
+        where: { candidateUserId: 7, offer: { status: 'open' } },
+        skip: 20,
+        take: 10,
       }),
     );
-  });
-
-  it('keeps a recruiter match visible when the candidate profile is unavailable', async () => {
-    prisma.match.findMany.mockResolvedValue([
-      {
-        id: 12,
-        matchedAt: new Date('2026-08-18T10:00:00.000Z'),
-        offer: { id: 4, title: 'Développeur Full-Stack' },
-        candidate: { id: 3, candidateProfile: null },
-      },
-    ]);
-
-    const [match] = await service.findMine({ id: 9, userType: 'recruiter' });
-
-    expect(match.counterpart).toBeNull();
   });
 });

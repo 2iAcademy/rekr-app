@@ -1,20 +1,20 @@
 import { MatchesPage } from '@/features/matches/MatchesPage';
-import { Navigate, useLocation, useNavigate } from 'react-router';
-import { useAuth } from '@/features/auth/useAuth';
+import { useLocation, useNavigate } from 'react-router';
+import { homePathFor } from '@/domain/homeRoute';
+import { RouteGuard } from '@/features/auth/RouteGuard';
 import { MatchPage } from '@/features/matches/pages/MatchPage';
 
+/**
+ * Candidate-only: a match is born of a reciprocal like on one given offer, so a
+ * recruiter reads it on the offer concerned rather than in a list spanning every
+ * post of their company.
+ */
 export function MatchesRoute() {
-  const { status } = useAuth();
-
-  if (status === 'loading') {
-    return null;
-  }
-
-  if (status !== 'authenticated') {
-    return <Navigate to="/connexion" replace />;
-  }
-
-  return <MatchesPage />;
+  return (
+    <RouteGuard allowedUserTypes={['candidate']}>
+      <MatchesPage />
+    </RouteGuard>
+  );
 }
 
 interface MatchRouteState {
@@ -27,26 +27,23 @@ interface MatchRouteState {
 export function MatchRoute() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { status, user } = useAuth();
-
-  if (status === 'loading') {
-    return null;
-  }
-
-  if (status !== 'authenticated') {
-    return <Navigate to="/connexion" replace />;
-  }
-
   const { matchedProfile = { name: 'Votre match', avatarUrl: null } } =
     (location.state as MatchRouteState | null) ?? {};
-  const currentUserName = user?.email.split('@')[0] || 'Toi';
 
   return (
-    <MatchPage
-      currentUser={{ name: currentUserName }}
-      matchedProfile={matchedProfile}
-      onContinue={() => navigate('/')}
-      onWriteMessage={() => navigate('/')}
-    />
+    <RouteGuard>
+      {(user) => {
+        const currentUserName = user.email.split('@')[0] || 'Toi';
+
+        return (
+          <MatchPage
+            currentUser={{ name: currentUserName }}
+            matchedProfile={matchedProfile}
+            onContinue={() => navigate(homePathFor(user))}
+            onWriteMessage={() => navigate(homePathFor(user))}
+          />
+        );
+      }}
+    </RouteGuard>
   );
 }

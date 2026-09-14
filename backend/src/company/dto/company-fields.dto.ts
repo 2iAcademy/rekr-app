@@ -1,6 +1,4 @@
 import {
-  ArrayMaxSize,
-  IsArray,
   IsEnum,
   IsInt,
   IsOptional,
@@ -11,12 +9,7 @@ import {
   Min,
 } from 'class-validator';
 import { CompanySize } from '../../../generated/prisma/client';
-import {
-  MAX_BENEFITS,
-  MAX_TAG_LABEL_LENGTH,
-} from '../../common/tags/tag-bounds';
 import { MAX_INT4 } from '../../common/validation/numeric-bounds';
-import { NoControlCharacters } from '../../common/validation/no-control-characters';
 import { MAX_FREE_TEXT_LENGTH } from '../../common/validation/text-bounds';
 import {
   EmptyUrlToNull,
@@ -65,12 +58,4 @@ export class CompanyFieldsDto {
   // location a client sends, and the coordinates are derived from it server-side
   // by `CityService.assertKnown`. Accepting them would let a payload display one
   // commune and be matched at another's coordinates.
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(MAX_BENEFITS)
-  @IsString({ each: true })
-  @MaxLength(MAX_TAG_LABEL_LENGTH, { each: true })
-  @NoControlCharacters({ each: true })
-  benefits?: string[];
 }

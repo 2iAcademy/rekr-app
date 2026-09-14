@@ -22,6 +22,7 @@ const authenticatedUser = {
   role: 'user',
   userType: 'candidate',
   isActive: true,
+  hasProfile: true,
 };
 
 const apiError = (status: number, data: unknown) =>

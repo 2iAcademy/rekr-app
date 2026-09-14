@@ -287,35 +287,25 @@ describe('Security hardening (e2e) — M4 / M5', () => {
       expect(await prisma.tag.count()).toBe(0);
     });
 
-    it('rejects 5000 benefits on a company with 400', async () => {
-      const recruiter = await createUser('recruiter');
+    it('rejects 5000 benefits on an offer with 400', async () => {
+      const recruiter = await seedRecruiterWithCompany();
 
       const res = await httpRequest(app)
-        .post('/api/companies')
+        .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({
-          name: 'Acme',
-          firstName: 'R',
-          lastName: 'D',
-          benefits: labels(HUGE_ARRAY_SIZE),
-        });
+        .send({ title: 'Dev', benefits: labels(HUGE_ARRAY_SIZE) });
 
       expect(res.status).toBe(400);
       expect(await prisma.tag.count()).toBe(0);
     });
 
     it('rejects a 100 000-character benefit label with 400', async () => {
-      const recruiter = await createUser('recruiter');
+      const recruiter = await seedRecruiterWithCompany();
 
       const res = await httpRequest(app)
-        .post('/api/companies')
+        .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({
-          name: 'Acme',
-          firstName: 'R',
-          lastName: 'D',
-          benefits: [hugeLabel()],
-        });
+        .send({ title: 'Dev', benefits: [hugeLabel()] });
 
       expect(res.status).toBe(400);
       expect(await prisma.tag.count()).toBe(0);
@@ -362,17 +352,12 @@ describe('Security hardening (e2e) — M4 / M5', () => {
     });
 
     it('still accepts a sane number of benefits (guards against an over-tight bound)', async () => {
-      const recruiter = await createUser('recruiter');
+      const recruiter = await seedRecruiterWithCompany();
 
       await httpRequest(app)
-        .post('/api/companies')
+        .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({
-          name: 'Acme',
-          firstName: 'R',
-          lastName: 'D',
-          benefits: labels(SANE_ARRAY_SIZE),
-        })
+        .send({ title: 'Dev', benefits: labels(SANE_ARRAY_SIZE) })
         .expect(201);
 
       expect(await prisma.tag.count()).toBe(SANE_ARRAY_SIZE);

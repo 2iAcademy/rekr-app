@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -55,52 +56,93 @@ describe('Match (e2e)', () => {
     await app.close();
   });
 
-  it('does not expose another company’s matches to a recruiter', async () => {
-    const candidate = await createUser('candidate');
-    const companyA = await seedRecruiterWithCompany('Acme');
-    const companyB = await seedRecruiterWithCompany('Globex');
-    const offerA = await prisma.offer.create({
+  /**
+   * A match is born of a reciprocal like on one given offer, so a recruiter
+   * reads it on the offer concerned — not in a list spanning every post of the
+   * company. The route is a candidate route now.
+   *
+   * 403 rather than an empty list: an empty 200 would read as « you have no
+   * match » and invite a caller to keep asking.
+   */
+  it('refuses the match list to a recruiter (403)', async () => {
+    const recruiter = await seedRecruiterWithCompany('Acme');
+
+    await httpRequest(app)
+      .get('/api/matches')
+      .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+      .expect(403);
+  });
+
+  it('rejects an unauthenticated read with 401', async () => {
+    await httpRequest(app).get('/api/matches').expect(401);
+  });
+
+  /**
+   * The list has one shape now, and the document has to say so. While the
+   * recruiter branch existed, a counterpart could be a candidate and could be
+   * missing — a match whose candidate had no profile answered `null`. Both are
+   * gone: every row of a candidate's list carries the company of the offer.
+   *
+   * Guarded here because the contract is what the client is generated from: a
+   * `counterpart` still advertised as nullable makes every reader write a
+   * fallback for a case the API can no longer produce.
+   */
+  it('advertises a single, always-present counterpart in the OpenAPI document', () => {
+    const document = SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder().build(),
+    );
+    const schemas = document.components?.schemas as Record<
+      string,
+      {
+        properties?: Record<string, { enum?: string[]; nullable?: boolean }>;
+        required?: string[];
+      }
+    >;
+
+    expect(schemas.MatchCounterpartDto.properties?.kind?.enum).toEqual([
+      'company',
+    ]);
+    expect(schemas.MatchListItemDto.properties?.counterpart?.nullable).not.toBe(
+      true,
+    );
+    expect(schemas.MatchListItemDto.required).toContain('counterpart');
+  });
+
+  /**
+   * The tenant axis, observed rather than mocked.
+   *
+   * Both matches sit on the same open offer, so nothing but `candidateUserId`
+   * tells them apart: drop it from the `where` and this test fails, where a
+   * fixture with a single candidate would still pass. It replaces the
+   * company-isolation case the recruiter branch used to carry.
+   */
+  it('never returns the matches of another candidate', async () => {
+    const alice = await createUser('candidate');
+    const bob = await createUser('candidate');
+    const recruiter = await seedRecruiterWithCompany('Acme');
+    const offer = await prisma.offer.create({
       data: {
         title: 'Développeur Front',
         status: 'open',
-        companyId: companyA.company.id,
-        createdById: companyA.user.id,
+        companyId: recruiter.company.id,
+        createdById: recruiter.user.id,
       },
     });
-    const offerB = await prisma.offer.create({
-      data: {
-        title: 'Développeur Back',
-        status: 'open',
-        companyId: companyB.company.id,
-        createdById: companyB.user.id,
-      },
-    });
-    const matchA = await prisma.match.create({
-      data: {
-        candidateUserId: candidate.id,
-        offerId: offerA.id,
-        recruiterUserId: companyA.user.id,
-      },
+    const aliceMatch = await prisma.match.create({
+      data: { candidateUserId: alice.id, offerId: offer.id },
     });
     await prisma.match.create({
-      data: {
-        candidateUserId: candidate.id,
-        offerId: offerB.id,
-        recruiterUserId: companyB.user.id,
-      },
+      data: { candidateUserId: bob.id, offerId: offer.id },
     });
 
     const res = await httpRequest(app)
       .get('/api/matches')
-      .set('Authorization', bearerFor(app, companyA.user.id, 'recruiter'))
+      .set('Authorization', bearerFor(app, alice.id, 'candidate'))
       .expect(200);
 
     expect(res.body).toHaveLength(1);
-    const matches = res.body as Array<{ id: number }>;
-    expect(matches[0]).toMatchObject({
-      id: matchA.id,
-      offer: { id: offerA.id, title: 'Développeur Front' },
-    });
+    expect((res.body as { id: number }[])[0].id).toBe(aliceMatch.id);
   });
 
   it('hides matches for a candidate when the offer is no longer open', async () => {

@@ -63,6 +63,13 @@ export function OfferStep({ state, onChange, invalidField }: StepProps) {
         invalid={invalidField === 'skills'}
         describedBy={invalidField === 'skills' ? WIZARD_ERROR_ID : undefined}
       />
+
+      <TagInput
+        label="Avantages (optionnel)"
+        placeholder="Mutuelle, tickets resto, RTT…"
+        values={state.benefits}
+        onChange={(benefits) => onChange({ benefits })}
+      />
     </>
   );
 }

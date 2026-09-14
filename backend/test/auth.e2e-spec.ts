@@ -82,7 +82,35 @@ describe('Auth (e2e)', () => {
       role: 'user',
       userType: 'candidate',
       isActive: true,
+      /*
+       * Nothing has been filled in yet: the client reads this to send the
+       * account to its onboarding rather than to a feed it cannot populate.
+       */
+      hasProfile: false,
     });
+  });
+
+  /**
+   * The unit specs mock Prisma, so they prove how the answer is computed but
+   * not that the relations it reads are the ones the schema declares. Creating
+   * a real profile row is the only thing that closes that gap — and the client
+   * gates its whole onboarding on this flag flipping.
+   */
+  it('reports the profile as complete once the row exists', async () => {
+    const created = await signup('onboarded@test.dev', 'candidate');
+    const token = tokenOf(created);
+    const { id } = (created.body as { user: { id: number } }).user;
+
+    await prisma.candidateProfile.create({
+      data: { userId: id, firstName: 'Camille', lastName: 'Martin' },
+    });
+
+    const res = await httpRequest(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(res.body).toMatchObject({ hasProfile: true });
   });
 
   it('returns the current user for a token issued at login', async () => {

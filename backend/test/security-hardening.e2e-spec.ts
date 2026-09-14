@@ -194,18 +194,13 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       expect(await prisma.tag.count()).toBe(0);
     });
 
-    it('rejects a NUL byte in a company benefit label (400, never 500)', async () => {
-      const recruiter = await createUser('recruiter');
+    it('rejects a NUL byte in an offer benefit label (400, never 500)', async () => {
+      const { user } = await seedRecruiterWithCompany();
 
       const res = await httpRequest(app)
-        .post('/api/companies')
-        .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({
-          name: 'Acme',
-          firstName: 'R',
-          lastName: 'D',
-          benefits: ['ok\u0000'],
-        });
+        .post('/api/offers')
+        .set('Authorization', bearerFor(app, user.id, 'recruiter'))
+        .send({ title: 'Dev', benefits: ['ok\u0000'] });
 
       expect(res.status).toBe(400);
       expect(await prisma.tag.count()).toBe(0);
@@ -214,16 +209,11 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
 
   describe('tag dictionary cannot be poisoned across categories', () => {
     it('lets a candidate remove a skill whose label was first created as a benefit', async () => {
-      const recruiter = await createUser('recruiter');
+      const { user: recruiter } = await seedRecruiterWithCompany();
       await httpRequest(app)
-        .post('/api/companies')
+        .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({
-          name: 'Acme',
-          firstName: 'R',
-          lastName: 'D',
-          benefits: ['React'],
-        })
+        .send({ title: 'Dev', benefits: ['React'] })
         .expect(201);
 
       const candidate = await createUser('candidate');
@@ -254,29 +244,37 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
         .send({ firstName: 'Ada', lastName: 'Lovelace', skills: ['Remote'] })
         .expect(201);
 
-      const recruiter = await createUser('recruiter');
+      const { user: recruiter } = await seedRecruiterWithCompany();
       const authorization = bearerFor(app, recruiter.id, 'recruiter');
 
-      await httpRequest(app)
-        .post('/api/companies')
+      const created = await httpRequest(app)
+        .post('/api/offers')
         .set('Authorization', authorization)
-        .send({
-          name: 'Acme',
-          firstName: 'R',
-          lastName: 'D',
-          benefits: ['Remote'],
-        })
+        .send({ title: 'Dev', skills: ['React'], benefits: ['Remote'] })
         .expect(201);
+      const offerId = (created.body as { id: number }).id;
 
-      expect(await prisma.companyTag.count()).toBe(1);
+      const linkedLabels = async (category: 'skill' | 'benefit') =>
+        (
+          await prisma.offerTag.findMany({
+            where: { offerId, tag: { category } },
+            select: { tag: { select: { label: true } } },
+          })
+        ).map((link) => link.tag.label);
+
+      expect(await linkedLabels('benefit')).toEqual(['Remote']);
+      expect(await linkedLabels('skill')).toEqual(['React']);
 
       await httpRequest(app)
-        .patch('/api/companies/mine')
+        .patch(`/api/offers/${offerId}`)
         .set('Authorization', authorization)
         .send({ benefits: [] })
         .expect(200);
 
-      expect(await prisma.companyTag.count()).toBe(0);
+      // Asserted per category, not on a global count: a wipe scoped on the
+      // offer alone would also empty this list and pass a bare `count() === 0`.
+      expect(await linkedLabels('benefit')).toEqual([]);
+      expect(await linkedLabels('skill')).toEqual(['React']);
     });
   });
 
@@ -349,12 +347,19 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
    * re-declaring an Update DTO by hand would break a test.
    */
   describe('NON-REGRESSION — PATCH routes inherit the array bounds', () => {
-    it('rejects 5000 benefits on a company update (400)', async () => {
+    it('rejects 5000 benefits on an offer update (400)', async () => {
       const { user } = await seedRecruiterWithCompany();
+      const authorization = bearerFor(app, user.id, 'recruiter');
+      const created = await httpRequest(app)
+        .post('/api/offers')
+        .set('Authorization', authorization)
+        .send({ title: 'Dev' })
+        .expect(201);
+      const offerId = (created.body as { id: number }).id;
 
       const res = await httpRequest(app)
-        .patch('/api/companies/mine')
-        .set('Authorization', bearerFor(app, user.id, 'recruiter'))
+        .patch(`/api/offers/${offerId}`)
+        .set('Authorization', authorization)
         .send({ benefits: labels(HUGE_ARRAY_SIZE) });
 
       expect(res.status).toBe(400);

@@ -22,6 +22,10 @@ export interface PublicUser {
   role: UserRole;
   userType: UserType;
   isActive: boolean;
+  /** Whether the profile matching `userType` exists. The client gates the
+   * onboarding on it, so it travels with the session rather than costing a
+   * round trip of its own on every boot. */
+  hasProfile: boolean;
 }
 
 export interface Session {
