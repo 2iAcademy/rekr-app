@@ -15,6 +15,11 @@ import { httpRequest } from './http-client';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
 import { stubCityReference } from './city-reference';
+import {
+  DEFAULT_JOB_FAMILY,
+  OTHER_JOB_FAMILY,
+  jobFamilyIdFor,
+} from './job-family-reference';
 
 type FeedItem = {
   id: number;
@@ -42,6 +47,7 @@ type OfferOverrides = {
   salaryMin?: number | null;
   salaryMax?: number | null;
   createdAt?: Date;
+  jobFamilyId?: number | null;
 };
 
 const VITRINE_KEYS = [
@@ -285,6 +291,160 @@ describe('Offer feed (e2e)', () => {
       const res = await getFeed().expect(200);
 
       expect(titlesOf(res)).toEqual(['Non précisé']);
+    });
+  });
+
+  /**
+   * The trade excludes, where every other preference only narrows.
+   *
+   * A contract type left unset widens the deck; a trade left unset on the
+   * offer side removes it as soon as the candidate named one. Worth holding in
+   * e2e rather than in the service alone: the rule is expressed as a Prisma
+   * `where`, and what the unit tests assert is the object handed to the query,
+   * not what the query then returns.
+   */
+  describe('shaped by the trade', () => {
+    let wanted: number;
+    let unwanted: number;
+
+    const seedProfile = () =>
+      prisma.candidateProfile.create({
+        data: { userId: candidate.id, firstName: 'Ada', lastName: 'Lovelace' },
+      });
+
+    const looksFor = (...jobFamilyIds: number[]) =>
+      prisma.candidateJobFamily.createMany({
+        data: jobFamilyIds.map((jobFamilyId) => ({
+          candidateUserId: candidate.id,
+          jobFamilyId,
+        })),
+      });
+
+    const titlesOf = (res: request.Response): string[] =>
+      (res.body as { title: string }[]).map((offer) => offer.title);
+
+    beforeAll(async () => {
+      wanted = await jobFamilyIdFor(prisma, DEFAULT_JOB_FAMILY);
+      unwanted = await jobFamilyIdFor(prisma, OTHER_JOB_FAMILY);
+    });
+
+    it('keeps only the trade the candidate named', async () => {
+      await seedProfile();
+      await looksFor(wanted);
+      await seedOffer({ title: 'Dev', jobFamilyId: wanted });
+      await seedOffer({ title: 'Boulanger', jobFamilyId: unwanted });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res)).toEqual(['Dev']);
+    });
+
+    it('keeps every trade the candidate named', async () => {
+      await seedProfile();
+      await looksFor(wanted, unwanted);
+      await seedOffer({ title: 'Dev', jobFamilyId: wanted });
+      await seedOffer({ title: 'Boulanger', jobFamilyId: unwanted });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res).sort()).toEqual(['Boulanger', 'Dev']);
+    });
+
+    // Nobody changes career because an unrelated post pays well: a trade that
+    // does not match is dropped even when every other axis lines up.
+    it('drops an unwanted trade whose every other axis matches', async () => {
+      await prisma.candidateProfile.create({
+        data: {
+          userId: candidate.id,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          contractTypes: ['CDI'],
+          remotePolicy: 'HYBRID',
+        },
+      });
+      await looksFor(wanted);
+      await seedOffer({
+        title: 'Boulanger',
+        jobFamilyId: unwanted,
+        contractType: 'CDI',
+        remotePolicy: 'HYBRID',
+      });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res)).toEqual([]);
+    });
+
+    /**
+     * The mirror of the test above, and the one that would catch the `OR` that
+     * `findFeed` warns about: collected in an `AND`, a trade the candidate did
+     * not name cannot be readmitted by a contract type that happens to match.
+     */
+    it('does not let a matching contract type readmit an unwanted trade', async () => {
+      await prisma.candidateProfile.create({
+        data: {
+          userId: candidate.id,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          contractTypes: ['CDI'],
+        },
+      });
+      await looksFor(wanted);
+      await seedOffer({
+        title: 'Dev alternance',
+        jobFamilyId: wanted,
+        contractType: 'ALTERNANCE',
+      });
+      await seedOffer({
+        title: 'Boulanger CDI',
+        jobFamilyId: unwanted,
+        contractType: 'CDI',
+      });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res)).toEqual([]);
+    });
+
+    // The column is nullable, so the accounts created before it exists must not
+    // face an empty deck — including the offers that carry no trade either.
+    it('serves every trade to a candidate who named none', async () => {
+      await seedProfile();
+      await seedOffer({ title: 'Dev', jobFamilyId: wanted });
+      await seedOffer({ title: 'Boulanger', jobFamilyId: unwanted });
+      await seedOffer({ title: 'Sans métier', jobFamilyId: null });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res).sort()).toEqual(['Boulanger', 'Dev', 'Sans métier']);
+    });
+
+    it('serves every trade to a candidate who has no profile at all', async () => {
+      await seedOffer({ title: 'Dev', jobFamilyId: wanted });
+      await seedOffer({ title: 'Boulanger', jobFamilyId: unwanted });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res).sort()).toEqual(['Boulanger', 'Dev']);
+    });
+
+    /**
+     * Unlike every other axis, an offer that never said is treated as a no.
+     *
+     * A contract type left unset on the offer keeps it in the deck; an unset
+     * trade does not, because it is unknown rather than universal — serving it
+     * to someone who named a trade would reopen the very bucket the column was
+     * added to close.
+     */
+    it('drops an offer carrying no trade once the candidate named one', async () => {
+      await seedProfile();
+      await looksFor(wanted);
+      await seedOffer({ title: 'Dev', jobFamilyId: wanted });
+      await seedOffer({ title: 'Sans métier', jobFamilyId: null });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res)).toEqual(['Dev']);
     });
   });
 
