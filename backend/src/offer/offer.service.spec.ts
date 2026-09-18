@@ -6,6 +6,7 @@ import { OfferService } from './offer.service';
 import { CityService } from '../city/city.service';
 import { JobFamilyService } from '../job-family/job-family.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MatchService } from '../match/match.service';
 import { OfferListQueryDto } from './dto/offer-list-query.dto';
 
 type PrismaMock = {
@@ -89,17 +90,20 @@ describe('OfferService', () => {
   let service: OfferService;
   let prisma: ReturnType<typeof buildPrismaMock>;
   let cities: { assertKnown: jest.Mock };
+  let matches: { tryCreateReciprocalMatch: jest.Mock };
   let jobFamilies: { assertKnown: jest.Mock };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
     cities = { assertKnown: jest.fn().mockResolvedValue(undefined) };
+    matches = { tryCreateReciprocalMatch: jest.fn() };
     jobFamilies = { assertKnown: jest.fn().mockResolvedValue(undefined) };
     const moduleRef = await Test.createTestingModule({
       providers: [
         OfferService,
         { provide: PrismaService, useValue: prisma },
         { provide: CityService, useValue: cities },
+        { provide: MatchService, useValue: matches },
         { provide: JobFamilyService, useValue: jobFamilies },
       ],
     }).compile();

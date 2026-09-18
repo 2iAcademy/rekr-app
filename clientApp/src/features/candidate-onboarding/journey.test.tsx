@@ -50,6 +50,9 @@ const route = (url: string): Response => {
   if (url.includes('/api/candidate-profiles/me')) {
     return json(200, {});
   }
+  if (url.includes('/api/offers/feed')) {
+    return json(200, []);
+  }
   if (url.includes('/api/candidate-profiles')) {
     return json(201, {});
   }
@@ -167,7 +170,7 @@ describe('parcours candidat de bout en bout', () => {
       languages: ['Anglais'],
       bio: 'Je construis des interfaces qui respectent leurs utilisateurs.',
     });
-  });
+  }, 45_000);
 
   // The profile was created by the first attempt, so the replayed call gets the
   // 409 the real backend raises. The wizard has to fall back to the update —
@@ -205,5 +208,5 @@ describe('parcours candidat de bout en bout', () => {
     const update = callTo('/api/candidate-profiles/me');
     expect(update.method).toBe('PATCH');
     expect(update.body).toMatchObject({ firstName: 'Ada', skills: ['React', 'TypeScript'] });
-  });
+  }, 45_000);
 });

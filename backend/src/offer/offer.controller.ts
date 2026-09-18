@@ -32,6 +32,7 @@ import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
 import { OfferListItemDto } from './dto/offer-list-item.dto';
 import { OfferListQueryDto } from './dto/offer-list-query.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
+import { LikeResultDto } from '../match/dto/like-result.dto';
 
 @Controller('offers')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -124,15 +125,28 @@ export class OfferController {
    */
   @Post(':id/like')
   @Roles('candidate')
-  @ApiCreatedResponse({ description: 'Intérêt enregistré.' })
+  @ApiCreatedResponse({
+    type: LikeResultDto,
+    description: 'Intérêt enregistré.',
+  })
   @ApiNotFoundResponse({ description: 'Offre inexistante ou non publiée.' })
   like(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<void> {
+  ): Promise<LikeResultDto> {
     return this.service.like(user.id, id);
   }
 
+  @Post(':id/pass')
+  @Roles('candidate')
+  @ApiCreatedResponse({ description: 'Passage enregistré.' })
+  @ApiNotFoundResponse({ description: 'Offre inexistante ou non publiée.' })
+  pass(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<void> {
+    return this.service.pass(user.id, id);
+  }
   @Get(':id/likes')
   @ApiOkResponse({ type: OfferApplicantDto, isArray: true })
   @ApiNotFoundResponse({
@@ -154,7 +168,10 @@ export class OfferController {
    * what carries that right.
    */
   @Post(':id/likes/:candidateUserId')
-  @ApiCreatedResponse({ description: 'Intérêt enregistré.' })
+  @ApiCreatedResponse({
+    type: LikeResultDto,
+    description: 'Intérêt enregistré.',
+  })
   @ApiNotFoundResponse({
     description:
       'Offre hors de portée de l’appelant, ou candidat n’ayant pas postulé.',
@@ -163,7 +180,20 @@ export class OfferController {
     @CurrentUser() user: AuthUser,
     @Param('id', ParseIntPipe) id: number,
     @Param('candidateUserId', ParseIntPipe) candidateUserId: number,
-  ): Promise<void> {
+  ): Promise<LikeResultDto> {
     return this.service.likeApplicant(user.id, id, candidateUserId);
+  }
+  @Post(':id/passes/:candidateUserId')
+  @ApiCreatedResponse({ description: 'Passage enregistré.' })
+  @ApiNotFoundResponse({
+    description:
+      'Offre hors de portée de l’appelant, ou candidat n’ayant pas postulé.',
+  })
+  passApplicant(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('candidateUserId', ParseIntPipe) candidateUserId: number,
+  ): Promise<void> {
+    return this.service.passApplicant(user.id, id, candidateUserId);
   }
 }

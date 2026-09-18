@@ -417,6 +417,43 @@ export interface UpdateOfferDto {
   jobFamilyId?: number;
 }
 
+export interface MatchOfferDto {
+  id: number;
+  title: string;
+}
+
+export type MatchCounterpartDtoKind =
+  (typeof MatchCounterpartDtoKind)[keyof typeof MatchCounterpartDtoKind];
+
+export const MatchCounterpartDtoKind = {
+  company: 'company',
+  candidate: 'candidate',
+} as const;
+
+export interface MatchCounterpartDto {
+  kind: MatchCounterpartDtoKind;
+  id: number;
+  name: string;
+  /** @nullable */
+  avatarUrl: string | null;
+  /** @nullable */
+  headline: string | null;
+}
+
+export interface MatchListItemDto {
+  id: number;
+  matchedAt: string;
+  offer: MatchOfferDto;
+  counterpart: MatchCounterpartDto;
+}
+
+export interface LikeResultDto {
+  likeCreated: boolean;
+  /** Whether this request completed the reciprocal pair and created its match. */
+  matchCreated: boolean;
+  match?: MatchListItemDto;
+}
+
 export interface OfferApplicantDto {
   userId: number;
   /** @maxLength 100 */
@@ -434,45 +471,20 @@ export interface OfferApplicantDto {
   availability: Availability | null;
   remotePolicy: RemotePolicy | null;
   tags: string[];
-}
-
-export interface SectorDto {
-  id: number;
-  /** @maxLength 100 */
-  label: string;
+  /** @nullable */
+  recruiterLikedAt: string | null;
+  /** @nullable */
+  recruiterPassedAt: string | null;
 }
 
 export interface Object {
   [key: string]: unknown;
 }
 
-export interface MatchOfferDto {
+export interface SectorDto {
   id: number;
-  title: string;
-}
-
-export type MatchCounterpartDtoKind =
-  (typeof MatchCounterpartDtoKind)[keyof typeof MatchCounterpartDtoKind];
-
-export const MatchCounterpartDtoKind = {
-  company: 'company',
-} as const;
-
-export interface MatchCounterpartDto {
-  kind: MatchCounterpartDtoKind;
-  id: number;
-  name: string;
-  /** @nullable */
-  avatarUrl?: string | null;
-  /** @nullable */
-  headline?: string | null;
-}
-
-export interface MatchListItemDto {
-  id: number;
-  matchedAt: string;
-  offer: MatchOfferDto;
-  counterpart: MatchCounterpartDto;
+  /** @maxLength 100 */
+  label: string;
 }
 
 export type CandidateProfileControllerReplacePictureBody = {
@@ -1833,7 +1845,7 @@ export const offerControllerUpdate = async (
 };
 
 export type offerControllerLikeResponse201 = {
-  data: void;
+  data: LikeResultDto;
   status: 201;
 };
 
@@ -1870,6 +1882,49 @@ export const offerControllerLike = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<offerControllerLikeResponseSuccess> => {
   return customFetch<offerControllerLikeResponseSuccess>(getOfferControllerLikeUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type offerControllerPassResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type offerControllerPassResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerPassResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerPassResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerPassResponseSuccess = offerControllerPassResponse201 & {
+  headers: Headers;
+};
+export type offerControllerPassResponseError = (
+  offerControllerPassResponse401 | offerControllerPassResponse403 | offerControllerPassResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerPassUrl = (id: number) => {
+  return `/api/offers/${id}/pass`;
+};
+
+export const offerControllerPass = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerPassResponseSuccess> => {
+  return customFetch<offerControllerPassResponseSuccess>(getOfferControllerPassUrl(id), {
     ...options,
     method: 'POST',
   });
@@ -1941,7 +1996,7 @@ export const offerControllerFindApplicants = async (
 };
 
 export type offerControllerLikeApplicantResponse201 = {
-  data: void;
+  data: LikeResultDto;
   status: 201;
 };
 
@@ -1990,25 +2045,54 @@ export const offerControllerLikeApplicant = async (
   );
 };
 
-export type sectorControllerFindAllResponse200 = {
-  data: SectorDto[];
-  status: 200;
+export type offerControllerPassApplicantResponse201 = {
+  data: void;
+  status: 201;
 };
 
-export type sectorControllerFindAllResponseSuccess = sectorControllerFindAllResponse200 & {
+export type offerControllerPassApplicantResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerPassApplicantResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerPassApplicantResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerPassApplicantResponseSuccess =
+  offerControllerPassApplicantResponse201 & {
+    headers: Headers;
+  };
+export type offerControllerPassApplicantResponseError = (
+  | offerControllerPassApplicantResponse401
+  | offerControllerPassApplicantResponse403
+  | offerControllerPassApplicantResponse404
+) & {
   headers: Headers;
 };
-export const getSectorControllerFindAllUrl = () => {
-  return `/api/sectors`;
+
+export const getOfferControllerPassApplicantUrl = (id: number, candidateUserId: number) => {
+  return `/api/offers/${id}/passes/${candidateUserId}`;
 };
 
-export const sectorControllerFindAll = async (
+export const offerControllerPassApplicant = async (
+  id: number,
+  candidateUserId: number,
   options?: Parameters<typeof customFetch>[1],
-): Promise<sectorControllerFindAllResponseSuccess> => {
-  return customFetch<sectorControllerFindAllResponseSuccess>(getSectorControllerFindAllUrl(), {
-    ...options,
-    method: 'GET',
-  });
+): Promise<offerControllerPassApplicantResponseSuccess> => {
+  return customFetch<offerControllerPassApplicantResponseSuccess>(
+    getOfferControllerPassApplicantUrl(id, candidateUserId),
+    {
+      ...options,
+      method: 'POST',
+    },
+  );
 };
 
 export type matchControllerFindMineResponse200 = {
@@ -2044,4 +2128,25 @@ export const matchControllerFindMine = async (
       method: 'GET',
     },
   );
+};
+
+export type sectorControllerFindAllResponse200 = {
+  data: SectorDto[];
+  status: 200;
+};
+
+export type sectorControllerFindAllResponseSuccess = sectorControllerFindAllResponse200 & {
+  headers: Headers;
+};
+export const getSectorControllerFindAllUrl = () => {
+  return `/api/sectors`;
+};
+
+export const sectorControllerFindAll = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<sectorControllerFindAllResponseSuccess> => {
+  return customFetch<sectorControllerFindAllResponseSuccess>(getSectorControllerFindAllUrl(), {
+    ...options,
+    method: 'GET',
+  });
 };

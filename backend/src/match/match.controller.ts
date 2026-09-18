@@ -12,7 +12,7 @@ import { MatchService } from './match.service';
 @Controller('matches')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
-@Roles('candidate')
+@Roles('candidate', 'recruiter')
 export class MatchController {
   constructor(private readonly service: MatchService) {}
 

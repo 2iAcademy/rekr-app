@@ -111,7 +111,7 @@ describe('Offer (e2e)', () => {
   it('rejects an unauthenticated create with 401', async () => {
     await httpRequest(app)
       .post('/api/offers')
-      .send({ title: 'Dev' })
+      .send({ jobFamilyId, title: 'Dev' })
       .expect(401);
   });
 
@@ -120,7 +120,7 @@ describe('Offer (e2e)', () => {
     await httpRequest(app)
       .post('/api/offers')
       .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
-      .send({ title: 'Dev' })
+      .send({ jobFamilyId, title: 'Dev' })
       .expect(403);
   });
 
@@ -129,8 +129,8 @@ describe('Offer (e2e)', () => {
 
     const res = await postOffer(user.id)
       .send({
-        title: 'Développeur Front',
         jobFamilyId,
+        title: 'Développeur Front',
         description: 'Belle mission.',
         contractType: 'CDI',
         minExperienceLevel: 'CONFIRME',
@@ -177,7 +177,7 @@ describe('Offer (e2e)', () => {
     await httpRequest(app)
       .patch(`/api/offers/${offerIdOf(res)}`)
       .set('Authorization', bearerFor(app, user.id, 'recruiter'))
-      .send({ title: 'Dev Senior', status: 'open' })
+      .send({ jobFamilyId, title: 'Dev Senior', status: 'open' })
       .expect(200);
 
     const saved = await prisma.offer.findUnique({
@@ -194,7 +194,7 @@ describe('Offer (e2e)', () => {
 
     await httpRequest(app)
       .patch(`/api/offers/${offer.id}`)
-      .send({ title: 'Hijacked' })
+      .send({ jobFamilyId, title: 'Hijacked' })
       .expect(401);
 
     const saved = await prisma.offer.findUnique({ where: { id: offer.id } });
@@ -213,7 +213,7 @@ describe('Offer (e2e)', () => {
     await httpRequest(app)
       .patch(`/api/offers/${offer.id}`)
       .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
-      .send({ title: 'Hijacked' })
+      .send({ jobFamilyId, title: 'Hijacked' })
       .expect(403);
 
     const saved = await prisma.offer.findUnique({ where: { id: offer.id } });
@@ -230,7 +230,7 @@ describe('Offer (e2e)', () => {
     await httpRequest(app)
       .patch(`/api/offers/${offer.id}`)
       .set('Authorization', bearerFor(app, orphan.id, 'recruiter'))
-      .send({ title: 'Hijacked' })
+      .send({ jobFamilyId, title: 'Hijacked' })
       .expect(404);
 
     const saved = await prisma.offer.findUnique({ where: { id: offer.id } });
@@ -251,7 +251,7 @@ describe('Offer (e2e)', () => {
     await httpRequest(app)
       .patch(`/api/offers/${offerIdOf(res)}`)
       .set('Authorization', bearerFor(app, intruder.user.id, 'recruiter'))
-      .send({ title: 'Hijacked' })
+      .send({ jobFamilyId, title: 'Hijacked' })
       .expect(404);
 
     const saved = await prisma.offer.findUnique({
@@ -347,7 +347,7 @@ describe('Offer (e2e)', () => {
     await httpRequest(app)
       .patch('/api/offers/999999')
       .set('Authorization', bearerFor(app, user.id, 'recruiter'))
-      .send({ title: 'x' })
+      .send({ jobFamilyId, title: 'x' })
       .expect(404);
   });
   /**
@@ -378,8 +378,8 @@ describe('Offer (e2e)', () => {
 
       const res = await postOffer(user.id)
         .send({
-          title: 'Dev',
           jobFamilyId,
+          title: 'Dev',
           skills: ['React'],
           benefits: ['Mutuelle', 'Tickets restaurant'],
         })
@@ -463,8 +463,8 @@ describe('Offer (e2e)', () => {
       const offerId = offerIdOf(
         await postOffer(user.id)
           .send({
-            title: 'Dev',
             jobFamilyId,
+            title: 'Dev',
             status: 'open',
             skills: ['React'],
             benefits: ['Mutuelle'],
@@ -491,8 +491,8 @@ describe('Offer (e2e)', () => {
 
       await postOffer(user.id)
         .send({
-          title: 'Dev',
           jobFamilyId,
+          title: 'Dev',
           benefits: Array.from({ length: 51 }, (_, i) => `Avantage ${i}`),
         })
         .expect(400);
@@ -513,6 +513,11 @@ describe('Offer (e2e)', () => {
     const likeAsCandidate = (userId: number, offerId: number) =>
       httpRequest(app)
         .post(`/api/offers/${offerId}/like`)
+        .set('Authorization', asCandidate(userId));
+
+    const passAsCandidate = (userId: number, offerId: number) =>
+      httpRequest(app)
+        .post(`/api/offers/${offerId}/pass`)
         .set('Authorization', asCandidate(userId));
 
     const readInterested = (userId: number, offerId: number, query = '') =>
@@ -996,15 +1001,155 @@ describe('Offer (e2e)', () => {
        * ticket does not carry, and a later reader has to be able to tell the
        * omission from an oversight.
        */
-      it('derives no match from the reciprocal pair', async () => {
+      it('creates one match and reports which reciprocal request created it', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        const candidateLike = await likeAsCandidate(
+          candidate.id,
+          offer.id,
+        ).expect(201);
+        expect(candidateLike.body).toMatchObject({
+          likeCreated: true,
+          matchCreated: false,
+        });
+
+        const recruiterLike = await likeBack(
+          user.id,
+          offer.id,
+          candidate.id,
+        ).expect(201);
+        expect(recruiterLike.body).toMatchObject({
+          likeCreated: true,
+          matchCreated: true,
+          match: {
+            offer: { id: offer.id },
+            counterpart: { kind: 'candidate', id: candidate.id },
+          },
+        });
+
+        const duplicate = await likeBack(
+          user.id,
+          offer.id,
+          candidate.id,
+        ).expect(201);
+        expect(duplicate.body).toMatchObject({
+          likeCreated: false,
+          matchCreated: false,
+          match: { offer: { id: offer.id } },
+        });
+        await expect(
+          prisma.match.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      it('creates exactly one match under concurrent recruiter decisions', async () => {
         const { user, company } = await seedRecruiterWithCompany('Acme');
         const offer = await seedOffer(company, { status: 'open' });
         const candidate = await seedCandidateWithProfile('Camille');
         await likeAsCandidate(candidate.id, offer.id).expect(201);
 
-        await likeBack(user.id, offer.id, candidate.id).expect(201);
+        const responses = await Promise.all([
+          likeBack(user.id, offer.id, candidate.id),
+          likeBack(user.id, offer.id, candidate.id),
+        ]);
 
-        await expect(prisma.match.count()).resolves.toBe(0);
+        expect(responses.map((response) => response.status)).toEqual([
+          201, 201,
+        ]);
+        expect(
+          responses.map(
+            (response) =>
+              (response.body as { matchCreated: boolean }).matchCreated,
+          ),
+        ).toEqual(expect.arrayContaining([true, false]));
+        await expect(
+          prisma.match.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      it('creates a match when the candidate completes a pre-existing recruiter like', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await prisma.recruiterLikesCandidate.create({
+          data: {
+            recruiterUserId: user.id,
+            candidateUserId: candidate.id,
+            offerId: offer.id,
+          },
+        });
+
+        const response = await likeAsCandidate(candidate.id, offer.id).expect(
+          201,
+        );
+
+        expect(response.body).toMatchObject({
+          likeCreated: true,
+          matchCreated: true,
+          match: {
+            offer: { id: offer.id },
+            counterpart: { kind: 'company', id: company.id },
+          },
+        });
+        await expect(prisma.match.count()).resolves.toBe(1);
+      });
+
+      it('never crosses offers when creating a reciprocal match', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const first = await seedOffer(company, {
+          status: 'open',
+          title: 'First',
+        });
+        const second = await seedOffer(company, {
+          status: 'open',
+          title: 'Second',
+        });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await likeAsCandidate(candidate.id, first.id).expect(201);
+        await likeAsCandidate(candidate.id, second.id).expect(201);
+
+        await likeBack(user.id, second.id, candidate.id).expect(201);
+
+        await expect(
+          prisma.match.findMany({
+            where: { candidateUserId: candidate.id },
+            select: { offerId: true },
+          }),
+        ).resolves.toEqual([{ offerId: second.id }]);
+      });
+
+      it('refuses to like back after an offer is closed', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+        await prisma.offer.update({
+          where: { id: offer.id },
+          data: { status: 'closed' },
+        });
+
+        await likeBack(user.id, offer.id, candidate.id).expect(404);
+
+        await expect(
+          prisma.recruiterLikesCandidate.count({
+            where: {
+              recruiterUserId: user.id,
+              candidateUserId: candidate.id,
+              offerId: offer.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.match.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(0);
       });
 
       it('refuses to like back a candidate who did not apply to the offer (404)', async () => {
@@ -1027,6 +1172,97 @@ describe('Offer (e2e)', () => {
         await likeBack(other.user.id, offer.id, candidate.id).expect(404);
 
         await expect(prisma.recruiterLikesCandidate.count()).resolves.toBe(0);
+      });
+    });
+
+    describe('POST pass endpoints', () => {
+      it('records a candidate pass idempotently and refuses a non-open offer', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const open = await seedOffer(company, { status: 'open' });
+        const closed = await seedOffer(company, { status: 'closed' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await passAsCandidate(candidate.id, open.id).expect(201);
+        await passAsCandidate(candidate.id, open.id).expect(201);
+        await passAsCandidate(candidate.id, closed.id).expect(404);
+
+        await expect(
+          prisma.candidatePassesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: open.id },
+          }),
+        ).resolves.toBe(1);
+        await expect(
+          prisma.candidatePassesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: closed.id },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('records a recruiter pass only for an applicant of an owned offer', async () => {
+        const owner = await seedRecruiterWithCompany('Acme');
+        const outsider = await seedRecruiterWithCompany('Globex');
+        const offer = await seedOffer(owner.company, { status: 'open' });
+        const otherOffer = await seedOffer(owner.company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await httpRequest(app)
+          .post(`/api/offers/${offer.id}/passes/${candidate.id}`)
+          .set('Authorization', bearerFor(app, owner.user.id, 'recruiter'))
+          .expect(404);
+
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+        await likeAsCandidate(candidate.id, otherOffer.id).expect(201);
+        await httpRequest(app)
+          .post(`/api/offers/${offer.id}/passes/${candidate.id}`)
+          .set('Authorization', bearerFor(app, outsider.user.id, 'recruiter'))
+          .expect(404);
+
+        await httpRequest(app)
+          .post(`/api/offers/${offer.id}/passes/${candidate.id}`)
+          .set('Authorization', bearerFor(app, owner.user.id, 'recruiter'))
+          .expect(201);
+        await httpRequest(app)
+          .post(`/api/offers/${offer.id}/passes/${candidate.id}`)
+          .set('Authorization', bearerFor(app, owner.user.id, 'recruiter'))
+          .expect(201);
+
+        await expect(
+          prisma.recruiterPassesCandidate.count({
+            where: {
+              recruiterUserId: owner.user.id,
+              candidateUserId: candidate.id,
+              offerId: offer.id,
+            },
+          }),
+        ).resolves.toBe(1);
+
+        const applicants = await readInterested(owner.user.id, offer.id).expect(
+          200,
+        );
+        const body: unknown = applicants.body;
+        const [applicant] = body as Array<{
+          userId: number;
+          recruiterPassedAt: string | null;
+          recruiterLikedAt: string | null;
+        }>;
+        expect(applicant).toMatchObject({
+          userId: candidate.id,
+          recruiterLikedAt: null,
+        });
+        expect(applicant?.recruiterPassedAt).toEqual(expect.any(String));
+
+        const otherApplicants = await readInterested(
+          owner.user.id,
+          otherOffer.id,
+        ).expect(200);
+        const [otherApplicant] = otherApplicants.body as Array<{
+          userId: number;
+          recruiterPassedAt: string | null;
+        }>;
+        expect(otherApplicant).toMatchObject({
+          userId: candidate.id,
+          recruiterPassedAt: null,
+        });
       });
     });
   });

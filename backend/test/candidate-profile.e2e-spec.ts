@@ -77,6 +77,7 @@ describe('CandidateProfile (e2e)', () => {
     const payload = {
       firstName: 'Ada',
       lastName: 'Lovelace',
+      jobFamilyIds,
       bio: 'Pionnière du calcul.',
       city: 'Lyon',
       postalCode: '69001',
@@ -90,7 +91,6 @@ describe('CandidateProfile (e2e)', () => {
       salaryMin: 45000,
       salaryMax: 60000,
       linkedinUrl: 'https://linkedin.com/in/ada',
-      jobFamilyIds,
     };
 
     await httpRequest(app)

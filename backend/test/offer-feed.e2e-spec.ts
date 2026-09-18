@@ -228,17 +228,53 @@ describe('Offer feed (e2e)', () => {
     const titlesOf = (res: request.Response): string[] =>
       (res.body as { title: string }[]).map((offer) => offer.title);
 
-    it('keeps only the contract types the candidate is looking for', async () => {
+    /**
+     * The contract orders, it no longer eliminates.
+     *
+     * Filtering on it amputates half the stock of a temping agency and hides
+     * the best offer of the catalogue for an administrative reason — someone
+     * who asked for a permanent contract still wants to see the six-month
+     * mission that pays well, further down the deck.
+     */
+    it('no longer hides a contract the candidate did not tick', async () => {
+      await seedProfile({ contractTypes: ['CDI'] });
+      await seedOffer({ title: 'CDI', contractType: 'CDI' });
+      await seedOffer({ title: 'Intérim', contractType: 'INTERIM' });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res).sort()).toEqual(['CDI', 'Intérim']);
+    });
+
+    /**
+     * The single exception, and the only one the matrix marks as impossible:
+     * an apprenticeship or an internship is a status, not a preference. The
+     * exclusion cuts both ways, so neither side is served the other.
+     */
+    it('keeps a study contract out of a permanent-contract deck', async () => {
+      await seedProfile({ contractTypes: ['CDI'] });
+      await seedOffer({ title: 'CDI', contractType: 'CDI' });
+      await seedOffer({ title: 'Alternance', contractType: 'ALTERNANCE' });
+      await seedOffer({ title: 'Stage', contractType: 'STAGE' });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res)).toEqual(['CDI']);
+    });
+
+    it('keeps a permanent contract out of an apprenticeship deck', async () => {
       await seedProfile({ contractTypes: ['ALTERNANCE'] });
       await seedOffer({ title: 'Alternance', contractType: 'ALTERNANCE' });
+      await seedOffer({ title: 'Stage', contractType: 'STAGE' });
       await seedOffer({ title: 'CDI', contractType: 'CDI' });
 
       const res = await getFeed().expect(200);
 
-      expect(titlesOf(res)).toEqual(['Alternance']);
+      expect(titlesOf(res).sort()).toEqual(['Alternance', 'Stage']);
     });
 
-    it('keeps every contract type the candidate accepts', async () => {
+    // Ticking one more box must widen the deck, never narrow it.
+    it('widens the deck as the candidate accepts more contracts', async () => {
       await seedProfile({ contractTypes: ['ALTERNANCE', 'CDI'] });
       await seedOffer({ title: 'Alternance', contractType: 'ALTERNANCE' });
       await seedOffer({ title: 'CDI', contractType: 'CDI' });
@@ -246,12 +282,49 @@ describe('Offer feed (e2e)', () => {
 
       const res = await getFeed().expect(200);
 
-      expect(titlesOf(res).sort()).toEqual(['Alternance', 'CDI']);
+      expect(titlesOf(res).sort()).toEqual(['Alternance', 'CDI', 'Stage']);
     });
 
-    it('keeps only the remote policy the candidate is looking for', async () => {
+    /**
+     * Remote work filters on what the candidate can hold, not on a literal
+     * match. Someone who asked for hybrid was offering to come in, not
+     * requiring it, so a fully remote post suits them too — testing equality
+     * hid the best-paid offers of their trade from them.
+     *
+     * The inability only points one way, which is why this matrix, unlike the
+     * contract one, is not symmetric.
+     */
+    it('serves a fully remote post to an hybrid candidate', async () => {
+      await seedProfile({ remotePolicy: 'HYBRID' });
+      await seedOffer({ title: 'Hybride', remotePolicy: 'HYBRID' });
+      await seedOffer({ title: 'Full remote', remotePolicy: 'FULL_REMOTE' });
+      await seedOffer({ title: 'Sur site', remotePolicy: 'ON_SITE' });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res).sort()).toEqual(['Full remote', 'Hybride']);
+    });
+
+    // Wanting to be on site constrains nothing: the whole deck stays open.
+    it('hides nothing from a candidate who asked to be on site', async () => {
+      await seedProfile({ remotePolicy: 'ON_SITE' });
+      await seedOffer({ title: 'Sur site', remotePolicy: 'ON_SITE' });
+      await seedOffer({ title: 'Hybride', remotePolicy: 'HYBRID' });
+      await seedOffer({ title: 'Full remote', remotePolicy: 'FULL_REMOTE' });
+
+      const res = await getFeed().expect(200);
+
+      expect(titlesOf(res).sort()).toEqual([
+        'Full remote',
+        'Hybride',
+        'Sur site',
+      ]);
+    });
+
+    it('keeps an on-site post away from someone who cannot come in', async () => {
       await seedProfile({ remotePolicy: 'FULL_REMOTE' });
       await seedOffer({ title: 'Remote', remotePolicy: 'FULL_REMOTE' });
+      await seedOffer({ title: 'Hybride', remotePolicy: 'HYBRID' });
       await seedOffer({ title: 'Sur site', remotePolicy: 'ON_SITE' });
 
       const res = await getFeed().expect(200);
