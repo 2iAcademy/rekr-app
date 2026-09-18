@@ -8,6 +8,7 @@ import { configureApp } from '../src/setup-app';
 import { bearerFor } from './auth-header';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
+import { jobFamilyIdFor } from './job-family-reference';
 
 /**
  * M4 — POST /api/logs/sample and POST /api/logs/error are unauthenticated and
@@ -41,6 +42,11 @@ jest.setTimeout(120_000);
 describe('Security hardening (e2e) — M4 / M5', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  // The trades every fixture is filed under. Required at creation since job
+  // families landed, and read once because the reference rows outlive
+  // `resetDb`.
+  let jobFamilyId: number;
+  let jobFamilyIds: number[];
 
   const publish = jest.fn().mockResolvedValue({ stubbed: true });
 
@@ -85,6 +91,8 @@ describe('Security hardening (e2e) — M4 / M5', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    jobFamilyId = await jobFamilyIdFor(prisma);
+    jobFamilyIds = [jobFamilyId];
   });
 
   beforeEach(async () => {
@@ -228,6 +236,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           skills: labels(HUGE_ARRAY_SIZE),
@@ -244,6 +253,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           skills: [hugeLabel()],
@@ -260,6 +270,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           contractTypes: Array.from({ length: HUGE_ARRAY_SIZE }, () => 'CDI'),
@@ -275,7 +286,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace' })
+        .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
         .expect(201);
 
       const res = await httpRequest(app)
@@ -293,7 +304,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
       const res = await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({ title: 'Dev', benefits: labels(HUGE_ARRAY_SIZE) });
+        .send({ jobFamilyId, title: 'Dev', benefits: labels(HUGE_ARRAY_SIZE) });
 
       expect(res.status).toBe(400);
       expect(await prisma.tag.count()).toBe(0);
@@ -305,7 +316,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
       const res = await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({ title: 'Dev', benefits: [hugeLabel()] });
+        .send({ jobFamilyId, title: 'Dev', benefits: [hugeLabel()] });
 
       expect(res.status).toBe(400);
       expect(await prisma.tag.count()).toBe(0);
@@ -317,7 +328,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
       const res = await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({ title: 'Dev', skills: labels(HUGE_ARRAY_SIZE) });
+        .send({ jobFamilyId, title: 'Dev', skills: labels(HUGE_ARRAY_SIZE) });
 
       expect(res.status).toBe(400);
       expect(await prisma.tag.count()).toBe(0);
@@ -329,7 +340,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
       const res = await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({ title: 'Dev', skills: [hugeLabel()] });
+        .send({ jobFamilyId, title: 'Dev', skills: [hugeLabel()] });
 
       expect(res.status).toBe(400);
       expect(await prisma.tag.count()).toBe(0);
@@ -342,6 +353,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           skills: labels(SANE_ARRAY_SIZE),
@@ -357,7 +369,7 @@ describe('Security hardening (e2e) — M4 / M5', () => {
       await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({ title: 'Dev', benefits: labels(SANE_ARRAY_SIZE) })
+        .send({ jobFamilyId, title: 'Dev', benefits: labels(SANE_ARRAY_SIZE) })
         .expect(201);
 
       expect(await prisma.tag.count()).toBe(SANE_ARRAY_SIZE);
