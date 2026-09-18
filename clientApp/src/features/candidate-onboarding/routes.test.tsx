@@ -7,6 +7,9 @@ import { AuthProvider } from '@/features/auth/AuthProvider';
 import { routes } from '@/router';
 
 vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   authControllerSignup: vi.fn(),
   authControllerLogin: vi.fn(),
   authControllerLogout: vi.fn(),

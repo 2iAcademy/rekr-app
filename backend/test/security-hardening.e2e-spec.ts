@@ -8,6 +8,7 @@ import { configureApp } from '../src/setup-app';
 import { bearerFor } from './auth-header';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
+import { jobFamilyIdFor } from './job-family-reference';
 
 /**
  * Bypasses found by the adversarial verifiers on the M1 / M4 / M5 fixes.
@@ -30,6 +31,11 @@ jest.setTimeout(120_000);
 describe('Security hardening (e2e) — verifier bypasses', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  // The trades every fixture is filed under. Required at creation since job
+  // families landed, and read once because the reference rows outlive
+  // `resetDb`.
+  let jobFamilyId: number;
+  let jobFamilyIds: number[];
 
   const publish = jest.fn().mockResolvedValue({ stubbed: true });
 
@@ -74,6 +80,8 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    jobFamilyId = await jobFamilyIdFor(prisma);
+    jobFamilyIds = [jobFamilyId];
   });
 
   beforeEach(async () => {
@@ -188,7 +196,12 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       const res = await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace', skills: ['\u0000'] });
+        .send({
+          jobFamilyIds,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          skills: ['\u0000'],
+        });
 
       expect(res.status).toBe(400);
       expect(await prisma.tag.count()).toBe(0);
@@ -200,7 +213,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       const res = await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', bearerFor(app, user.id, 'recruiter'))
-        .send({ title: 'Dev', benefits: ['ok\u0000'] });
+        .send({ jobFamilyId, title: 'Dev', benefits: ['ok\u0000'] });
 
       expect(res.status).toBe(400);
       expect(await prisma.tag.count()).toBe(0);
@@ -213,7 +226,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-        .send({ title: 'Dev', benefits: ['React'] })
+        .send({ jobFamilyId, title: 'Dev', benefits: ['React'] })
         .expect(201);
 
       const candidate = await createUser('candidate');
@@ -222,7 +235,12 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', authorization)
-        .send({ firstName: 'Ada', lastName: 'Lovelace', skills: ['React'] })
+        .send({
+          jobFamilyIds,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          skills: ['React'],
+        })
         .expect(201);
 
       expect(await prisma.candidateTag.count()).toBe(1);
@@ -241,7 +259,12 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace', skills: ['Remote'] })
+        .send({
+          jobFamilyIds,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          skills: ['Remote'],
+        })
         .expect(201);
 
       const { user: recruiter } = await seedRecruiterWithCompany();
@@ -250,7 +273,12 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       const created = await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', authorization)
-        .send({ title: 'Dev', skills: ['React'], benefits: ['Remote'] })
+        .send({
+          jobFamilyId,
+          title: 'Dev',
+          skills: ['React'],
+          benefits: ['Remote'],
+        })
         .expect(201);
       const offerId = (created.body as { id: number }).id;
 
@@ -286,6 +314,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           skills: ['React', 'React ', ' React', '   ', '', 'Vue'],
@@ -304,7 +333,12 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       const res = await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace', bio: overlongText() });
+        .send({
+          jobFamilyIds,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          bio: overlongText(),
+        });
 
       expect(res.status).toBe(400);
       expect(await prisma.candidateProfile.count()).toBe(0);
@@ -333,7 +367,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       const res = await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', bearerFor(app, user.id, 'recruiter'))
-        .send({ title: 'Dev', description: overlongText() });
+        .send({ jobFamilyId, title: 'Dev', description: overlongText() });
 
       expect(res.status).toBe(400);
       expect(await prisma.offer.count()).toBe(0);
@@ -353,7 +387,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       const created = await httpRequest(app)
         .post('/api/offers')
         .set('Authorization', authorization)
-        .send({ title: 'Dev' })
+        .send({ jobFamilyId, title: 'Dev' })
         .expect(201);
       const offerId = (created.body as { id: number }).id;
 
@@ -403,7 +437,12 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, userId, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace', linkedinUrl });
+        .send({
+          jobFamilyIds,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          linkedinUrl,
+        });
 
     const postCompany = (userId: number, siteUrl: string) =>
       httpRequest(app)
@@ -470,7 +509,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', authorization)
-        .send({ firstName: 'Ada', lastName: 'Lovelace' })
+        .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
         .expect(201);
 
       await httpRequest(app)
@@ -552,6 +591,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', authorization)
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           linkedinUrl: 'https://www.linkedin.com/in/ada',
@@ -595,7 +635,12 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace', linkedinUrl: '' })
+        .send({
+          jobFamilyIds,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          linkedinUrl: '',
+        })
         .expect(201);
 
       const saved = await prisma.candidateProfile.findUnique({
@@ -613,6 +658,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', authorization)
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           linkedinUrl: 'https://www.linkedin.com/in/ada',
@@ -638,7 +684,12 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace', linkedinUrl: '   ' })
+        .send({
+          jobFamilyIds,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          linkedinUrl: '   ',
+        })
         .expect(201);
 
       const saved = await prisma.candidateProfile.findUnique({
@@ -673,6 +724,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           salaryMin: 3_000_000_000,
@@ -716,7 +768,12 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
         const res = await httpRequest(app)
           .post('/api/candidate-profiles')
           .set('Authorization', bearerFor(app, user.id, 'candidate'))
-          .send({ firstName: 'Ada', lastName: 'Lovelace', [field]: value });
+          .send({
+            jobFamilyIds,
+            firstName: 'Ada',
+            lastName: 'Lovelace',
+            [field]: value,
+          });
 
         expect(res.status).toBe(400);
         expectRejectedField(res.body, field);
@@ -731,6 +788,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           mobilityRadiusKm: 3_000_000_000,
@@ -747,6 +805,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           salaryMin: 45_000,

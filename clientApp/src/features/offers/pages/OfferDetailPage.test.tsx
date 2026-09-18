@@ -7,6 +7,9 @@ import { OfferDetailPage } from './OfferDetailPage';
 import { offerControllerFindOneById } from '@/api/generated';
 
 vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   offerControllerFindOneById: vi.fn(),
 }));
 

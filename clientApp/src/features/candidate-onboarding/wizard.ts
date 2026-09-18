@@ -63,6 +63,15 @@ const RULES: Record<CandidateStepId, Rule[]> = {
       isSatisfied: filled('desiredJobTitle'),
     },
     {
+      field: 'jobFamilyIds',
+      // Blocking rather than optional: a candidate who names no trade is served
+      // every trade, which is the bucket this field exists to close. The feed
+      // still tolerates the accounts created before it, but nobody new goes
+      // through without answering.
+      message: 'Choisissez au moins un domaine.',
+      isSatisfied: (state) => state.jobFamilyIds.length > 0,
+    },
+    {
       field: 'contractTypes',
       message: 'Choisissez au moins un type de contrat.',
       isSatisfied: (state) => state.contractTypes.length > 0,

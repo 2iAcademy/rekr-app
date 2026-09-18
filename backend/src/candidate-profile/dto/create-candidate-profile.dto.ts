@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDate,
@@ -20,6 +21,7 @@ import {
   RemotePolicy,
 } from '../../../generated/prisma/client';
 import {
+  MAX_JOB_FAMILIES,
   MAX_LANGUAGES,
   MAX_SKILLS,
   MAX_TAG_LABEL_LENGTH,
@@ -144,4 +146,22 @@ export class CreateCandidateProfileDto {
   @MaxLength(MAX_TAG_LABEL_LENGTH, { each: true })
   @NoControlCharacters({ each: true })
   languages?: string[];
+
+  /**
+   * The trades this candidate is looking for, which decide what their feed can
+   * contain at all.
+   *
+   * Required at creation: a profile without a trade is served every trade, and
+   * that is the bucket this field exists to close. `UpdateCandidateProfileDto`
+   * is a `PartialType` of this class, so a patch that does not mention the
+   * trades leaves them alone — and `findFeed` still serves an unfiltered deck
+   * to the accounts created before the column, rather than an empty one.
+   */
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_JOB_FAMILIES)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(MAX_INT4, { each: true })
+  jobFamilyIds!: number[];
 }

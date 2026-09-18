@@ -29,6 +29,7 @@ export type CompanyPayload = {
 
 export type OfferPayload = {
   title: string;
+  jobFamilyId: number;
   description?: string;
   city?: string;
   postalCode?: string;
@@ -59,6 +60,7 @@ export const buildCompanyPayload = (state: RecruiterOnboardingState): CompanyPay
 export const buildOfferPayload = (state: RecruiterOnboardingState): OfferPayload =>
   withoutEmptyFields({
     title: state.offerTitle.trim(),
+    jobFamilyId: Number(state.offerJobFamilyId),
     description: optionalText(state.offerDescription),
     city: optionalText(state.offerCity),
     postalCode: optionalText(state.offerPostalCode),

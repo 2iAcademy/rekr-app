@@ -19,10 +19,15 @@ import { stubCityReference } from './city-reference';
 import { resetDb } from './reset-db';
 import { resetCityCache } from './city-cache-reset';
 import { resetThrottler } from './throttler-reset';
+import { jobFamilyIdFor } from './job-family-reference';
 
 describe('Offer (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  // The trade every fixture offer is filed under. Required at creation since
+  // job families landed, and read once because the reference rows outlive
+  // `resetDb`.
+  let jobFamilyId: number;
 
   const createUser = (userType: 'candidate' | 'recruiter') =>
     prisma.user.create({
@@ -89,6 +94,7 @@ describe('Offer (e2e)', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    jobFamilyId = await jobFamilyIdFor(prisma);
   });
 
   beforeEach(async () => {
@@ -124,6 +130,7 @@ describe('Offer (e2e)', () => {
     const res = await postOffer(user.id)
       .send({
         title: 'Développeur Front',
+        jobFamilyId,
         description: 'Belle mission.',
         contractType: 'CDI',
         minExperienceLevel: 'CONFIRME',
@@ -158,12 +165,14 @@ describe('Offer (e2e)', () => {
 
   it('rejects create when the recruiter has no company (404)', async () => {
     const orphan = await createUser('recruiter');
-    await postOffer(orphan.id).send({ title: 'Dev' }).expect(404);
+    await postOffer(orphan.id).send({ title: 'Dev', jobFamilyId }).expect(404);
   });
 
   it("updates the recruiter's own offer", async () => {
     const { user } = await seedRecruiterWithCompany('Acme');
-    const res = await postOffer(user.id).send({ title: 'Dev' }).expect(201);
+    const res = await postOffer(user.id)
+      .send({ title: 'Dev', jobFamilyId })
+      .expect(201);
 
     await httpRequest(app)
       .patch(`/api/offers/${offerIdOf(res)}`)
@@ -236,7 +245,7 @@ describe('Offer (e2e)', () => {
     const intruder = await seedRecruiterWithCompany('Intruder Corp');
 
     const res = await postOffer(owner.user.id)
-      .send({ title: 'Dev' })
+      .send({ title: 'Dev', jobFamilyId })
       .expect(201);
 
     await httpRequest(app)
@@ -370,6 +379,7 @@ describe('Offer (e2e)', () => {
       const res = await postOffer(user.id)
         .send({
           title: 'Dev',
+          jobFamilyId,
           skills: ['React'],
           benefits: ['Mutuelle', 'Tickets restaurant'],
         })
@@ -387,7 +397,12 @@ describe('Offer (e2e)', () => {
       const { user } = await seedRecruiterWithCompany('Acme');
       const offerId = offerIdOf(
         await postOffer(user.id)
-          .send({ title: 'Dev', skills: ['React'], benefits: ['Mutuelle'] })
+          .send({
+            title: 'Dev',
+            jobFamilyId,
+            skills: ['React'],
+            benefits: ['Mutuelle'],
+          })
           .expect(201),
       );
 
@@ -403,7 +418,12 @@ describe('Offer (e2e)', () => {
       const { user } = await seedRecruiterWithCompany('Acme');
       const offerId = offerIdOf(
         await postOffer(user.id)
-          .send({ title: 'Dev', skills: ['React'], benefits: ['Mutuelle'] })
+          .send({
+            title: 'Dev',
+            jobFamilyId,
+            skills: ['React'],
+            benefits: ['Mutuelle'],
+          })
           .expect(201),
       );
 
@@ -421,7 +441,12 @@ describe('Offer (e2e)', () => {
       const { user } = await seedRecruiterWithCompany('Acme');
       const offerId = offerIdOf(
         await postOffer(user.id)
-          .send({ title: 'Dev', skills: ['React'], benefits: ['Mutuelle'] })
+          .send({
+            title: 'Dev',
+            jobFamilyId,
+            skills: ['React'],
+            benefits: ['Mutuelle'],
+          })
           .expect(201),
       );
 
@@ -439,6 +464,7 @@ describe('Offer (e2e)', () => {
         await postOffer(user.id)
           .send({
             title: 'Dev',
+            jobFamilyId,
             status: 'open',
             skills: ['React'],
             benefits: ['Mutuelle'],
@@ -466,6 +492,7 @@ describe('Offer (e2e)', () => {
       await postOffer(user.id)
         .send({
           title: 'Dev',
+          jobFamilyId,
           benefits: Array.from({ length: 51 }, (_, i) => `Avantage ${i}`),
         })
         .expect(400);
@@ -1222,6 +1249,7 @@ describe('Offer (e2e)', () => {
       'createdAt',
       'description',
       'id',
+      'jobFamilyId',
       'minExperienceLevel',
       'postalCode',
       'remotePolicy',
