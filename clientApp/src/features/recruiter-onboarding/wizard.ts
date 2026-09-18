@@ -89,6 +89,14 @@ const RULES: Record<RecruiterStepId, Rule[]> = {
       isSatisfied: filled('offerTitle'),
     },
     {
+      field: 'offerJobFamilyId',
+      // An offer published without a trade reaches no candidate feed at all.
+      // Refused here so the recruiter learns it now rather than through an
+      // empty applicant list weeks later.
+      message: 'Choisissez le domaine du poste.',
+      isSatisfied: chosen('offerJobFamilyId'),
+    },
+    {
       field: 'offerDescription',
       message: 'Décrivez les missions du poste.',
       isSatisfied: filled('offerDescription'),

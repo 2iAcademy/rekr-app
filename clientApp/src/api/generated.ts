@@ -147,6 +147,12 @@ export interface CityDto {
   longitude: number;
 }
 
+export interface JobFamilyDto {
+  id: number;
+  /** @maxLength 100 */
+  label: string;
+}
+
 export type CompanySize = (typeof CompanySize)[keyof typeof CompanySize];
 
 export const CompanySize = {
@@ -312,6 +318,8 @@ export interface OfferDetailDto {
   /** @nullable */
   postalCode?: string | null;
   status?: OfferStatus;
+  /** @nullable */
+  jobFamilyId?: number | null;
 }
 
 export interface CreateOfferDto {
@@ -343,6 +351,7 @@ export interface CreateOfferDto {
   skills?: string[];
   /** @maxItems 50 */
   benefits?: string[];
+  jobFamilyId: number;
 }
 
 export interface OfferDto {
@@ -370,6 +379,8 @@ export interface OfferDto {
   /** @nullable */
   salaryMax: number | null;
   status: OfferStatus;
+  /** @nullable */
+  jobFamilyId: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -403,6 +414,7 @@ export interface UpdateOfferDto {
   skills?: string[];
   /** @maxItems 50 */
   benefits?: string[];
+  jobFamilyId?: number;
 }
 
 export interface OfferApplicantDto {
@@ -464,11 +476,11 @@ export interface MatchListItemDto {
 }
 
 export type CandidateProfileControllerReplacePictureBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type CandidateProfileControllerReplaceCvBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type CityControllerSearchParams = {
@@ -480,11 +492,11 @@ export type CityControllerSearchParams = {
 };
 
 export type CompanyControllerReplaceLogoBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type CompanyControllerReplaceCoverImageBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type OfferControllerFindMineParams = {
@@ -641,11 +653,24 @@ export const logsControllerPublishError = async (
   publishErrorLogDto: PublishErrorLogDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<logsControllerPublishErrorResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<logsControllerPublishErrorResponseSuccess>(
     getLogsControllerPublishErrorUrl(),
@@ -674,11 +699,24 @@ export const authControllerSignup = async (
   signupDto: SignupDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerSignupResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<authControllerSignupResponseSuccess>(getAuthControllerSignupUrl(), {
     ...options,
@@ -704,11 +742,24 @@ export const authControllerLogin = async (
   loginDto: LoginDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerLoginResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<authControllerLoginResponseSuccess>(getAuthControllerLoginUrl(), {
     ...options,
@@ -777,11 +828,24 @@ export const authControllerForgotPassword = async (
   forgotPasswordDto: ForgotPasswordDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerForgotPasswordResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<authControllerForgotPasswordResponseSuccess>(
     getAuthControllerForgotPasswordUrl(),
@@ -810,11 +874,24 @@ export const authControllerResetPassword = async (
   resetPasswordDto: ResetPasswordDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerResetPasswordResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<authControllerResetPasswordResponseSuccess>(
     getAuthControllerResetPasswordUrl(),
@@ -890,11 +967,24 @@ export const candidateProfileControllerUpdate = async (
   updateCandidateProfileDto: UpdateCandidateProfileDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<candidateProfileControllerUpdateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<candidateProfileControllerUpdateResponseSuccess>(
     getCandidateProfileControllerUpdateUrl(),
@@ -924,11 +1014,24 @@ export const candidateProfileControllerCreate = async (
   createCandidateProfileDto: CreateCandidateProfileDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<candidateProfileControllerCreateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<candidateProfileControllerCreateResponseSuccess>(
     getCandidateProfileControllerCreateUrl(),
@@ -1108,6 +1211,30 @@ export const cityControllerSearch = async (
   });
 };
 
+export type jobFamilyControllerFindAllResponse200 = {
+  data: JobFamilyDto[];
+  status: 200;
+};
+
+export type jobFamilyControllerFindAllResponseSuccess = jobFamilyControllerFindAllResponse200 & {
+  headers: Headers;
+};
+export const getJobFamilyControllerFindAllUrl = () => {
+  return `/api/job-families`;
+};
+
+export const jobFamilyControllerFindAll = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<jobFamilyControllerFindAllResponseSuccess> => {
+  return customFetch<jobFamilyControllerFindAllResponseSuccess>(
+    getJobFamilyControllerFindAllUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
 export type filesControllerReadResponse200 = {
   data: void;
   status: 200;
@@ -1178,11 +1305,24 @@ export const companyControllerUpdateMine = async (
   updateCompanyDto: UpdateCompanyDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<companyControllerUpdateMineResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<companyControllerUpdateMineResponseSuccess>(
     getCompanyControllerUpdateMineUrl(),
@@ -1211,11 +1351,24 @@ export const companyControllerCreate = async (
   createCompanyDto: CreateCompanyDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<companyControllerCreateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<companyControllerCreateResponseSuccess>(getCompanyControllerCreateUrl(), {
     ...options,
@@ -1431,11 +1584,24 @@ export const offerControllerCreate = async (
   createOfferDto: CreateOfferDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<offerControllerCreateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<offerControllerCreateResponseSuccess>(getOfferControllerCreateUrl(), {
     ...options,
@@ -1639,11 +1805,24 @@ export const offerControllerUpdate = async (
   updateOfferDto: UpdateOfferDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<offerControllerUpdateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<offerControllerUpdateResponseSuccess>(getOfferControllerUpdateUrl(id), {
     ...options,

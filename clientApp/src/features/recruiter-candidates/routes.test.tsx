@@ -8,6 +8,9 @@ import { routes } from '@/router';
 import { anApplicant } from './fixtures';
 
 vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   authControllerLogin: vi.fn(),
   authControllerLogout: vi.fn(),
   authControllerSignup: vi.fn(),

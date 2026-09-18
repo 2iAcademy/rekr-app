@@ -3,6 +3,7 @@ import { Prisma, TagCategory } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
 import { resolveTagIds } from '../common/tags/tag-sync';
 import type { AuthUser } from '../auth/auth-user.interface';
+import { JobFamilyService } from '../job-family/job-family.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
 import { OfferFeedItemDto } from './dto/offer-feed-item.dto';
@@ -121,6 +122,10 @@ const OWNER_DETAIL_OFFER_COLUMNS = {
   ...DETAIL_OFFER_COLUMNS,
   postalCode: true,
   status: true,
+  // Read by the edit form to preselect the trade. Absent from the candidate
+  // projection: the family decides which feed the offer reaches, it is not
+  // something the card has to show.
+  jobFamilyId: true,
 } as const;
 
 /** The columns of an applicant a recruiter may read, and no others. */
@@ -172,11 +177,13 @@ export class OfferService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cities: CityService,
+    private readonly jobFamilies: JobFamilyService,
   ) {}
 
   async create(userId: number, dto: CreateOfferDto) {
     const { skills, benefits, ...offerData } = dto;
 
+    await this.jobFamilies.assertKnown([dto.jobFamilyId]);
     const coordinates = await this.cities.assertKnown(dto);
 
     return this.prisma.$transaction(async (tx) => {
@@ -205,6 +212,10 @@ export class OfferService {
   async update(userId: number, offerId: number, dto: UpdateOfferDto) {
     const { skills, benefits, ...offerData } = dto;
     let coordinates: Coordinates | null = null;
+
+    if (dto.jobFamilyId !== undefined) {
+      await this.jobFamilies.assertKnown([dto.jobFamilyId]);
+    }
 
     if (dto.city !== undefined || dto.postalCode !== undefined) {
       coordinates = await this.verifyPatchedLocation(userId, offerId, dto);
@@ -295,13 +306,20 @@ export class OfferService {
   ): Promise<OfferFeedItemDto[]> {
     const { limit } = query;
 
-    const profile = await this.prisma.candidateProfile.findUnique({
-      where: { userId: user.id },
-      select: { contractTypes: true, remotePolicy: true },
-    });
+    const [profile, wantedFamilies] = await Promise.all([
+      this.prisma.candidateProfile.findUnique({
+        where: { userId: user.id },
+        select: { contractTypes: true, remotePolicy: true },
+      }),
+      this.prisma.candidateJobFamily.findMany({
+        where: { candidateUserId: user.id },
+        select: { jobFamilyId: true },
+      }),
+    ]);
 
     const wantedContracts = profile?.contractTypes ?? [];
     const wantedRemote = profile?.remotePolicy ?? null;
+    const wantedFamilyIds = wantedFamilies.map((link) => link.jobFamilyId);
 
     // Collected in an `AND` rather than spread as two `OR` keys: a second `OR`
     // at the same level would overwrite the first, silently dropping one of the
@@ -333,6 +351,17 @@ export class OfferService {
       where: {
         status: 'open',
         ...(preferences.length > 0 ? { AND: preferences } : {}),
+        // The trade excludes rather than scores: nobody changes career because
+        // an unrelated post pays well, so a family that does not match has no
+        // rank low enough to be worth showing.
+        //
+        // A candidate who named no family is left unfiltered, which keeps the
+        // accounts created before this column from facing an empty deck. Once
+        // they name one, an offer carrying no family stops matching: its trade
+        // is unknown, and an unknown trade is not a wildcard.
+        ...(wantedFamilyIds.length > 0
+          ? { jobFamilyId: { in: wantedFamilyIds } }
+          : {}),
         candidateLikes: { none: { candidateUserId: user.id } },
         candidatePasses: { none: { candidateUserId: user.id } },
       },

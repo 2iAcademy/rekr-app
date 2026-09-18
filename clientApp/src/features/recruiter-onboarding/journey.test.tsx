@@ -47,6 +47,12 @@ const route = (url: string): Response => {
       { id: 9, label: 'Juridique' },
     ]);
   }
+  if (url.includes('/api/job-families')) {
+    return json(200, [
+      { id: 13, label: 'Informatique & Numérique' },
+      { id: 14, label: 'Juridique' },
+    ]);
+  }
   if (url.includes('/api/cities')) {
     return json(200, [
       { name: 'Lyon', postalCode: '69003', latitude: 45.751578, longitude: 4.869577 },
@@ -108,6 +114,8 @@ const completeWizard = async (user: User) => {
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 
   await user.type(screen.getByLabelText('Titre du poste'), 'Développeur Front React');
+  await waitFor(() => expect(screen.getByLabelText('Domaine du poste')).toBeEnabled());
+  await user.selectOptions(screen.getByLabelText('Domaine du poste'), '13');
   await user.type(screen.getByLabelText('Missions'), 'Construire les écrans du swipe.');
   await user.type(screen.getByLabelText('Compétences recherchées'), 'React, TypeScript{Enter}');
   await user.type(screen.getByLabelText('Avantages (optionnel)'), 'Mutuelle, RTT{Enter}');
@@ -172,6 +180,7 @@ describe('parcours recruteur de bout en bout', () => {
     expect(offer.authorization).toBe('Bearer jeton-de-test');
     expect(offer.body).toEqual({
       title: 'Développeur Front React',
+      jobFamilyId: 13,
       description: 'Construire les écrans du swipe.',
       city: 'Lyon',
       postalCode: '69003',

@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { CityField } from '@/components/form/CityField';
+import { JobFamilySelect } from '@/features/job-families/JobFamilySelect';
 import { OptionCards } from '@/components/form/OptionCards';
 import { RichTextField } from '@/components/form/RichTextField';
 import { TagInput } from '@/components/form/TagInput';
@@ -78,6 +79,13 @@ export function OfferForm({
             onSelect={(city) => onChange({ city: city.name, postalCode: city.postalCode })}
             onClear={() => onChange({ city: '', postalCode: '' })}
             {...markGroupIfInvalid(error?.field, 'city')}
+          />
+
+          <JobFamilySelect
+            value={value.jobFamilyId}
+            onChange={(jobFamilyId) => onChange({ jobFamilyId })}
+            invalid={error?.field === 'jobFamilyId'}
+            describedBy={markIfInvalid(error?.field, 'jobFamilyId')['aria-describedby']}
           />
         </div>
 
