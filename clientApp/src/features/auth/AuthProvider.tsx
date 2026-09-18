@@ -91,9 +91,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [abandon]);
 
+  /*
+   * Only the flag moves. Rebuilding the user here would make the client a
+   * second source of truth for an identity the server owns; the next refresh
+   * reads the same answer from the database anyway.
+   */
+  const markProfileCompleted = useCallback(() => {
+    setUser((current) => (current === null ? null : { ...current, hasProfile: true }));
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, login, signup, logout }),
-    [status, user, login, signup, logout],
+    () => ({ status, user, login, signup, logout, markProfileCompleted }),
+    [status, user, login, signup, logout, markProfileCompleted],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

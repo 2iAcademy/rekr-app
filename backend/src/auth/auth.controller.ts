@@ -17,6 +17,9 @@ import { CurrentUser } from './current-user.decorator';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { PasswordResetService } from './password-reset.service';
 import {
   REFRESH_COOKIE_NAME,
   clearRefreshCookie,
@@ -35,7 +38,10 @@ const refreshTokenOf = (req: Request): string | undefined =>
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passwordReset: PasswordResetService,
+  ) {}
 
   @Post('signup')
   @ThrottleScope('signup')
@@ -92,6 +98,30 @@ export class AuthController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     await this.authService.logout(refreshTokenOf(req));
     clearRefreshCookie(res);
+  }
+
+  /**
+   * 204 whatever happens, including on an address no account uses: an answer
+   * that varied would be an account-enumeration endpoint open to anyone.
+   */
+  @Post('password/forgot')
+  @HttpCode(204)
+  @ThrottleScope('passwordForgot')
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    await this.passwordReset.requestReset(forgotPasswordDto.email);
+  }
+
+  /** No session is opened on success: the account has just had every session
+   * cut, and handing one back here would undo that for whoever submitted the
+   * link. The client sends the user through the login screen. */
+  @Post('password/reset')
+  @HttpCode(204)
+  @ThrottleScope('passwordReset')
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    await this.passwordReset.reset(
+      resetPasswordDto.token,
+      resetPasswordDto.password,
+    );
   }
 
   @Get('me')

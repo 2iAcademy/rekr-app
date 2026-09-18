@@ -5,6 +5,20 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
 
+/**
+ * The dev and preview port, overridable from the environment.
+ *
+ * It stays 8080 by default because that is the port the container publishes
+ * (`compose.yml` maps it, and `compose.override.yml` re-publishes it on 8082 on
+ * a machine where 8080 is taken). Running a second server on the host — next to
+ * the containerised one, or next to another project — needs a different port
+ * without editing a committed file, hence the variable.
+ *
+ * `strictPort` is kept: a silent fallback to another port would leave the API
+ * proxy and the container mapping pointing at nothing.
+ */
+const DEV_PORT = Number(process.env.VITE_DEV_PORT ?? 8080);
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -57,11 +71,11 @@ export default defineConfig({
     sourcemap: 'hidden',
   },
   preview: {
-    port: 8080,
+    port: DEV_PORT,
     strictPort: true,
   },
   server: {
-    port: 8080,
+    port: DEV_PORT,
     strictPort: true,
     host: true,
     proxy: {

@@ -1,16 +1,19 @@
-import { Navigate } from 'react-router';
-import { useAuth } from '@/features/auth/useAuth';
+import { isRecruiter, userTypeLabel } from '@/domain/userType';
+import { RouteGuard } from '@/features/auth/RouteGuard';
+import { AccountPage } from '@/features/profile/pages/AccountPage';
+import { CandidateAccountSection } from '@/features/profile/sections/CandidateAccountSection';
+import { RecruiterAccountSection } from '@/features/profile/sections/RecruiterAccountSection';
 
 export function ProfileRoute() {
-  const { status } = useAuth();
-
-  if (status === 'loading') {
-    return null;
-  }
-
-  if (status !== 'authenticated') {
-    return <Navigate to="/connexion" replace />;
-  }
-  //To be developed in the future, for now we redirect to matches page
-  return <Navigate to={'/matches'} replace />;
+  return (
+    <RouteGuard>
+      {(user) => (
+        <AccountPage email={user.email} roleLabel={userTypeLabel(user.userType)}>
+          {/* `isRecruiter` treats an unknown user type as a candidate, matching
+              `userTypeLabel`: an unrecognised session lands on the narrower half. */}
+          {isRecruiter(user.userType) ? <RecruiterAccountSection /> : <CandidateAccountSection />}
+        </AccountPage>
+      )}
+    </RouteGuard>
+  );
 }

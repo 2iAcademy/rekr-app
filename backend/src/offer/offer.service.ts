@@ -1,11 +1,171 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
+import { Prisma, TagCategory } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
 import { resolveTagIds } from '../common/tags/tag-sync';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
+import { OfferFeedItemDto } from './dto/offer-feed-item.dto';
+import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
+import { OfferApplicantDto } from './dto/offer-applicant.dto';
+import { OfferApplicantsQueryDto } from './dto/offer-applicants-query.dto';
+import { OfferDetailDto } from './dto/offer-detail.dto';
+import { OfferListItemDto } from './dto/offer-list-item.dto';
+import { OfferListQueryDto } from './dto/offer-list-query.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
+
+const LIST_ITEM_COLUMNS = {
+  id: true,
+  title: true,
+  status: true,
+  city: true,
+  postalCode: true,
+  contractType: true,
+  minExperienceLevel: true,
+  remotePolicy: true,
+  salaryMin: true,
+  salaryMax: true,
+  createdAt: true,
+  updatedAt: true,
+  // What makes the list actionable: without it the recruiter has to open every
+  // offer to find the one people applied to.
+  //
+  // Counted over the same population `findApplicants` lists, not over the raw
+  // pivot: a badge saying « 2 intéressés » above a screen showing one is a bug
+  // report waiting to happen — and the gap would tell the recruiter that an
+  // account was deactivated.
+  _count: {
+    select: {
+      candidateLikes: {
+        where: { user: { isActive: true, candidateProfile: { isNot: null } } },
+      },
+    },
+  },
+} as const;
+
+/**
+ * The showcase projection of an offer, shared by the candidate feed and the
+ * list of offers a candidate liked: two reads of the same thing by the same
+ * role, so they answer the same shape.
+ */
+const SHOWCASE_OFFER_COLUMNS = {
+  id: true,
+  title: true,
+  description: true,
+  city: true,
+  contractType: true,
+  minExperienceLevel: true,
+  remotePolicy: true,
+  salaryMin: true,
+  salaryMax: true,
+  createdAt: true,
+  company: {
+    select: {
+      id: true,
+      name: true,
+      logo: true,
+    },
+  },
+  // Filtered on the category rather than trusting the pivot to hold one kind:
+  // `offer_tag` carries the benefits too, and `tags` advertises the skills of
+  // the post, not its perks.
+  offerTags: {
+    where: { tag: { category: 'skill' } },
+    orderBy: { tag: { label: 'asc' } },
+    select: { tag: { select: { label: true } } },
+  },
+} as const;
+
+/**
+ * The showcase projection of a single offer: the same columns the feed serves,
+ * plus the ones the detail screen has room for. Declared as a `select` and not
+ * an `include` so that a column added to `offer` tomorrow stays off the wire
+ * until someone puts it here.
+ */
+const DETAIL_OFFER_COLUMNS = {
+  id: true,
+  title: true,
+  description: true,
+  city: true,
+  contractType: true,
+  minExperienceLevel: true,
+  remotePolicy: true,
+  salaryMin: true,
+  salaryMax: true,
+  createdAt: true,
+  company: {
+    select: {
+      id: true,
+      name: true,
+      logo: true,
+      size: true,
+      description: true,
+      city: true,
+    },
+  },
+  // Every category, unlike the feed: the detail screen tells the skills from
+  // the perks itself, and needs both.
+  offerTags: {
+    orderBy: { tag: { label: 'asc' } },
+    select: { tag: { select: { label: true, category: true } } },
+  },
+} as const;
+
+/**
+ * What the company carrying the offer reads on top: the postcode places the
+ * office and the status says where the offer stands in its life cycle, both
+ * read by the management screen and by no one else. The coordinates are read
+ * by no screen at all, so they are in neither projection.
+ */
+const OWNER_DETAIL_OFFER_COLUMNS = {
+  ...DETAIL_OFFER_COLUMNS,
+  postalCode: true,
+  status: true,
+} as const;
+
+/** The columns of an applicant a recruiter may read, and no others. */
+const APPLICANT_COLUMNS = {
+  userId: true,
+  firstName: true,
+  picture: true,
+  bio: true,
+  city: true,
+  desiredJobTitle: true,
+  contractTypes: true,
+  experienceLevel: true,
+  availability: true,
+  remotePolicy: true,
+} as const;
+
+type ShowcaseOfferRow = {
+  offerTags: { tag: { label: string } }[];
+};
+
+/** Flattens the tag pivot into the list of labels the clients read. */
+const toShowcaseOffer = <T extends ShowcaseOfferRow>({
+  offerTags,
+  ...offer
+}: T): Omit<T, 'offerTags'> & { tags: string[] } => ({
+  ...offer,
+  tags: offerTags.map((link) => link.tag.label),
+});
+
+type DetailTag = { label: string; category: TagCategory };
+
+type DetailOfferRow = { offerTags: { tag: DetailTag }[] };
+
+/**
+ * Flattens the tag pivot the detail screen reads. Unlike the showcase one it
+ * keeps the category: the recruiter form splits the labels on it, and the
+ * candidate screen tells a skill from a perk the same way.
+ */
+const toDetailOffer = <T extends DetailOfferRow>({
+  offerTags,
+  ...offer
+}: T): Omit<T, 'offerTags'> & { tags: DetailTag[] } => ({
+  ...offer,
+  tags: offerTags.map((link) => link.tag),
+});
 
 @Injectable()
 export class OfferService {
@@ -15,7 +175,7 @@ export class OfferService {
   ) {}
 
   async create(userId: number, dto: CreateOfferDto) {
-    const { skills, ...offerData } = dto;
+    const { skills, benefits, ...offerData } = dto;
 
     const coordinates = await this.cities.assertKnown(dto);
 
@@ -36,16 +196,14 @@ export class OfferService {
         },
       });
 
-      if (skills) {
-        await this.syncSkills(tx, offer.id, skills);
-      }
+      await this.syncTagLists(tx, offer.id, { skills, benefits });
 
       return offer;
     });
   }
 
   async update(userId: number, offerId: number, dto: UpdateOfferDto) {
-    const { skills, ...offerData } = dto;
+    const { skills, benefits, ...offerData } = dto;
     let coordinates: Coordinates | null = null;
 
     if (dto.city !== undefined || dto.postalCode !== undefined) {
@@ -70,15 +228,294 @@ export class OfferService {
         data: { ...offerData, ...(coordinates ?? {}) },
       });
 
-      if (skills) {
-        await this.syncSkills(tx, offerId, skills);
-      }
+      await this.syncTagLists(tx, offerId, { skills, benefits });
 
       return updated;
     });
   }
 
-  async findOneById(user: AuthUser, id: number) {
+  /**
+   * The recruiter's own offers, every status included — this is the screen
+   * where a draft gets published and a closed offer reopened, not the candidate
+   * feed. Scoping on the company rather than on `createdById` is what lets a
+   * second recruiter of the same company take over an offer they did not write.
+   */
+  async findMine(
+    userId: number,
+    { page = 1, limit = 50, status }: OfferListQueryDto,
+  ): Promise<OfferListItemDto[]> {
+    const profile = await this.prisma.recruiterProfile.findUnique({
+      where: { userId },
+      select: { companyId: true },
+    });
+    if (!profile) {
+      throw new NotFoundException('Recruiter has no company');
+    }
+
+    const offers = await this.prisma.offer.findMany({
+      where: {
+        companyId: profile.companyId,
+        ...(status ? { status } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: LIST_ITEM_COLUMNS,
+    });
+
+    // Flattened: `_count` is a Prisma shape, and leaking it into the contract
+    // would tie the client to the way the figure happens to be read.
+    return offers.map(({ _count, ...offer }) => ({
+      ...offer,
+      applicantCount: _count.candidateLikes,
+    }));
+  }
+
+  /**
+   * The deck a candidate swipes, shaped by their own profile.
+   *
+   * The preferences are read here from the stored profile rather than taken
+   * from the query: they are already recorded, so asking the client to resend
+   * them would give one fact two sources, and let the deck drift from the
+   * profile the candidate is shown. The screen has no filter bar for the same
+   * reason — those two axes are edited on the profile, and nowhere else.
+   *
+   * This is curation, NOT an access boundary, and nothing here should be read
+   * as one: `GET /offers/:id` and `POST /offers/:id/like` both serve any `open`
+   * offer to any candidate, preferences or not. A narrower deck hides nothing
+   * that iterating over the ids would not reveal.
+   *
+   * An unset preference narrows nothing: the candidate did not say, which is
+   * not the same as wanting nothing. Symmetrically, an offer that left the
+   * field empty is kept — a post that never said is not a post that says no.
+   */
+  async findFeed(
+    user: AuthUser,
+    query: OfferFeedQueryDto,
+  ): Promise<OfferFeedItemDto[]> {
+    const { limit } = query;
+
+    const profile = await this.prisma.candidateProfile.findUnique({
+      where: { userId: user.id },
+      select: { contractTypes: true, remotePolicy: true },
+    });
+
+    const wantedContracts = profile?.contractTypes ?? [];
+    const wantedRemote = profile?.remotePolicy ?? null;
+
+    // Collected in an `AND` rather than spread as two `OR` keys: a second `OR`
+    // at the same level would overwrite the first, silently dropping one of the
+    // two preferences. `null` cannot ride in an `in` either, hence the pairs.
+    const preferences: Prisma.OfferWhereInput[] = [
+      ...(wantedContracts.length > 0
+        ? [
+            {
+              OR: [
+                { contractType: { in: wantedContracts } },
+                { contractType: { equals: null } },
+              ],
+            },
+          ]
+        : []),
+      ...(wantedRemote
+        ? [
+            {
+              OR: [
+                { remotePolicy: { equals: wantedRemote } },
+                { remotePolicy: { equals: null } },
+              ],
+            },
+          ]
+        : []),
+    ];
+
+    const offers = await this.prisma.offer.findMany({
+      where: {
+        status: 'open',
+        ...(preferences.length > 0 ? { AND: preferences } : {}),
+        candidateLikes: { none: { candidateUserId: user.id } },
+        candidatePasses: { none: { candidateUserId: user.id } },
+      },
+      // `createdAt` alone is not unique, so it cannot order the deck on its
+      // own: two offers written in the same instant would swap places from one
+      // read to the next. The id break is what makes the order stable.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+      select: SHOWCASE_OFFER_COLUMNS,
+    });
+
+    return offers.map(toShowcaseOffer);
+  }
+
+  /**
+   * Writes down that a candidate is interested in an offer.
+   *
+   * Idempotent: liking twice is what a double tap produces, not an error worth
+   * showing. No `Match` is derived from a reciprocal pair — that rule belongs
+   * to #134, and settling it here would decide a product question this code
+   * does not carry.
+   */
+  async like(candidateUserId: number, offerId: number): Promise<void> {
+    // Only a published offer can be liked, and a candidate cannot see any
+    // other — same 404 as the detail route, for the same reason: a 403 on an
+    // unpublished offer would confirm that the id exists.
+    const offer = await this.prisma.offer.findFirst({
+      where: { id: offerId, status: 'open' },
+      select: { id: true },
+    });
+    if (!offer) {
+      throw new NotFoundException('Offer not found');
+    }
+
+    await this.prisma.candidateLikesOffer.createMany({
+      data: [{ candidateUserId, offerId }],
+      skipDuplicates: true,
+    });
+  }
+
+  /** The offers the calling candidate has liked, newest interest first. */
+  async findLiked(
+    candidateUserId: number,
+    { page, limit }: OfferApplicantsQueryDto,
+  ): Promise<OfferFeedItemDto[]> {
+    const likes = await this.prisma.candidateLikesOffer.findMany({
+      // Published only, exactly as the match list reads: a like is not a
+      // standing right to read the offer. Unpublished, the post is being
+      // reworked, and `GET /offers/:id` answers 404 on it — this list must not
+      // be the way around that.
+      where: { candidateUserId, offer: { status: 'open' } },
+      // `offerId` breaks the ties `likedAt` leaves: two likes written in the
+      // same instant would otherwise swap places between two reads.
+      orderBy: [{ likedAt: 'desc' }, { offerId: 'desc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+      select: { offer: { select: SHOWCASE_OFFER_COLUMNS } },
+    });
+
+    return likes.map(({ offer }) => toShowcaseOffer(offer));
+  }
+
+  /**
+   * The candidates who liked one of the recruiter's offers.
+   *
+   * Every status is served, not just `open`: the recruiter drives the whole
+   * life cycle from their own screens, and a paused post still has applicants
+   * to answer.
+   */
+  async findApplicants(
+    recruiterUserId: number,
+    offerId: number,
+    { page, limit }: OfferApplicantsQueryDto,
+  ): Promise<OfferApplicantDto[]> {
+    await this.assertOwnedOffer(recruiterUserId, offerId);
+
+    const likes = await this.prisma.candidateLikesOffer.findMany({
+      // Both predicates belong in the `where`, not after the read: filtering a
+      // page once it is fetched returns fewer rows than asked without it being
+      // the last one, and the caller cannot tell the two apart.
+      //
+      // A like cannot exist without an account, but a profile can still be
+      // missing: signup writes the user, the wizard writes the profile. Such a
+      // row has nothing to show.
+      where: {
+        offerId,
+        user: { isActive: true, candidateProfile: { isNot: null } },
+      },
+      orderBy: [{ likedAt: 'desc' }, { candidateUserId: 'desc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+      select: {
+        user: {
+          select: {
+            candidateProfile: { select: APPLICANT_COLUMNS },
+            // Same detour as the profile reads: `candidate_tag` is keyed on
+            // the user, and selecting nothing else off that relation keeps the
+            // account columns out of reach.
+            candidateTags: {
+              where: { tag: { category: 'skill' } },
+              orderBy: { tag: { label: 'asc' } },
+              select: { tag: { select: { label: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    // The `where` above guarantees the profile, which the types cannot know.
+    return likes.flatMap(({ user }) =>
+      user.candidateProfile
+        ? [
+            {
+              ...user.candidateProfile,
+              tags: user.candidateTags.map((link) => link.tag.label),
+            },
+          ]
+        : [],
+    );
+  }
+
+  /**
+   * Writes down the recruiter's interest in one of their applicants.
+   *
+   * Scoped through the offer: the recruiter answers someone who applied to a
+   * post of theirs, so both the offer and the application are verified before
+   * anything is written. Idempotent, and no `Match` is derived — see `like`.
+   *
+   * The row itself carries no offer: `RecruiterLikesCandidate` is keyed on the
+   * pair alone, and giving it an `offerId` is #134's business, not this one's.
+   */
+  async likeApplicant(
+    recruiterUserId: number,
+    offerId: number,
+    candidateUserId: number,
+  ): Promise<void> {
+    await this.assertOwnedOffer(recruiterUserId, offerId);
+
+    // One answer for « no such application » and « not on this offer »: a
+    // recruiter may only answer someone who came to them.
+    const application = await this.prisma.candidateLikesOffer.findUnique({
+      where: {
+        candidateUserId_offerId: { candidateUserId, offerId },
+      },
+      select: { candidateUserId: true },
+    });
+    if (!application) {
+      throw new NotFoundException('Applicant not found');
+    }
+
+    await this.prisma.recruiterLikesCandidate.createMany({
+      data: [{ recruiterUserId, candidateUserId }],
+      skipDuplicates: true,
+    });
+  }
+
+  /**
+   * Resolves the offer a recruiter names, or answers 404.
+   *
+   * 404 rather than 403 on an offer of another company, as everywhere else
+   * here: telling a stranger « not yours » already tells them the id exists.
+   */
+  private async assertOwnedOffer(
+    recruiterUserId: number,
+    offerId: number,
+  ): Promise<void> {
+    const [offer, profile] = await Promise.all([
+      this.prisma.offer.findUnique({
+        where: { id: offerId },
+        select: { companyId: true },
+      }),
+      this.prisma.recruiterProfile.findUnique({
+        where: { userId: recruiterUserId },
+        select: { companyId: true },
+      }),
+    ]);
+
+    if (!offer || !profile || offer.companyId !== profile.companyId) {
+      throw new NotFoundException('Offer not found');
+    }
+  }
+
+  async findOneById(user: AuthUser, id: number): Promise<OfferDetailDto> {
     const profile =
       user.userType === 'recruiter'
         ? await this.prisma.recruiterProfile.findUnique({
@@ -86,44 +523,44 @@ export class OfferService {
           })
         : null;
 
-    const offer = await this.prisma.offer.findFirst({
-      where: {
-        id,
-        OR: [
-          { status: 'open' },
-          ...(profile ? [{ companyId: profile.companyId }] : []),
-        ],
-      },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-            logo: true,
-            size: true,
-            description: true,
-            city: true,
-          },
-        },
-        offerTags: {
-          include: {
-            tag: {
-              select: {
-                id: true,
-                label: true,
-                category: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    // An offer is readable while it is published; a recruiter reads every offer
+    // of their own company, whatever its status.
+    const where = {
+      id,
+      OR: [
+        { status: 'open' as const },
+        ...(profile ? [{ companyId: profile.companyId }] : []),
+      ],
+    };
+
+    // Which projection applies depends on the company carrying the offer, so
+    // ownership is settled on a read of its own. Claiming the owner columns
+    // first and dropping them afterwards would have taken them out of the
+    // database, and the next spread would put them back on the wire.
+    const owned =
+      profile !== null &&
+      (
+        await this.prisma.offer.findFirst({
+          where,
+          select: { companyId: true },
+        })
+      )?.companyId === profile.companyId;
+
+    const offer = owned
+      ? await this.prisma.offer.findFirst({
+          where,
+          select: OWNER_DETAIL_OFFER_COLUMNS,
+        })
+      : await this.prisma.offer.findFirst({
+          where,
+          select: DETAIL_OFFER_COLUMNS,
+        });
 
     if (!offer) {
       throw new NotFoundException('Offer not found');
     }
 
-    return offer;
+    return toDetailOffer(offer);
   }
 
   /**
@@ -161,17 +598,41 @@ export class OfferService {
     });
   }
 
-  private async syncSkills(
+  /**
+   * An omitted list means « leave it as it is », an empty one means « clear it ».
+   * Distinguishing the two is what lets a patch touch the skills without
+   * mentioning the benefits, and the other way round.
+   */
+  private async syncTagLists(
     tx: Prisma.TransactionClient,
     offerId: number,
-    skills: string[],
+    lists: { skills?: string[]; benefits?: string[] },
   ): Promise<void> {
-    // `offerTag` rows are only ever written here, and skills are the only
-    // category an offer links, so wiping the set and re-creating it from the
-    // payload is the symmetric operation.
-    await tx.offerTag.deleteMany({ where: { offerId } });
+    if (lists.skills) {
+      await this.syncOfferTags(tx, offerId, lists.skills, 'skill');
+    }
 
-    const tagIds = await resolveTagIds(tx, skills, 'skill');
+    if (lists.benefits) {
+      await this.syncOfferTags(tx, offerId, lists.benefits, 'benefit');
+    }
+  }
+
+  /**
+   * Replaces one category of an offer's tags, and only that one.
+   *
+   * The wipe is scoped on the category as well as on the offer: skills and
+   * benefits share the `offer_tag` pivot, so a wipe on `offerId` alone would
+   * make saving either list silently delete the other.
+   */
+  private async syncOfferTags(
+    tx: Prisma.TransactionClient,
+    offerId: number,
+    labels: string[],
+    category: TagCategory,
+  ): Promise<void> {
+    await tx.offerTag.deleteMany({ where: { offerId, tag: { category } } });
+
+    const tagIds = await resolveTagIds(tx, labels, category);
     if (tagIds.length === 0) {
       return;
     }

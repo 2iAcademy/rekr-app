@@ -11,78 +11,39 @@ export interface MatchListItem {
     title: string;
   };
   counterpart: {
-    kind: 'company' | 'candidate';
+    kind: 'company';
     id: number;
     name: string;
     avatarUrl: string | null;
     headline: string | null;
-  } | null;
+  };
 }
 
 @Injectable()
 export class MatchService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * The matches of the calling candidate.
+   *
+   * A candidate route only: a match is born of a reciprocal like on one given
+   * offer, so a recruiter reads it on the offer concerned rather than in a list
+   * spanning every post of their company. The role is enforced on the
+   * controller, and this method has no recruiter branch left to fall back on.
+   *
+   * Offers that left `open` are dropped: a match on a filled or closed post is
+   * a dead end, and showing it would invite a candidate to wait for an answer
+   * that is no longer coming.
+   */
   async findMine(
     user: AuthUser,
     { page = 1, limit = 50 }: MatchListQueryDto = new MatchListQueryDto(),
   ): Promise<MatchListItem[]> {
-    const pagination = {
+    const matches = await this.prisma.match.findMany({
+      where: { candidateUserId: user.id, offer: { status: 'open' } },
+      orderBy: { matchedAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
-    };
-
-    if (user.userType === 'candidate') {
-      const matches = await this.prisma.match.findMany({
-        where: { candidateUserId: user.id, offer: { status: 'open' } },
-        orderBy: { matchedAt: 'desc' },
-        ...pagination,
-        select: {
-          id: true,
-          matchedAt: true,
-          offer: {
-            select: {
-              id: true,
-              title: true,
-              company: {
-                select: {
-                  id: true,
-                  name: true,
-                  logo: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      return matches.map((match) => ({
-        id: match.id,
-        matchedAt: match.matchedAt,
-        offer: { id: match.offer.id, title: match.offer.title },
-        counterpart: {
-          kind: 'company',
-          id: match.offer.company.id,
-          name: match.offer.company.name,
-          avatarUrl: match.offer.company.logo,
-          headline: match.offer.title,
-        },
-      }));
-    }
-
-    // `recruiterUserId` is nullable in the schema, while every match points
-    // to an offer. Scoping through that offer's company therefore covers both
-    // current matches and historical rows created before the recruiter link.
-    const matches = await this.prisma.match.findMany({
-      where: {
-        offer: {
-          company: {
-            recruiter: { some: { userId: user.id } },
-          },
-        },
-      },
-      orderBy: { matchedAt: 'desc' },
-      ...pagination,
       select: {
         id: true,
         matchedAt: true,
@@ -90,17 +51,11 @@ export class MatchService {
           select: {
             id: true,
             title: true,
-          },
-        },
-        candidate: {
-          select: {
-            id: true,
-            candidateProfile: {
+            company: {
               select: {
-                firstName: true,
-                lastName: true,
-                picture: true,
-                desiredJobTitle: true,
+                id: true,
+                name: true,
+                logo: true,
               },
             },
           },
@@ -108,23 +63,17 @@ export class MatchService {
       },
     });
 
-    return matches.map((match) => {
-      const profile = match.candidate.candidateProfile;
-
-      return {
-        id: match.id,
-        matchedAt: match.matchedAt,
-        offer: { id: match.offer.id, title: match.offer.title },
-        counterpart: profile
-          ? {
-              kind: 'candidate' as const,
-              id: match.candidate.id,
-              name: `${profile.firstName} ${profile.lastName}`,
-              avatarUrl: profile.picture,
-              headline: profile.desiredJobTitle,
-            }
-          : null,
-      };
-    });
+    return matches.map((match) => ({
+      id: match.id,
+      matchedAt: match.matchedAt,
+      offer: { id: match.offer.id, title: match.offer.title },
+      counterpart: {
+        kind: 'company',
+        id: match.offer.company.id,
+        name: match.offer.company.name,
+        avatarUrl: match.offer.company.logo,
+        headline: match.offer.title,
+      },
+    }));
   }
 }

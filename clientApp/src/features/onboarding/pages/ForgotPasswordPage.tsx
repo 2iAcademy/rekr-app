@@ -2,6 +2,26 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { authControllerForgotPassword } from '@/api/generated';
+import { ApiError } from '@/api/customFetch';
+import { passwordForgotBusiness } from '@/features/auth/authFeedback';
+import { notifyFailure } from '@/lib/feedback/notify';
+
+/**
+ * The endpoint answers 204 for an unknown address, an inactive account and a
+ * mail that could not be sent — the whole point being that none of them is
+ * distinguishable from a delivered link, so all of them land on the
+ * confirmation screen unchanged. What must not is a request the server never
+ * answered on its merits (outage, throttle) and a payload it rejected outright:
+ * a 400 means nothing was sent, and announcing a delivery would leave the user
+ * waiting for a mail that will never come. Neither wording says anything about
+ * the address existing.
+ */
+const blocksConfirmation = (cause: unknown): boolean =>
+  !(cause instanceof ApiError) ||
+  cause.status === 400 ||
+  cause.status === 429 ||
+  cause.status >= 500;
 
 interface ForgotPasswordPageProps {
   onBack?: () => void;
@@ -21,13 +41,22 @@ export function ForgotPasswordPage({ onBack, onSignIn, onSubmit }: ForgotPasswor
     }
   }, [submitted]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const trimmedEmail = email.trim();
-    setEmail(trimmedEmail);
-    onSubmit?.({ email: trimmedEmail });
+    // ForgotPasswordDto normalizes the address server-side; doing it again here
+    // would only rewrite what the user sees for no gain.
+    try {
+      await authControllerForgotPassword({ email });
+    } catch (caught) {
+      if (blocksConfirmation(caught)) {
+        notifyFailure(caught, passwordForgotBusiness);
+        return;
+      }
+    }
+
+    onSubmit?.({ email });
     setSubmitted(true);
-  }
+  };
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background px-6 pt-4 pb-8">

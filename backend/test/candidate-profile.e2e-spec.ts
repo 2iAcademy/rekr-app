@@ -432,4 +432,272 @@ describe('CandidateProfile (e2e)', () => {
       .send({ firstName: 'Ada', lastName: 'Lovelace', hacker: 'x' })
       .expect(400);
   });
+
+  /**
+   * The recruiter deck is gone: a recruiter publishes an offer and reads who
+   * applied to it rather than swiping through the whole pool of candidates.
+   *
+   * Asserted as a 404 on the route itself, for both roles. A leftover handler
+   * would answer 200 or 403 — either way it would still be exposing the pool.
+   */
+  describe('the retired recruiter deck', () => {
+    it.each(['recruiter', 'candidate'] as const)(
+      'no longer serves the candidate deck to a %s (404)',
+      async (userType) => {
+        const user = await createUser(userType);
+
+        await httpRequest(app)
+          .get('/api/candidate-profiles/feed')
+          .set('Authorization', bearerFor(app, user.id, userType))
+          .expect(404);
+      },
+    );
+
+    /**
+     * The collection root, guarded too. It is where a « list the candidates »
+     * handler would naturally land — and it would inherit the class-level
+     * `@Roles('candidate')`, serving the whole pool to every candidate. Nothing
+     * else in the suite holds that address.
+     */
+    it.each(['recruiter', 'candidate'] as const)(
+      'does not list the candidate pool from the collection root to a %s (404)',
+      async (userType) => {
+        const user = await createUser(userType);
+
+        await httpRequest(app)
+          .get('/api/candidate-profiles')
+          .set('Authorization', bearerFor(app, user.id, userType))
+          .expect(404);
+      },
+    );
+  });
+
+  describe('GET /api/candidate-profiles/me', () => {
+    const readMine = (userId: number) =>
+      httpRequest(app)
+        .get('/api/candidate-profiles/me')
+        .set('Authorization', bearerFor(app, userId, 'candidate'));
+
+    const linkTag = async (
+      userId: number,
+      label: string,
+      category: 'skill' | 'language',
+    ) => {
+      const tag = await prisma.tag.create({ data: { label, category } });
+      await prisma.candidateTag.create({
+        data: { candidateUserId: userId, tagId: tag.id },
+      });
+    };
+
+    it('rejects an unauthenticated read with 401', async () => {
+      await httpRequest(app).get('/api/candidate-profiles/me').expect(401);
+    });
+
+    it('forbids a recruiter from reading a candidate profile (403)', async () => {
+      const recruiter = await createUser('recruiter');
+
+      await httpRequest(app)
+        .get('/api/candidate-profiles/me')
+        .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
+        .expect(403);
+    });
+
+    it('refuses an inactive account with 403', async () => {
+      const user = await createUser('candidate');
+      await prisma.candidateProfile.create({
+        data: { userId: user.id, firstName: 'Ada', lastName: 'Lovelace' },
+      });
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { isActive: false },
+      });
+
+      await readMine(user.id).expect(403);
+    });
+
+    // Same wording as the PATCH on the same row: one missing profile, one
+    // message, whichever verb the client used.
+    it('answers 404 when the caller has no profile', async () => {
+      const user = await createUser('candidate');
+
+      const res = await readMine(user.id).expect(404);
+
+      expect((res.body as { message?: string }).message).toBe(
+        'Candidate profile not found',
+      );
+    });
+
+    it('returns the whole profile of the caller, and nothing else', async () => {
+      const user = await createUser('candidate');
+      await prisma.candidateProfile.create({
+        data: {
+          userId: user.id,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          picture: 'candidates/1/picture/ada.webp',
+          bio: 'Pionnière du calcul.',
+          city: 'Lyon',
+          postalCode: '69001',
+          latitude: '45.7578125',
+          longitude: '4.8320114',
+          desiredJobTitle: 'Développeuse Front React',
+          contractTypes: ['CDI', 'FREELANCE'],
+          experienceLevel: 'CONFIRME',
+          availability: 'WITHIN_DELAY',
+          availabilityDelayMonths: 3,
+          availabilityDate: new Date('2026-09-01T00:00:00.000Z'),
+          remotePolicy: 'HYBRID',
+          mobilityRadiusKm: 30,
+          mobilityNationwide: false,
+          salaryMin: 45000,
+          salaryMax: 60000,
+          linkedinUrl: 'https://linkedin.com/in/ada',
+          cvUrl: 'candidates/1/cv/ada.pdf',
+        },
+      });
+      await linkTag(user.id, 'React', 'skill');
+      await linkTag(user.id, 'Anglais', 'language');
+
+      const res = await readMine(user.id).expect(200);
+
+      // Exhaustive on purpose: `toEqual` fails on an extra key, so a column
+      // added to `candidate_profile` later cannot reach a client unnoticed.
+      expect(res.body).toEqual({
+        id: expect.any(Number) as number,
+        userId: user.id,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        picture: 'candidates/1/picture/ada.webp',
+        bio: 'Pionnière du calcul.',
+        city: 'Lyon',
+        postalCode: '69001',
+        latitude: expect.any(String) as string,
+        longitude: expect.any(String) as string,
+        desiredJobTitle: 'Développeuse Front React',
+        contractTypes: ['CDI', 'FREELANCE'],
+        experienceLevel: 'CONFIRME',
+        availability: 'WITHIN_DELAY',
+        availabilityDelayMonths: 3,
+        availabilityDate: '2026-09-01T00:00:00.000Z',
+        remotePolicy: 'HYBRID',
+        mobilityRadiusKm: 30,
+        mobilityNationwide: false,
+        salaryMin: 45000,
+        salaryMax: 60000,
+        linkedinUrl: 'https://linkedin.com/in/ada',
+        cvUrl: 'candidates/1/cv/ada.pdf',
+        skills: ['React'],
+        languages: ['Anglais'],
+        createdAt: expect.any(String) as string,
+        updatedAt: expect.any(String) as string,
+      });
+
+      // Decimal(10, 7) travels as a string, verbatim. The fixture carries all
+      // seven decimals and the assertion compares the string, so a rounding
+      // anywhere on the way out fails here — which a numeric tolerance would
+      // have swallowed.
+      const body = res.body as { latitude: string; longitude: string };
+      expect(body.latitude).toBe('45.7578125');
+      expect(body.longitude).toBe('4.8320114');
+    });
+
+    // The two lists come back separated and each sorted by label: the account
+    // screen renders them as two distinct groups, and an unordered read would
+    // reshuffle them on every request.
+    it('splits skills and languages by category, each sorted by label', async () => {
+      const user = await createUser('candidate');
+      await prisma.candidateProfile.create({
+        data: { userId: user.id, firstName: 'Ada', lastName: 'Lovelace' },
+      });
+      await linkTag(user.id, 'TypeScript', 'skill');
+      await linkTag(user.id, 'Espagnol', 'language');
+      await linkTag(user.id, 'React', 'skill');
+      await linkTag(user.id, 'Anglais', 'language');
+
+      const res = await readMine(user.id).expect(200);
+
+      expect(res.body).toMatchObject({
+        skills: ['React', 'TypeScript'],
+        languages: ['Anglais', 'Espagnol'],
+      });
+    });
+
+    it("never returns another candidate's profile", async () => {
+      const alice = await createUser('candidate');
+      const bob = await createUser('candidate');
+
+      await prisma.candidateProfile.create({
+        data: {
+          userId: alice.id,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          bio: 'bio-alice',
+        },
+      });
+      await prisma.candidateProfile.create({
+        data: {
+          userId: bob.id,
+          firstName: 'Bob',
+          lastName: 'Morane',
+          bio: 'bio-bob',
+        },
+      });
+      await linkTag(alice.id, 'React', 'skill');
+      await linkTag(bob.id, 'COBOL', 'skill');
+
+      const res = await readMine(alice.id).expect(200);
+
+      expect(res.body).toMatchObject({
+        userId: alice.id,
+        bio: 'bio-alice',
+        skills: ['React'],
+      });
+      expect(JSON.stringify(res.body)).not.toContain('bio-bob');
+      expect(JSON.stringify(res.body)).not.toContain('COBOL');
+    });
+
+    /**
+     * `toEqual` treats a missing key as `undefined` but not as `null`, so this
+     * locks the keys being present and empty. The edit form binds to all of
+     * them; an absent key would render as an uncontrolled input.
+     */
+    it('answers null and empty lists for a profile with nothing filled in', async () => {
+      const user = await createUser('candidate');
+      await prisma.candidateProfile.create({
+        data: { userId: user.id, firstName: 'Ada', lastName: 'Lovelace' },
+      });
+
+      const res = await readMine(user.id).expect(200);
+
+      expect(res.body).toEqual({
+        id: expect.any(Number) as number,
+        userId: user.id,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        picture: null,
+        bio: null,
+        city: null,
+        postalCode: null,
+        latitude: null,
+        longitude: null,
+        desiredJobTitle: null,
+        contractTypes: [],
+        experienceLevel: null,
+        availability: null,
+        availabilityDelayMonths: null,
+        availabilityDate: null,
+        remotePolicy: null,
+        mobilityRadiusKm: null,
+        mobilityNationwide: null,
+        salaryMin: null,
+        salaryMax: null,
+        linkedinUrl: null,
+        cvUrl: null,
+        skills: [],
+        languages: [],
+        createdAt: expect.any(String) as string,
+        updatedAt: expect.any(String) as string,
+      });
+    });
+  });
 });

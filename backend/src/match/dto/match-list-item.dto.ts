@@ -8,9 +8,19 @@ export class MatchOfferDto {
   title!: string;
 }
 
+/**
+ * The other side of a match, seen by the candidate whose list it is: always the
+ * company behind the offer.
+ *
+ * `kind` survives as a single-valued discriminator rather than being dropped:
+ * the reciprocal view — a recruiter reading who applied to one of their offers —
+ * carries a candidate, and it will land on its own route with its own shape.
+ * Keeping the tag means the client can branch on it the day a second shape
+ * exists, without the field having to be reintroduced everywhere.
+ */
 export class MatchCounterpartDto {
-  @ApiProperty({ enum: ['company', 'candidate'], example: 'company' })
-  kind!: 'company' | 'candidate';
+  @ApiProperty({ enum: ['company'], example: 'company' })
+  kind!: 'company';
 
   @ApiProperty({ example: 8 })
   id!: number;
@@ -43,6 +53,8 @@ export class MatchListItemDto {
   @ApiProperty({ type: () => MatchOfferDto })
   offer!: MatchOfferDto;
 
-  @ApiPropertyOptional({ type: () => MatchCounterpartDto, nullable: true })
-  counterpart!: MatchCounterpartDto | null;
+  // Never absent: the list is scoped to offers that are still open, and an
+  // offer always belongs to a company.
+  @ApiProperty({ type: () => MatchCounterpartDto })
+  counterpart!: MatchCounterpartDto;
 }

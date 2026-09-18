@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, RefreshToken } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { IssuedRefreshToken, SessionContext } from './session.interface';
 import { seal, unseal } from './successor-seal';
+import { hashToken } from './token-hash';
 
 type PrismaWriter = PrismaService | Prisma.TransactionClient;
 
@@ -27,17 +28,8 @@ export class RefreshTokenService {
     private readonly config: ConfigService,
   ) {}
 
-  /**
-   * SHA-256 rather than bcrypt, which is the opposite of what the password
-   * column does — deliberately. bcrypt salts each entry, which rules out any
-   * indexed lookup, and we must find the row *from* the presented token. Its
-   * cost also exists to slow a dictionary attack against a low-entropy secret;
-   * this one is 256 bits of cryptographic randomness, so there is no dictionary
-   * to walk. What matters is preserved: a database dump yields no usable
-   * session.
-   */
   static hash(token: string): string {
-    return createHash('sha256').update(token, 'utf8').digest('hex');
+    return hashToken(token);
   }
 
   getTtlMs(): number {
@@ -183,6 +175,22 @@ export class RefreshTokenService {
   async revokeById(id: number): Promise<void> {
     await this.prisma.refreshToken.update({
       where: { id },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  /**
+   * Every live session of one account, cut in a single statement. The writer is
+   * a parameter so that a password reset can revoke inside the transaction that
+   * changes the password: were the two split, a crash between them would leave
+   * the old sessions alive against a password their holder no longer knows.
+   */
+  async revokeAllForUser(
+    userId: number,
+    client: PrismaWriter = this.prisma,
+  ): Promise<void> {
+    await client.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
   }

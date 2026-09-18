@@ -35,6 +35,10 @@
 }
 
 @theme inline {
+  /* Penpot breakpoints: 375 (mobile, base) / 768 (tablet, `md:`) / 1440 (desktop).
+     The shell only switches to a sidebar past 1440 — below that, including on
+     tablet, the navigation stays in the header. */
+  --breakpoint-desktop: 90rem;
   --font-heading: 'Outfit Variable', sans-serif;
   --font-sans: 'Inter Variable', sans-serif;
   --color-brand: var(--brand);

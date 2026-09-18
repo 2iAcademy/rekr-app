@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { Prisma } from '../../generated/prisma/client';
 import { CandidateProfileService } from './candidate-profile.service';
 import { CityService } from '../city/city.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -281,6 +282,124 @@ describe('CandidateProfileService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(prisma.candidateProfile.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findMine', () => {
+    const profileRow = (overrides: Record<string, unknown> = {}) => ({
+      id: 1,
+      userId: 42,
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      latitude: null,
+      longitude: null,
+      user: { candidateTags: [] as unknown[] },
+      ...overrides,
+    });
+
+    it('rejects a read when the user has no profile', async () => {
+      prisma.candidateProfile.findUnique.mockResolvedValue(null);
+
+      await expect(service.findMine(42)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    /**
+     * Two properties in one assertion, both structural: the row is keyed on the
+     * caller, and the only thing read off the `user` relation is the tag links —
+     * `passwordHash` lives on that same row.
+     */
+    it('keys the read on the caller and reads nothing off the account but its tags', async () => {
+      prisma.candidateProfile.findUnique.mockResolvedValue(profileRow());
+
+      await service.findMine(42);
+
+      expect(prisma.candidateProfile.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 42 },
+          select: expect.objectContaining({
+            user: {
+              select: {
+                candidateTags: {
+                  orderBy: { tag: { label: 'asc' } },
+                  select: { tag: { select: { label: true, category: true } } },
+                },
+              },
+            },
+          }) as object,
+        }),
+      );
+    });
+
+    it('splits the tag links into skills and languages', async () => {
+      prisma.candidateProfile.findUnique.mockResolvedValue(
+        profileRow({
+          user: {
+            candidateTags: [
+              { tag: { label: 'Anglais', category: 'language' } },
+              { tag: { label: 'React', category: 'skill' } },
+              { tag: { label: 'TypeScript', category: 'skill' } },
+            ],
+          },
+        }),
+      );
+
+      const result = await service.findMine(42);
+
+      expect(result.skills).toEqual(['React', 'TypeScript']);
+      expect(result.languages).toEqual(['Anglais']);
+    });
+
+    // `tag_category` holds seven values and the account screen renders two of
+    // them. A link in any other category belongs to neither list rather than
+    // falling into whichever one is built last.
+    it('drops a tag link whose category is neither a skill nor a language', async () => {
+      prisma.candidateProfile.findUnique.mockResolvedValue(
+        profileRow({
+          user: {
+            candidateTags: [{ tag: { label: 'Docker', category: 'tech' } }],
+          },
+        }),
+      );
+
+      const result = await service.findMine(42);
+
+      expect(result.skills).toEqual([]);
+      expect(result.languages).toEqual([]);
+    });
+
+    it('renders the coordinates as strings', async () => {
+      prisma.candidateProfile.findUnique.mockResolvedValue(
+        profileRow({
+          latitude: new Prisma.Decimal('45.7580000'),
+          longitude: new Prisma.Decimal('4.8350000'),
+        }),
+      );
+
+      const result = await service.findMine(42);
+
+      expect(result.latitude).toBe('45.758');
+      expect(result.longitude).toBe('4.835');
+    });
+
+    it('keeps an unset coordinate null rather than stringifying it', async () => {
+      prisma.candidateProfile.findUnique.mockResolvedValue(profileRow());
+
+      const result = await service.findMine(42);
+
+      expect(result.latitude).toBeNull();
+      expect(result.longitude).toBeNull();
+    });
+
+    // The tags are read through the `user` relation, so the relation itself
+    // must not ride along into the response.
+    it('does not leak the relation it read the tags through', async () => {
+      prisma.candidateProfile.findUnique.mockResolvedValue(profileRow());
+
+      const result = await service.findMine(42);
+
+      expect(result).not.toHaveProperty('user');
     });
   });
 });

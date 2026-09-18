@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { Prisma } from '../../generated/prisma/client';
 import { CompanyService } from './company.service';
 import { CityService } from '../city/city.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,8 +16,6 @@ type PrismaMock = {
     create: jest.Mock;
     update: jest.Mock;
   };
-  companyTag: { deleteMany: jest.Mock; createMany: jest.Mock };
-  tag: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
 };
 
@@ -28,8 +27,6 @@ const buildPrismaMock = (): PrismaMock => {
       create: jest.fn(),
       update: jest.fn(),
     },
-    companyTag: { deleteMany: jest.fn(), createMany: jest.fn() },
-    tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
   };
   return mock;
@@ -231,6 +228,91 @@ describe('CompanyService', () => {
       );
 
       expect(prisma.company.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findMine', () => {
+    const profileRow = (company: Record<string, unknown> = {}) => ({
+      firstName: 'Rick',
+      lastName: 'Deckard',
+      jobTitle: 'CTO',
+      company: {
+        id: 10,
+        name: 'Acme',
+        latitude: null,
+        longitude: null,
+        ...company,
+      },
+    });
+
+    it('rejects a read when the recruiter has no company', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(null);
+
+      await expect(service.findMine(7)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    // The company is reached through the caller's own profile: no request
+    // names it, so none can name someone else's.
+    it('resolves the company through the caller', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(profileRow());
+
+      await service.findMine(7);
+
+      expect(prisma.recruiterProfile.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 7 } }),
+      );
+    });
+
+    /**
+     * The perks now belong to the offer, where they differ from one post to the
+     * next. Reading them back here would resurrect a field the recruiter can no
+     * longer edit on this screen.
+     */
+    it('reports no benefits on the company', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(profileRow());
+
+      const result = await service.findMine(7);
+
+      expect(result).not.toHaveProperty('benefits');
+    });
+
+    it('renders the coordinates as strings', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(
+        profileRow({
+          latitude: new Prisma.Decimal('45.7580000'),
+          longitude: new Prisma.Decimal('4.8350000'),
+        }),
+      );
+
+      const result = await service.findMine(7);
+
+      expect(result.latitude).toBe('45.758');
+      expect(result.longitude).toBe('4.835');
+    });
+
+    it('keeps an unset coordinate null rather than stringifying it', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(profileRow());
+
+      const result = await service.findMine(7);
+
+      expect(result.latitude).toBeNull();
+      expect(result.longitude).toBeNull();
+    });
+
+    // The identity lives on `recruiter_profile`, so it is nested rather than
+    // read as company data.
+    it('nests the recruiter identity', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue(profileRow());
+
+      const result = await service.findMine(7);
+
+      expect(result.recruiter).toEqual({
+        firstName: 'Rick',
+        lastName: 'Deckard',
+        jobTitle: 'CTO',
+      });
     });
   });
 });
