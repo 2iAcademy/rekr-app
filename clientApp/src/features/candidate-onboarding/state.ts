@@ -27,6 +27,7 @@ export interface CandidateOnboardingState {
   postalCode: string;
   desiredJobTitle: string;
   contractTypes: ContractType[];
+  jobFamilyIds: string[];
   experienceLevel: ExperienceLevel | '';
   availability: Availability | '';
   availabilityDelayMonths: string;
@@ -49,6 +50,7 @@ export const emptyCandidateOnboarding: CandidateOnboardingState = {
   postalCode: '',
   desiredJobTitle: '',
   contractTypes: [],
+  jobFamilyIds: [],
   experienceLevel: '',
   availability: '',
   availabilityDelayMonths: '',

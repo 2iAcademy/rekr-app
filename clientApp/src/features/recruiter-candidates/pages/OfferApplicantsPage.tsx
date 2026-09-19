@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import { notifyFailure } from '@/lib/feedback/notify';
 import { applicantLikeBusiness } from '../applicantFeedback';
+import { matchedCandidate } from '@/features/matches/likeResult';
 import { ApplicantRow } from '../components/ApplicantRow';
 import { CandidateDetailPage } from './CandidateDetailPage';
 import { APPLICANTS_PAGE_SIZE, useApplicants } from '../useApplicants';
@@ -12,6 +13,7 @@ interface OfferApplicantsPageProps {
   openApplicantId: number | null;
   onOpenProfile: (candidateUserId: number) => void;
   onCloseProfile: () => void;
+  onMatch: (matchedProfile: { name: string; avatarUrl: string | null }) => void;
 }
 
 const OFFERS_PATH = '/recruteur/offres';
@@ -28,11 +30,24 @@ export function OfferApplicantsPage({
   openApplicantId,
   onOpenProfile,
   onCloseProfile,
+  onMatch,
 }: OfferApplicantsPageProps) {
-  const { applicants, status, truncated, liked, pendingId, reload, like } = useApplicants(offerId);
+  const { applicants, status, truncated, pendingId, reload, like, pass, decisionFor } =
+    useApplicants(offerId);
 
   const answer = (candidateUserId: number): void => {
-    void like(candidateUserId).catch((cause: unknown) =>
+    void like(candidateUserId)
+      .then((result) => {
+        const counterpart = matchedCandidate(result);
+        if (counterpart) {
+          onMatch({ name: counterpart.name, avatarUrl: counterpart.avatarUrl });
+        }
+      })
+      .catch((cause: unknown) => notifyFailure(cause, applicantLikeBusiness));
+  };
+
+  const passApplicant = (candidateUserId: number): void => {
+    void pass(candidateUserId).catch((cause: unknown) =>
       notifyFailure(cause, applicantLikeBusiness),
     );
   };
@@ -45,10 +60,11 @@ export function OfferApplicantsPage({
     return (
       <CandidateDetailPage
         candidate={open}
-        liked={liked.has(open.userId)}
+        decision={decisionFor(open.userId)}
         pending={pendingId === open.userId}
         onBack={onCloseProfile}
         onLike={() => answer(open.userId)}
+        onPass={() => passApplicant(open.userId)}
       />
     );
   }
@@ -107,10 +123,11 @@ export function OfferApplicantsPage({
             <ApplicantRow
               key={applicant.userId}
               applicant={applicant}
-              liked={liked.has(applicant.userId)}
+              decision={decisionFor(applicant.userId)}
               pending={pendingId === applicant.userId}
               onOpen={() => onOpenProfile(applicant.userId)}
               onLike={() => answer(applicant.userId)}
+              onPass={() => passApplicant(applicant.userId)}
             />
           ))}
         </ul>

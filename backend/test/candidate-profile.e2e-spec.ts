@@ -9,11 +9,16 @@ import { stubCityReference } from './city-reference';
 import { resetDb } from './reset-db';
 import { resetCityCache } from './city-cache-reset';
 import { resetThrottler } from './throttler-reset';
+import { jobFamilyIdFor } from './job-family-reference';
 
 describe('CandidateProfile (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let fetchMock: jest.Mock;
+  // The trades every fixture profile is looking for. Required at creation
+  // since job families landed, and read once because the reference rows
+  // outlive `resetDb`.
+  let jobFamilyIds: number[];
 
   const createUser = (userType: 'candidate' | 'recruiter' = 'candidate') =>
     prisma.user.create({
@@ -34,6 +39,7 @@ describe('CandidateProfile (e2e)', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    jobFamilyIds = [await jobFamilyIdFor(prisma)];
   });
 
   beforeEach(async () => {
@@ -51,7 +57,7 @@ describe('CandidateProfile (e2e)', () => {
   it('rejects an unauthenticated create with 401', async () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
-      .send({ firstName: 'Ada', lastName: 'Lovelace' })
+      .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
       .expect(401);
   });
 
@@ -61,7 +67,7 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace' })
+      .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
       .expect(403);
   });
 
@@ -71,6 +77,7 @@ describe('CandidateProfile (e2e)', () => {
     const payload = {
       firstName: 'Ada',
       lastName: 'Lovelace',
+      jobFamilyIds,
       bio: 'Pionnière du calcul.',
       city: 'Lyon',
       postalCode: '69001',
@@ -124,7 +131,7 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace' })
+      .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
       .expect(201);
 
     await httpRequest(app)
@@ -170,7 +177,7 @@ describe('CandidateProfile (e2e)', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'A', lastName: 'B', bio: 'origine' })
+        .send({ jobFamilyIds, firstName: 'A', lastName: 'B', bio: 'origine' })
         .expect(201);
     }
 
@@ -192,7 +199,7 @@ describe('CandidateProfile (e2e)', () => {
       httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace' });
+        .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' });
 
     await create().expect(201);
     await create().expect(409);
@@ -206,7 +213,7 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace' })
+      .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
       .expect(201);
 
     fetchMock.mockResolvedValue(
@@ -220,6 +227,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         city: 'Atlantide',
@@ -237,7 +245,12 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace', skills: ['Anglais'] })
+      .send({
+        jobFamilyIds,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        skills: ['Anglais'],
+      })
       .expect(201);
 
     await httpRequest(app)
@@ -273,6 +286,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         experienceLevel: 'NOT_A_LEVEL',
@@ -293,6 +307,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         city: 'Wakanda',
@@ -312,7 +327,12 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace', city: 'Marseille' })
+      .send({
+        jobFamilyIds,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        city: 'Marseille',
+      })
       .expect(400);
   });
 
@@ -329,6 +349,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         city: 'Brest',
@@ -344,6 +365,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         skills: ['React', 'TypeScript', 'Node.js'],
@@ -369,6 +391,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         skills: ['React'],
@@ -400,6 +423,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         languages: ['x'.repeat(101)],
@@ -415,7 +439,12 @@ describe('CandidateProfile (e2e)', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'A', lastName: 'B', skills: ['React'] })
+        .send({
+          jobFamilyIds,
+          firstName: 'A',
+          lastName: 'B',
+          skills: ['React'],
+        })
         .expect(201);
     }
 
@@ -429,7 +458,12 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace', hacker: 'x' })
+      .send({
+        jobFamilyIds,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        hacker: 'x',
+      })
       .expect(400);
   });
 

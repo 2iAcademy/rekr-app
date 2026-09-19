@@ -28,6 +28,9 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
       UPLOADS_DIR: ${UPLOADS_DIR:-/var/lib/rekr/uploads}
+      ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-true}
+      ELASTICSEARCH_NODE: ${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
+      ELASTICSEARCH_REINDEX_ON_STARTUP: ${ELASTICSEARCH_REINDEX_ON_STARTUP:-false}
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -44,6 +47,31 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      elasticsearch:
+        condition: service_started
+
+  # Local development only. Production must use TLS, credentials, and a managed
+  # or separately secured cluster; disabling Elastic security here keeps the
+  # developer stack self-contained rather than defining a production posture.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:9200/_cluster/health?wait_for_status=yellow >/dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
 
   frontend:
     build:
@@ -107,3 +135,4 @@ volumes:
   pg18_data:
   frontend_node_modules:
   backend_uploads:
+  elasticsearch_data:

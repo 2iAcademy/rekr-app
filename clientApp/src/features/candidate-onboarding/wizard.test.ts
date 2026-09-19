@@ -10,6 +10,7 @@ const complete: CandidateOnboardingState = {
   postalCode: '69003',
   desiredJobTitle: 'Développeuse Front React',
   contractTypes: ['CDI'],
+  jobFamilyIds: ['13'],
   experienceLevel: 'CONFIRME',
   availability: 'IMMEDIATE',
   remotePolicy: 'HYBRID',

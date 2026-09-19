@@ -132,6 +132,10 @@ export class OfferDto {
   @ApiProperty({ enum: OfferStatus, enumName: 'OfferStatus', example: 'open' })
   status!: OfferStatus;
 
+  /** Null on the offers written before job families existed. */
+  @ApiProperty({ type: Number, nullable: true, example: 13 })
+  jobFamilyId!: number | null;
+
   @ApiProperty({
     type: String,
     format: 'date-time',
@@ -228,4 +232,12 @@ export class OfferDetailDto {
     example: 'open',
   })
   status?: OfferStatus;
+
+  /**
+   * Served only to the company carrying the offer, and read by the edit form to
+   * preselect the trade. Null on the offers written before job families
+   * existed; absent, not null, for anyone who is not the owner.
+   */
+  @ApiPropertyOptional({ type: Number, nullable: true, example: 13 })
+  jobFamilyId?: number | null;
 }

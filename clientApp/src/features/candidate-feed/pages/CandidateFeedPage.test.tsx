@@ -5,6 +5,8 @@ import { MemoryRouter } from 'react-router';
 import {
   offerControllerFindFeed,
   offerControllerLike,
+  offerControllerPass,
+  type LikeResultDto,
   type OfferFeedItemDto,
 } from '@/api/generated';
 import { anOffer, anotherOffer } from '../fixtures';
@@ -13,24 +15,26 @@ import { CandidateFeedPage } from './CandidateFeedPage';
 vi.mock('@/api/generated', () => ({
   offerControllerFindFeed: vi.fn(),
   offerControllerLike: vi.fn(),
+  offerControllerPass: vi.fn(),
 }));
 
 const findFeed = vi.mocked(offerControllerFindFeed);
 const like = vi.mocked(offerControllerLike);
+const pass = vi.mocked(offerControllerPass);
 
 const answer = (data: OfferFeedItemDto[]) =>
   ({ data, status: 200, headers: new Headers() }) as unknown as Awaited<
     ReturnType<typeof offerControllerFindFeed>
   >;
 
-const renderPage = (onOpenOffer = vi.fn()) => {
+const renderPage = (onOpenOffer = vi.fn(), onMatch = vi.fn()) => {
   render(
     <MemoryRouter>
-      <CandidateFeedPage onOpenOffer={onOpenOffer} />
+      <CandidateFeedPage onOpenOffer={onOpenOffer} onMatch={onMatch} />
     </MemoryRouter>,
   );
 
-  return { onOpenOffer };
+  return { onOpenOffer, onMatch };
 };
 
 const heading = (name: string) => screen.getByRole('heading', { name });
@@ -52,6 +56,7 @@ describe('CandidateFeedPage', () => {
     vi.clearAllMocks();
     findFeed.mockResolvedValue(answer([anOffer, anotherOffer]));
     like.mockResolvedValue(undefined as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
+    pass.mockResolvedValue(undefined as unknown as Awaited<ReturnType<typeof offerControllerPass>>);
   });
 
   it('ouvre le deck sur la première offre servie par l’API', async () => {
@@ -203,5 +208,40 @@ describe('CandidateFeedPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Passer' }));
 
     expect(screen.getByRole('heading', { name: 'Tu as tout vu' })).toBeInTheDocument();
+  });
+
+  it('reports a newly created company match to the route', async () => {
+    const user = userEvent.setup();
+    const onMatch = vi.fn();
+    like.mockResolvedValue({
+      data: {
+        likeCreated: true,
+        matchCreated: true,
+        match: {
+          id: 9,
+          matchedAt: '2026-09-17T09:30:00.000Z',
+          offer: { id: anOffer.id, title: anOffer.title },
+          counterpart: {
+            kind: 'company',
+            id: anOffer.company.id,
+            name: anOffer.company.name,
+            avatarUrl: null,
+            headline: anOffer.title,
+          },
+        },
+      } satisfies LikeResultDto,
+      status: 201,
+      headers: new Headers(),
+    } as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
+
+    renderPage(undefined, onMatch);
+    await user.click(await screen.findByRole('button', { name: 'Liker' }));
+
+    await waitFor(() =>
+      expect(onMatch).toHaveBeenCalledWith({
+        name: anOffer.company.name,
+        avatarUrl: null,
+      }),
+    );
   });
 });

@@ -4,7 +4,9 @@ import type { AuthUser } from '../auth/auth-user.interface';
 import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
 import { OfferService } from './offer.service';
 import { CityService } from '../city/city.service';
+import { JobFamilyService } from '../job-family/job-family.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MatchService } from '../match/match.service';
 import { OfferListQueryDto } from './dto/offer-list-query.dto';
 
 type PrismaMock = {
@@ -17,6 +19,7 @@ type PrismaMock = {
   };
   recruiterProfile: { findUnique: jest.Mock };
   candidateProfile: { findUnique: jest.Mock };
+  candidateJobFamily: { findMany: jest.Mock };
   offerTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
@@ -33,6 +36,7 @@ const buildPrismaMock = (): PrismaMock => {
     },
     recruiterProfile: { findUnique: jest.fn() },
     candidateProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+    candidateJobFamily: { findMany: jest.fn().mockResolvedValue([]) },
     offerTag: { deleteMany: jest.fn(), createMany: jest.fn() },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
@@ -86,15 +90,21 @@ describe('OfferService', () => {
   let service: OfferService;
   let prisma: ReturnType<typeof buildPrismaMock>;
   let cities: { assertKnown: jest.Mock };
+  let matches: { tryCreateReciprocalMatch: jest.Mock };
+  let jobFamilies: { assertKnown: jest.Mock };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
     cities = { assertKnown: jest.fn().mockResolvedValue(undefined) };
+    matches = { tryCreateReciprocalMatch: jest.fn() };
+    jobFamilies = { assertKnown: jest.fn().mockResolvedValue(undefined) };
     const moduleRef = await Test.createTestingModule({
       providers: [
         OfferService,
         { provide: PrismaService, useValue: prisma },
         { provide: CityService, useValue: cities },
+        { provide: MatchService, useValue: matches },
+        { provide: JobFamilyService, useValue: jobFamilies },
       ],
     }).compile();
     service = moduleRef.get(OfferService);
@@ -107,6 +117,7 @@ describe('OfferService', () => {
 
       await service.create(7, {
         title: 'Dev',
+        jobFamilyId: 13,
         city: 'Lyon',
         postalCode: '69001',
       });
@@ -122,6 +133,7 @@ describe('OfferService', () => {
       await expect(
         service.create(7, {
           title: 'Dev',
+          jobFamilyId: 13,
           city: 'Wakanda',
           postalCode: '99999',
         }),
@@ -203,12 +215,14 @@ describe('OfferService', () => {
 
       const result = await service.create(7, {
         title: 'Dev Front',
+        jobFamilyId: 13,
         contractType: 'CDI',
       });
 
       expect(prisma.offer.create).toHaveBeenCalledWith({
         data: {
           title: 'Dev Front',
+          jobFamilyId: 13,
           contractType: 'CDI',
           companyId: 10,
           createdById: 7,
@@ -221,7 +235,7 @@ describe('OfferService', () => {
       prisma.recruiterProfile.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.create(7, { title: 'Dev Front' }),
+        service.create(7, { title: 'Dev Front', jobFamilyId: 13 }),
       ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(prisma.offer.create).not.toHaveBeenCalled();
@@ -293,7 +307,11 @@ describe('OfferService', () => {
       prisma.offer.create.mockResolvedValue({ id: 50, companyId: 10 });
       prisma.tag.findMany.mockResolvedValue([{ id: 3 }]);
 
-      await service.create(7, { title: 'Dev', benefits: ['Mutuelle'] });
+      await service.create(7, {
+        title: 'Dev',
+        jobFamilyId: 13,
+        benefits: ['Mutuelle'],
+      });
 
       expect(prisma.tag.createMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -494,6 +512,36 @@ describe('OfferService', () => {
       });
     });
 
+    const withFamilies = (ids: number[]): void => {
+      prisma.candidateJobFamily.findMany.mockResolvedValue(
+        ids.map((jobFamilyId) => ({ jobFamilyId })),
+      );
+    };
+
+    /**
+     * The trade is the one criterion that excludes rather than ranks: nobody
+     * changes career because an unrelated post pays well, so there is no rank
+     * low enough at which a bakery belongs in a developer's deck.
+     */
+    it('keeps only the trades the candidate named', async () => {
+      withFamilies([13, 5]);
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf()).toMatchObject({ jobFamilyId: { in: [13, 5] } });
+    });
+
+    // The accounts created before job families existed carry none. Filtering
+    // them on an empty list would serve them an empty deck rather than the
+    // unfiltered one they have today.
+    it('narrows nothing when the candidate named no trade', async () => {
+      withFamilies([]);
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf()).not.toHaveProperty('jobFamilyId');
+    });
+
     it('leaves out every filter the query does not carry', async () => {
       await service.findFeed(candidate, new OfferFeedQueryDto());
 
@@ -653,6 +701,9 @@ describe('OfferService', () => {
       ...EXPECTED_SELECT,
       postalCode: true,
       status: true,
+      // Read by the edit form to preselect the trade, withheld from everyone
+      // else along with the postcode and the status.
+      jobFamilyId: true,
     };
 
     const serveRow = (row: Record<string, unknown> | null): void => {
