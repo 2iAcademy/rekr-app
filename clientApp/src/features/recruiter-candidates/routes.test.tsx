@@ -3,7 +3,12 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AuthProvider } from '@/features/auth/AuthProvider';
-import { offerControllerFindApplicants, type OfferApplicantDto } from '@/api/generated';
+import {
+  offerControllerFindApplicants,
+  offerControllerLikeApplicant,
+  type LikeResultDto,
+  type OfferApplicantDto,
+} from '@/api/generated';
 import { routes } from '@/router';
 import { anApplicant } from './fixtures';
 
@@ -16,11 +21,13 @@ vi.mock('@/api/generated', () => ({
   authControllerSignup: vi.fn(),
   offerControllerFindApplicants: vi.fn(),
   offerControllerLikeApplicant: vi.fn(),
+  offerControllerFindFeed: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   sectorControllerFindAll: vi.fn(),
 }));
 
 const findApplicants = vi.mocked(offerControllerFindApplicants);
+const likeApplicant = vi.mocked(offerControllerLikeApplicant);
 
 const answer = (data: OfferApplicantDto[]) =>
   ({ data, status: 200, headers: new Headers() }) as unknown as Awaited<
@@ -117,6 +124,38 @@ describe('OfferApplicantsRoute', () => {
     expect(findApplicants).not.toHaveBeenCalled();
   });
 
+  it('redirige vers la célébration avec le candidat retourné après un nouveau match', async () => {
+    const user = userEvent.setup();
+    authenticateAs('recruiter');
+    likeApplicant.mockResolvedValue({
+      data: {
+        likeCreated: true,
+        matchCreated: true,
+        match: {
+          id: 55,
+          matchedAt: '2026-09-16T09:30:00.000Z',
+          offer: { id: 12, title: 'Développeuse back-end' },
+          counterpart: {
+            kind: 'candidate',
+            id: 1,
+            name: 'Camille',
+            avatarUrl: null,
+            headline: 'Développeuse back-end',
+          },
+        },
+      } satisfies LikeResultDto,
+      status: 201,
+      headers: new Headers(),
+    } as unknown as Awaited<ReturnType<typeof offerControllerLikeApplicant>>);
+    const router = renderAt(APPLICANTS_PATH);
+
+    await user.click(await screen.findByRole('button', { name: 'Liker Camille' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/match'));
+    expect(
+      await screen.findByLabelText('Match entre vous et Camille', {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
+  });
   it('ouvre le profil par le paramètre d’URL, et le referme au retour arrière', async () => {
     const user = userEvent.setup();
     authenticateAs('recruiter');

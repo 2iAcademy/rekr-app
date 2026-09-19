@@ -3,28 +3,31 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { OfferApplicantDto } from '@/api/generated';
 import { anApplicant } from '../fixtures';
+import type { ApplicantDecision } from '../useApplicants';
 import { CandidateDetailPage } from './CandidateDetailPage';
 
 type Overrides = Partial<OfferApplicantDto> & {
-  liked?: boolean;
+  decision?: ApplicantDecision;
   pending?: boolean;
 };
 
-const renderPage = ({ liked, pending, ...overrides }: Overrides = {}) => {
+const renderPage = ({ decision = null, pending, ...overrides }: Overrides = {}) => {
   const onBack = vi.fn();
   const onLike = vi.fn();
+  const onPass = vi.fn();
 
   render(
     <CandidateDetailPage
       candidate={{ ...anApplicant, ...overrides }}
-      liked={liked}
+      decision={decision}
       pending={pending}
       onBack={onBack}
       onLike={onLike}
+      onPass={onPass}
     />,
   );
 
-  return { onBack, onLike };
+  return { onBack, onLike, onPass };
 };
 
 const itemsOf = (list: HTMLElement): (string | null)[] =>
@@ -137,13 +140,12 @@ describe('CandidateDetailPage', () => {
     expect(onLike).toHaveBeenCalledTimes(1);
   });
 
-  // Un intérêt déjà enregistré n'est pas à renvoyer : le bouton dit ce qui a
-  // été fait plutôt que de réarmer une action sans effet.
-  it('désactive le like une fois l’intérêt enregistré', () => {
-    renderPage({ liked: true });
+  it('affiche la décision sauvegardée et désactive les deux actions', () => {
+    renderPage({ decision: { kind: 'liked', at: '2026-09-16T09:30:00.000Z' } });
 
-    expect(screen.getByRole('button', { name: 'Intérêt enregistré' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Liker' })).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Intérêt déjà enregistré');
+    expect(screen.getByRole('button', { name: 'Liker' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Passer' })).toBeDisabled();
   });
 
   it('désactive le like pendant l’envoi', () => {

@@ -19,4 +19,6 @@ export const anApplicant: OfferApplicantDto = {
   availability: 'IMMEDIATE',
   remotePolicy: 'HYBRID',
   tags: ['Symfony', 'PostgreSQL', 'Docker'],
+  recruiterLikedAt: null,
+  recruiterPassedAt: null,
 };

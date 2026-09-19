@@ -8,10 +8,15 @@ import { RefreshTokenService } from '../src/auth/refresh-token.service';
 import { configureApp } from '../src/setup-app';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
+import { jobFamilyIdFor } from './job-family-reference';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  // The trades every fixture profile is looking for. Required at creation
+  // since job families landed, and read once because the reference rows
+  // outlive `resetDb`.
+  let jobFamilyIds: number[];
 
   const signup = (email: string, userType: 'candidate' | 'recruiter') =>
     httpRequest(app)
@@ -43,6 +48,7 @@ describe('Auth (e2e)', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    jobFamilyIds = [await jobFamilyIdFor(prisma)];
   });
 
   beforeEach(async () => {
@@ -172,7 +178,7 @@ describe('Auth (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', `Bearer ${token}`)
-      .send({ firstName: 'Ghost', lastName: 'User' })
+      .send({ jobFamilyIds, firstName: 'Ghost', lastName: 'User' })
       .expect(401);
   });
 
@@ -183,7 +189,7 @@ describe('Auth (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', `Bearer ${tokenOf(created)}`)
-      .send({ firstName: 'Frozen', lastName: 'User' })
+      .send({ jobFamilyIds, firstName: 'Frozen', lastName: 'User' })
       .expect(403);
   });
 

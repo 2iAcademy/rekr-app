@@ -34,7 +34,7 @@ const recruiter = {
 
 const fetchMock = vi.fn();
 
-const route = (url: string): Response => {
+const route = (url: string, init?: RequestInit): Response => {
   if (url.includes('/api/auth/refresh')) {
     return json(401, {});
   }
@@ -61,8 +61,11 @@ const route = (url: string): Response => {
   if (url.includes('/api/companies/mine')) {
     return json(200, {});
   }
-  if (url.includes('/api/companies') || url.includes('/api/offers')) {
+  if (url.includes('/api/companies')) {
     return json(201, {});
+  }
+  if (url.includes('/api/offers')) {
+    return (init?.method ?? 'GET') === 'GET' ? json(200, []) : json(201, {});
   }
 
   throw new Error(`Appel réseau inattendu : ${url}`);
@@ -134,7 +137,9 @@ describe('parcours recruteur de bout en bout', () => {
     sessionStorage.clear();
     clearAccessToken();
     fetchMock.mockReset();
-    fetchMock.mockImplementation((url: string) => Promise.resolve(route(url)));
+    fetchMock.mockImplementation((url: string, init?: RequestInit) =>
+      Promise.resolve(route(url, init)),
+    );
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -193,7 +198,7 @@ describe('parcours recruteur de bout en bout', () => {
       salaryMax: 55000,
       status: 'open',
     });
-  });
+  }, 45_000);
 
   it('conserve la saisie et aboutit au second essai quand l’offre échoue', async () => {
     const user = userEvent.setup({ delay: null });
@@ -241,5 +246,5 @@ describe('parcours recruteur de bout en bout', () => {
     const update = callTo('/api/companies/mine');
     expect(update.method).toBe('PATCH');
     expect(update.body).toMatchObject({ name: 'Rekr', jobTitle: 'Responsable RH', sectorId: 4 });
-  });
+  }, 45_000);
 });

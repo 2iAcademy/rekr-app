@@ -15,7 +15,7 @@ export function OfferDetailRoute() {
           <OfferDetailPage
             onBack={() => navigate(home)}
             onPass={() => navigate(home)}
-            onLike={(matchedProfile) =>
+            onMatch={(matchedProfile) =>
               navigate('/match', {
                 state: { matchedProfile },
               })

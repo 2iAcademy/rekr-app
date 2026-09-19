@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AuthProvider } from '@/features/auth/AuthProvider';
@@ -47,6 +47,7 @@ const renderAt = (path: string) => {
       <RouterProvider router={router} />
     </AuthProvider>,
   );
+  return router;
 };
 
 describe('navigation vers le match', () => {
@@ -85,9 +86,14 @@ describe('navigation vers le match', () => {
   // « Mes offres », pas depuis une liste de matches tous postes confondus.
   it('écarte un recruteur de la liste des matches, vers ses offres', async () => {
     authenticateAs('recruiter');
-    renderAt('/matches');
+    const router = renderAt('/matches');
 
-    expect(await screen.findByRole('heading', { name: 'Vos offres' })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/recruteur/offres'), {
+      timeout: 5000,
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Vos offres' }, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
   });
 

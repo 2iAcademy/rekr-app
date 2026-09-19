@@ -4,7 +4,14 @@ import { Button } from '@/components/ui/button';
 import { chipVariants } from '@/components/ui/chip-variants';
 import { SectionTitle } from '@/components/ui/section-title';
 import { useEffect, useState } from 'react';
-import { offerControllerFindOneById } from '@/api/generated';
+import {
+  offerControllerFindOneById,
+  offerControllerLike,
+  offerControllerPass,
+} from '@/api/generated';
+import { notifyFailure } from '@/lib/feedback/notify';
+import { likeFailureBusiness } from '@/features/candidate-feed/likeFeedback';
+import { matchedCompany } from '@/features/matches/likeResult';
 import type { OfferDetailDto, TagCategory } from '@/api/generated';
 import { fileUrl } from '@/lib/fileUrl';
 import { useParams } from 'react-router';
@@ -17,14 +24,16 @@ interface MatchedProfile {
 interface OfferDetailPageProps {
   onBack?: () => void;
   onPass?: () => void;
-  onLike?: (matchedProfile: MatchedProfile) => void;
+  onMatch?: (matchedProfile: MatchedProfile) => void;
 }
 
-export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps) {
+export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProps) {
   const { id } = useParams();
   const [offer, setOffer] = useState<OfferDetailDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLiking, setIsLiking] = useState(false);
+  const [isPassing, setIsPassing] = useState(false);
 
   useEffect(() => {
     const fetchOffer = async () => {
@@ -58,6 +67,30 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
       </main>
     );
   }
+
+  const pass = async (): Promise<void> => {
+    setIsPassing(true);
+    try {
+      await offerControllerPass(offer.id);
+      onPass?.();
+    } catch (cause) {
+      notifyFailure(cause, likeFailureBusiness);
+    } finally {
+      setIsPassing(false);
+    }
+  };
+  const like = async (): Promise<void> => {
+    setIsLiking(true);
+    try {
+      const response = await offerControllerLike(offer.id);
+      const counterpart = matchedCompany(response.data);
+      if (counterpart) onMatch?.({ name: counterpart.name, avatarUrl: counterpart.avatarUrl });
+    } catch (cause) {
+      notifyFailure(cause, likeFailureBusiness);
+    } finally {
+      setIsLiking(false);
+    }
+  };
 
   const { company, tags, salaryMin, salaryMax, remotePolicy, city } = offer;
   const companyLogoUrl = fileUrl(company.logo);
@@ -160,7 +193,8 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
           variant="outline"
           size="xl"
           className="flex-1 rounded-full"
-          onClick={onPass}
+          onClick={() => void pass()}
+          disabled={isPassing}
         >
           Passer
         </Button>
@@ -169,7 +203,8 @@ export function OfferDetailPage({ onBack, onPass, onLike }: OfferDetailPageProps
           variant="role"
           size="xl"
           className="flex-1 rounded-full"
-          onClick={() => onLike?.({ name: company.name, avatarUrl: companyLogoUrl })}
+          onClick={() => void like()}
+          disabled={isLiking}
         >
           <Heart className="size-5" />
           Liker

@@ -303,12 +303,14 @@ model Offer {
   createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user            User?                  @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  jobFamily       JobFamily?             @relation(fields: [jobFamilyId], references: [id], onDelete: Restrict)
+  user            User?                      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  company         Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobFamily       JobFamily?                 @relation(fields: [jobFamilyId], references: [id], onDelete: Restrict)
   offerTags       OfferTag[]
   candidateLikes  CandidateLikesOffer[]
   candidatePasses CandidatePassesOffer[]
+  recruiterLikes  RecruiterLikesCandidate[]
+  recruiterPasses RecruiterPassesCandidate[]
   matches         Match[]
 
   @@index([companyId])
@@ -394,24 +396,30 @@ model CandidatePassesOffer {
 model RecruiterLikesCandidate {
   recruiterUserId Int      @map("fk_user_recruiter")
   candidateUserId Int      @map("fk_user_candidate")
+  offerId         Int      @map("fk_offer")
   likedAt         DateTime @default(now()) @map("liked_at") @db.Timestamptz(6)
 
-  recruiter User @relation("RecruiterLikes", fields: [recruiterUserId], references: [id], onDelete: Cascade)
-  candidate User @relation("CandidateLikedByRecruiter", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  recruiter User  @relation("RecruiterLikes", fields: [recruiterUserId], references: [id], onDelete: Cascade)
+  candidate User  @relation("CandidateLikedByRecruiter", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  offer     Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
 
-  @@id([recruiterUserId, candidateUserId])
+  @@id([recruiterUserId, candidateUserId, offerId])
+  @@index([candidateUserId, offerId])
   @@map("recruiter_likes_candidate")
 }
 
 model RecruiterPassesCandidate {
   recruiterUserId Int      @map("fk_user_recruiter")
   candidateUserId Int      @map("fk_user_candidate")
+  offerId         Int      @map("fk_offer")
   passedAt        DateTime @default(now()) @map("passed_at") @db.Timestamptz(6)
 
-  recruiter User @relation("RecruiterPasses", fields: [recruiterUserId], references: [id], onDelete: Cascade)
-  candidate User @relation("CandidatePassedByRecruiter", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  recruiter User  @relation("RecruiterPasses", fields: [recruiterUserId], references: [id], onDelete: Cascade)
+  candidate User  @relation("CandidatePassedByRecruiter", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  offer     Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
 
-  @@id([recruiterUserId, candidateUserId])
+  @@id([recruiterUserId, candidateUserId, offerId])
+  @@index([candidateUserId, offerId])
   @@map("recruiter_passes_candidate")
 }
 

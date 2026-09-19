@@ -7,6 +7,7 @@ import { configureApp } from '../src/setup-app';
 import { bearerFor } from './auth-header';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
+import { jobFamilyIdFor } from './job-family-reference';
 
 /**
  * Payloads a UI can legitimately produce, that the database rejects.
@@ -25,6 +26,10 @@ import { resetThrottler } from './throttler-reset';
 describe('Prisma errors are translated (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  // The trades every fixture profile is looking for. Required at creation
+  // since job families landed, and read once because the reference rows
+  // outlive `resetDb`.
+  let jobFamilyIds: number[];
 
   const OUT_OF_INT4_RANGE = 3_000_000_000;
   const OUT_OF_DECIMAL_RANGE = 12_345_678_901.5;
@@ -63,6 +68,7 @@ describe('Prisma errors are translated (e2e)', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    jobFamilyIds = [await jobFamilyIdFor(prisma)];
   });
 
   beforeEach(async () => {
@@ -149,6 +155,7 @@ describe('Prisma errors are translated (e2e)', () => {
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
         .send({
+          jobFamilyIds,
           firstName: 'Ada',
           lastName: 'Lovelace',
           salaryMin: OUT_OF_INT4_RANGE,

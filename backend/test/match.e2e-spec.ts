@@ -57,20 +57,73 @@ describe('Match (e2e)', () => {
   });
 
   /**
-   * A match is born of a reciprocal like on one given offer, so a recruiter
-   * reads it on the offer concerned — not in a list spanning every post of the
-   * company. The route is a candidate route now.
-   *
-   * 403 rather than an empty list: an empty 200 would read as « you have no
-   * match » and invite a caller to keep asking.
+   * The same endpoint serves each role's own matches. The recruiter response
+   * must be isolated by recruiter id and expose the candidate counterpart.
    */
-  it('refuses the match list to a recruiter (403)', async () => {
+  it("returns only the recruiter's own matches with candidate counterparts", async () => {
     const recruiter = await seedRecruiterWithCompany('Acme');
+    const otherRecruiter = await seedRecruiterWithCompany('Globex');
+    const candidate = await createUser('candidate');
+    await prisma.candidateProfile.create({
+      data: { userId: candidate.id, firstName: 'Ada', lastName: 'Lovelace' },
+    });
+    const ownOffer = await prisma.offer.create({
+      data: { title: 'Own', status: 'open', companyId: recruiter.company.id },
+    });
+    const otherOffer = await prisma.offer.create({
+      data: {
+        title: 'Other',
+        status: 'open',
+        companyId: otherRecruiter.company.id,
+      },
+    });
+    const ownMatch = await prisma.match.create({
+      data: {
+        candidateUserId: candidate.id,
+        offerId: ownOffer.id,
+        recruiterUserId: recruiter.user.id,
+      },
+    });
+    await prisma.match.create({
+      data: {
+        candidateUserId: candidate.id,
+        offerId: otherOffer.id,
+        recruiterUserId: otherRecruiter.user.id,
+      },
+    });
 
-    await httpRequest(app)
+    const response = await httpRequest(app)
       .get('/api/matches')
       .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
-      .expect(403);
+      .expect(200);
+
+    const matches = response.body as Array<{
+      id: number;
+      matchedAt: string;
+      offer: { id: number; title: string };
+      counterpart: {
+        kind: string;
+        id: number;
+        name: string;
+        avatarUrl: string | null;
+        headline: string | null;
+      };
+    }>;
+
+    expect(matches).toHaveLength(1);
+    const match = matches[0];
+    expect(match).toMatchObject({
+      id: ownMatch.id,
+      offer: { id: ownOffer.id, title: 'Own' },
+      counterpart: {
+        kind: 'candidate',
+        id: candidate.id,
+        name: 'Ada Lovelace',
+        avatarUrl: null,
+        headline: null,
+      },
+    });
+    expect(match?.matchedAt).toEqual(expect.any(String));
   });
 
   it('rejects an unauthenticated read with 401', async () => {
@@ -78,14 +131,9 @@ describe('Match (e2e)', () => {
   });
 
   /**
-   * The list has one shape now, and the document has to say so. While the
-   * recruiter branch existed, a counterpart could be a candidate and could be
-   * missing — a match whose candidate had no profile answered `null`. Both are
-   * gone: every row of a candidate's list carries the company of the offer.
-   *
-   * Guarded here because the contract is what the client is generated from: a
-   * `counterpart` still advertised as nullable makes every reader write a
-   * fallback for a case the API can no longer produce.
+   * The generated client relies on this discriminator: candidates receive a
+   * company counterpart and recruiters a candidate counterpart. It is always
+   * present even if the candidate has not completed a profile.
    */
   it('advertises a single, always-present counterpart in the OpenAPI document', () => {
     const document = SwaggerModule.createDocument(
@@ -102,6 +150,7 @@ describe('Match (e2e)', () => {
 
     expect(schemas.MatchCounterpartDto.properties?.kind?.enum).toEqual([
       'company',
+      'candidate',
     ]);
     expect(schemas.MatchListItemDto.properties?.counterpart?.nullable).not.toBe(
       true,

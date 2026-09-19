@@ -4,13 +4,19 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { OfferDetailPage } from './OfferDetailPage';
-import { offerControllerFindOneById } from '@/api/generated';
+import {
+  offerControllerFindOneById,
+  offerControllerLike,
+  offerControllerPass,
+} from '@/api/generated';
 
 vi.mock('@/api/generated', () => ({
   jobFamilyControllerFindAll: vi.fn(() =>
     Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
   ),
   offerControllerFindOneById: vi.fn(),
+  offerControllerLike: vi.fn(),
+  offerControllerPass: vi.fn(),
 }));
 
 const mockOffer = {
@@ -54,6 +60,23 @@ const renderPage = (props: Partial<ComponentProps<typeof OfferDetailPage>> = {})
 
 describe('OfferDetailPage', () => {
   beforeEach(() => {
+    vi.mocked(offerControllerPass).mockResolvedValue(
+      undefined as unknown as Awaited<ReturnType<typeof offerControllerPass>>,
+    );
+    vi.mocked(offerControllerLike).mockResolvedValue({
+      data: {
+        likeCreated: true,
+        matchCreated: true,
+        match: {
+          id: 1,
+          counterpart: {
+            kind: 'company',
+            name: mockOffer.company.name,
+            avatarUrl: '/api/files/companies/1/logo/acme.png',
+          },
+        },
+      },
+    } as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
     vi.mocked(offerControllerFindOneById).mockResolvedValue({
       data: mockOffer,
     } as unknown as Awaited<ReturnType<typeof offerControllerFindOneById>>);
@@ -167,18 +190,20 @@ describe('OfferDetailPage', () => {
 
   it('déclenche onLike au clic sur Liker', async () => {
     const user = userEvent.setup();
-    const onLike = vi.fn();
-    renderPage({ onLike });
+    const onMatch = vi.fn();
+    renderPage({ onMatch });
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Liker' })).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole('button', { name: 'Liker' }));
-    expect(onLike).toHaveBeenCalledExactlyOnceWith({
-      name: mockOffer.company.name,
-      avatarUrl: '/api/files/companies/1/logo/acme.png',
-    });
+    await waitFor(() =>
+      expect(onMatch).toHaveBeenCalledExactlyOnceWith({
+        name: mockOffer.company.name,
+        avatarUrl: '/api/files/companies/1/logo/acme.png',
+      }),
+    );
   });
 
   it('déclenche onBack au clic sur le bouton fermer', async () => {
