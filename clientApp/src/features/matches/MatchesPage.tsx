@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import {
   likeControllerFindReceived,
@@ -19,6 +19,9 @@ const DAY_IN_MS = 24 * 60 * 60 * 1000;
 type TabValue = 'matches' | 'sent' | 'received';
 
 type LoadState = 'loading' | 'ready' | 'failed';
+
+/** State of a page beyond the first, which never hides the rows already read. */
+type MoreState = 'idle' | 'loading' | 'failed';
 
 /**
  * One row of any of the three lists. They come from two endpoints and three
@@ -97,6 +100,12 @@ const loadReceived: LoadPage = (page) =>
   likeControllerFindReceived({ page, limit: PAGE_SIZE }).then(({ data }) => data.map(receivedRow));
 
 /**
+ * What failed on a page beyond the first is the pagination, not the list: the
+ * rows stay on screen, so naming the list here would contradict them.
+ */
+const MORE_FAILURE = 'Impossible de charger la suite.';
+
+/**
  * Each tab carries its own wording: an empty match list, an empty like list and
  * a silent inbox are not the same silence, and neither is a failure to load one
  * or the other.
@@ -106,6 +115,7 @@ interface TabModel {
   label: string;
   empty: string;
   failure: string;
+  moreFailure: string;
   listLabel: string;
   load: LoadPage;
 }
@@ -115,6 +125,7 @@ const MATCHES_TAB: TabModel = {
   label: 'Matches',
   empty: 'Aucun match pour le moment.',
   failure: 'Impossible de charger tes matches.',
+  moreFailure: MORE_FAILURE,
   listLabel: 'Matches',
   load: loadMatches,
 };
@@ -124,6 +135,7 @@ const SENT_TAB: TabModel = {
   label: 'Mes likes',
   empty: 'Vous n’avez encore liké aucune offre.',
   failure: 'Impossible de charger tes likes.',
+  moreFailure: MORE_FAILURE,
   listLabel: 'Mes likes',
   load: loadSent,
 };
@@ -133,6 +145,7 @@ const RECEIVED_TAB: TabModel = {
   label: 'Reçus',
   empty: 'Aucun candidat n’a encore liké tes offres.',
   failure: 'Impossible de charger les likes reçus.',
+  moreFailure: MORE_FAILURE,
   listLabel: 'Reçus',
   load: loadReceived,
 };
@@ -156,6 +169,7 @@ function tabsFor(userType: string | undefined): readonly TabModel[] {
 interface PagedList {
   rows: ListRow[];
   state: LoadState;
+  more: MoreState;
   hasMore: boolean;
   loadMore: () => void;
 }
@@ -166,12 +180,20 @@ interface PagedList {
  * A full page is what tells us another one exists: the endpoints return rows
  * and no total, and asking for one would cost a COUNT on every scroll for an
  * answer nobody reads.
+ *
+ * `state` answers for the first page alone. What happens to the next ones is
+ * `more`, so that a page in flight or in error never takes away rows the reader
+ * is already looking at.
  */
 function usePagedList(load: LoadPage, enabled: boolean): PagedList {
   const [rows, setRows] = useState<ListRow[]>([]);
   const [state, setState] = useState<LoadState>('loading');
-  const [page, setPage] = useState(1);
+  const [more, setMore] = useState<MoreState>('idle');
   const [hasMore, setHasMore] = useState(false);
+  // Refs, not state: `loadMore` reads them at click time, and a value captured
+  // by the render that mounted the button would be one click behind.
+  const loadedPages = useRef(0);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     if (!enabled) {
@@ -180,13 +202,14 @@ function usePagedList(load: LoadPage, enabled: boolean): PagedList {
 
     let isCurrent = true;
 
-    void load(page)
+    void load(1)
       .then((fetched) => {
         if (!isCurrent) {
           return;
         }
 
-        setRows((previous) => (page === 1 ? fetched : [...previous, ...fetched]));
+        loadedPages.current = 1;
+        setRows(fetched);
         setHasMore(fetched.length === PAGE_SIZE);
         setState('ready');
       })
@@ -199,9 +222,37 @@ function usePagedList(load: LoadPage, enabled: boolean): PagedList {
     return () => {
       isCurrent = false;
     };
-  }, [enabled, load, page]);
+  }, [enabled, load]);
 
-  return { rows, state, hasMore, loadMore: () => setPage((current) => current + 1) };
+  // No cleanup cancels this one: the reader asked for these rows, and dropping
+  // the answer in flight would lose a page nobody asks for twice.
+  const loadMore = useCallback(() => {
+    if (inFlight.current || loadedPages.current === 0) {
+      return;
+    }
+
+    const next = loadedPages.current + 1;
+
+    inFlight.current = true;
+    setMore('loading');
+
+    void load(next)
+      .then((fetched) => {
+        loadedPages.current = next;
+        setRows((previous) => [...previous, ...fetched]);
+        setHasMore(fetched.length === PAGE_SIZE);
+        setMore('idle');
+      })
+      .catch(() => {
+        // `loadedPages` stays put, so a retry asks for the page that failed.
+        setMore('failed');
+      })
+      .finally(() => {
+        inFlight.current = false;
+      });
+  }, [load]);
+
+  return { rows, state, more, hasMore, loadMore };
 }
 
 function Row({ row }: { row: ListRow }) {
@@ -289,7 +340,7 @@ export function MatchesPage() {
   return (
     <div className="mx-auto max-w-3xl md:mx-0 lg:max-w-4xl xl:max-w-5xl">
       <h1 className="mt-5 font-heading text-xl font-bold text-ink md:mt-0 md:text-2xl">
-        Tes matches
+        {tab.listLabel}
       </h1>
       <div className="mt-3 border-b border-line">
         <div role="tablist" aria-label="Filtrer les matches" className="flex gap-6 sm:gap-10">
@@ -330,13 +381,22 @@ export function MatchesPage() {
         )}
         {list.state === 'ready' && list.rows.map((row) => <Row key={row.key} row={row} />)}
       </ul>
-      {list.state === 'ready' && list.hasMore && (
+      {list.state === 'ready' && list.more === 'failed' && (
+        <p role="alert" className="mt-4 text-sm text-destructive">
+          {tab.moreFailure}{' '}
+          <button type="button" onClick={list.loadMore} className="cursor-pointer underline">
+            Réessayer
+          </button>
+        </p>
+      )}
+      {list.state === 'ready' && list.hasMore && list.more !== 'failed' && (
         <button
           type="button"
           onClick={list.loadMore}
-          className="mt-4 w-full cursor-pointer rounded-2xl border border-line px-4 py-2.5 text-xs font-semibold text-ink-muted transition-colors hover:text-ink sm:text-sm"
+          disabled={list.more === 'loading'}
+          className="mt-4 w-full cursor-pointer rounded-2xl border border-line px-4 py-2.5 text-xs font-semibold text-ink-muted transition-colors hover:text-ink disabled:cursor-default disabled:text-ink-faint sm:text-sm"
         >
-          Voir plus
+          {list.more === 'loading' ? 'Chargement…' : 'Voir plus'}
         </button>
       )}
     </div>

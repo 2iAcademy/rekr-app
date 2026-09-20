@@ -8,13 +8,39 @@ import {
   offerControllerFindOneById,
   offerControllerLike,
   offerControllerPass,
+  offerControllerUnlike,
 } from '@/api/generated';
+import { ApiError } from '@/api/customFetch';
 import { notifyFailure } from '@/lib/feedback/notify';
+import type { BusinessMessages } from '@/lib/feedback/failureMessage';
 import { likeFailureBusiness } from '@/features/candidate-feed/likeFeedback';
 import { matchedCompany } from '@/features/matches/likeResult';
 import type { OfferDetailDto, TagCategory } from '@/api/generated';
 import { fileUrl } from '@/lib/fileUrl';
 import { useParams } from 'react-router';
+
+const UNLIKE_CONFLICT = 'Ce like ne peut plus être retiré.';
+
+const serverMessage = (cause: unknown): string | undefined => {
+  const body = cause instanceof ApiError ? cause.data : null;
+
+  if (typeof body !== 'object' || body === null || !('message' in body)) {
+    return undefined;
+  }
+
+  const { message } = body as { message: unknown };
+
+  return typeof message === 'string' ? message : undefined;
+};
+
+/**
+ * A 409 on the withdrawal means a match was made in the meantime — a race the
+ * reader lost while the screen was open. The server names the reason, and it
+ * names it better than a generic failure would.
+ */
+const unlikeFailure = (cause: unknown): BusinessMessages => ({
+  409: serverMessage(cause) ?? UNLIKE_CONFLICT,
+});
 
 interface MatchedProfile {
   name: string;
@@ -34,6 +60,7 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
   const [error, setError] = useState<string | null>(null);
   const [isLiking, setIsLiking] = useState(false);
   const [isPassing, setIsPassing] = useState(false);
+  const [isUnliking, setIsUnliking] = useState(false);
 
   useEffect(() => {
     const fetchOffer = async () => {
@@ -91,8 +118,23 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
       setIsLiking(false);
     }
   };
+  const unlike = async (): Promise<void> => {
+    setIsUnliking(true);
+    try {
+      await offerControllerUnlike(offer.id);
+      onBack?.();
+    } catch (cause) {
+      notifyFailure(cause, unlikeFailure(cause));
+    } finally {
+      setIsUnliking(false);
+    }
+  };
 
   const { company, tags, salaryMin, salaryMax, remotePolicy, city } = offer;
+  // Both keys are served to the candidate alone: on a recruiter's read they are
+  // absent, which is not the same answer as `false` and must not read as one.
+  const liked = offer.liked === true;
+  const passed = offer.passed === true;
   const companyLogoUrl = fileUrl(company.logo);
   const labelsOf = (...categories: TagCategory[]) =>
     tags.filter((tag) => categories.includes(tag.category)).map((tag) => tag.label);
@@ -187,28 +229,52 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
         )}
       </section>
 
-      <div className="sticky bottom-0 flex gap-3 bg-background/80 px-6 py-4 backdrop-blur-md">
-        <Button
-          type="button"
-          variant="outline"
-          size="xl"
-          className="flex-1 rounded-full"
-          onClick={() => void pass()}
-          disabled={isPassing}
-        >
-          Passer
-        </Button>
-        <Button
-          type="button"
-          variant="role"
-          size="xl"
-          className="flex-1 rounded-full"
-          onClick={() => void like()}
-          disabled={isLiking}
-        >
-          <Heart className="size-5" />
-          Liker
-        </Button>
+      <div className="sticky bottom-0 flex flex-col gap-3 bg-background/80 px-6 py-4 backdrop-blur-md">
+        {(liked || passed) && (
+          <p className="text-center text-sm text-ink-muted">
+            {liked ? 'Tu as liké cette offre' : 'Tu as passé cette offre'}
+          </p>
+        )}
+        {liked ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="xl"
+            className="w-full rounded-full"
+            onClick={() => void unlike()}
+            disabled={isUnliking}
+          >
+            Retirer mon like
+          </Button>
+        ) : (
+          <div className="flex gap-3">
+            {/* Passing again is a no-op; liking after a pass is a change of
+                mind the reader is entitled to. */}
+            {!passed && (
+              <Button
+                type="button"
+                variant="outline"
+                size="xl"
+                className="flex-1 rounded-full"
+                onClick={() => void pass()}
+                disabled={isPassing}
+              >
+                Passer
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="role"
+              size="xl"
+              className="flex-1 rounded-full"
+              onClick={() => void like()}
+              disabled={isLiking}
+            >
+              <Heart className="size-5" />
+              Liker
+            </Button>
+          </div>
+        )}
       </div>
     </main>
   );

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { Prisma, TagCategory } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
 import { resolveTagIds } from '../common/tags/tag-sync';
@@ -492,6 +497,12 @@ export class OfferService {
         select: { id: true, companyId: true },
       });
       if (!offer) throw new NotFoundException('Offer not found');
+      // The two answers are exclusive, so the one being given clears the
+      // other: a candidate may change their mind, but the pair must never
+      // carry a like and a pass at once.
+      await tx.candidatePassesOffer.deleteMany({
+        where: { candidateUserId, offerId },
+      });
       const like = await tx.candidateLikesOffer.createMany({
         data: [{ candidateUserId, offerId }],
         skipDuplicates: true,
@@ -525,11 +536,55 @@ export class OfferService {
         select: { id: true },
       });
       if (!offer) throw new NotFoundException('Offer not found');
+      await this.assertNotMatched(tx, candidateUserId, offerId);
+      await tx.candidateLikesOffer.deleteMany({
+        where: { candidateUserId, offerId },
+      });
       await tx.candidatePassesOffer.createMany({
         data: [{ candidateUserId, offerId }],
         skipDuplicates: true,
       });
     });
+  }
+
+  /**
+   * Takes back a candidate's like on an offer.
+   *
+   * Idempotent, and deliberately blind to the offer itself: a pair carrying no
+   * like answers like one that did, and an offer that has left `open` since
+   * the like was written must still be releasable — the candidate is undoing
+   * their own row, not reading the post.
+   */
+  async unlike(candidateUserId: number, offerId: number): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.assertNotMatched(tx, candidateUserId, offerId);
+      await tx.candidateLikesOffer.deleteMany({
+        where: { candidateUserId, offerId },
+      });
+    });
+  }
+
+  /**
+   * A match is a mutual commitment, and neither half of it is undone from the
+   * offer screen: refusing here is what keeps the likes list and the matches
+   * list from telling opposite stories about the same pair. Accepting the
+   * write and leaving the match standing would do exactly that.
+   */
+  private async assertNotMatched(
+    tx: Prisma.TransactionClient,
+    candidateUserId: number,
+    offerId: number,
+  ): Promise<void> {
+    const match = await tx.match.findUnique({
+      where: { candidateUserId_offerId: { candidateUserId, offerId } },
+      select: { id: true },
+    });
+
+    if (match) {
+      throw new ConflictException(
+        'Cette offre a déjà donné lieu à un match : il ne peut pas être défait ici.',
+      );
+    }
   }
   /** The offers the calling candidate has liked, newest interest first. */
   async findLiked(
@@ -764,7 +819,41 @@ export class OfferService {
       throw new NotFoundException('Offer not found');
     }
 
-    return toDetailOffer(offer);
+    // Read for the candidate only, and absent — not false — for anyone else:
+    // a recruiter has no answer to give on an offer, and the same convention
+    // already governs `postalCode` and `status`.
+    const answer =
+      user.userType === 'candidate'
+        ? await this.readCandidateAnswer(user.id, id)
+        : {};
+
+    return { ...toDetailOffer(offer), ...answer };
+  }
+
+  /**
+   * What the calling candidate has already answered on an offer.
+   *
+   * The deck never shows an offer that carries one — `findFeed` excludes both
+   * — but the likes list links straight to the detail screen, so the screen
+   * has to know before it offers « Passer / Liker » again.
+   */
+  private async readCandidateAnswer(
+    candidateUserId: number,
+    offerId: number,
+  ): Promise<{ liked: boolean; passed: boolean }> {
+    const key = { candidateUserId_offerId: { candidateUserId, offerId } };
+    const [liked, passed] = await Promise.all([
+      this.prisma.candidateLikesOffer.findUnique({
+        where: key,
+        select: { offerId: true },
+      }),
+      this.prisma.candidatePassesOffer.findUnique({
+        where: key,
+        select: { offerId: true },
+      }),
+    ]);
+
+    return { liked: liked !== null, passed: passed !== null };
   }
 
   /**

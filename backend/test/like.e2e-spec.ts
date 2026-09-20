@@ -221,7 +221,7 @@ describe('Like (e2e)', () => {
         counterpart: {
           kind: 'candidate',
           id: candidate.id,
-          name: 'Ada Lovelace',
+          name: 'Ada',
           avatarUrl: null,
           headline: 'Développeuse',
         },
@@ -320,6 +320,37 @@ describe('Like (e2e)', () => {
       expect(res.body).toHaveLength(1);
     });
 
+    /**
+     * The counterpart of a pending like is a first name: the surname comes
+     * with the match, not with the interest. Asserted over the whole payload
+     * rather than over `counterpart.name`, so that a surname reappearing in
+     * any other field fails too.
+     */
+    it('withholds the surname of every candidate until the match', async () => {
+      const acme = await seedRecruiterWithCompany('Acme');
+      const ada = await seedCandidate('Ada');
+      const grace = await seedCandidate('Grace');
+      const offer = await seedOffer(acme.company.id, 'Développeur Front');
+      await prisma.candidateLikesOffer.createMany({
+        data: [ada, grace].map((user) => ({
+          candidateUserId: user.id,
+          offerId: offer.id,
+        })),
+      });
+
+      const res = await httpRequest(app)
+        .get('/api/likes/received')
+        .set('Authorization', bearerFor(app, acme.user.id, 'recruiter'))
+        .expect(200);
+
+      const items = res.body as LikeListItem[];
+      expect(items.map((item) => item.counterpart.name).sort()).toEqual([
+        'Ada',
+        'Grace',
+      ]);
+      expect(JSON.stringify(res.body)).not.toContain('Lovelace');
+    });
+
     it('exposes no email, phone or account column', async () => {
       const acme = await seedRecruiterWithCompany('Acme');
       const candidate = await seedCandidate('Ada');
@@ -389,6 +420,25 @@ describe('Like (e2e)', () => {
 
       expect((page1.body as LikeListItem[])[0]?.offerId).toBe(second.id);
       expect((page2.body as LikeListItem[])[0]?.offerId).toBe(first.id);
+    });
+
+    /**
+     * `Number.isInteger(1e30)` is true, so the floor alone lets a page through
+     * whose offset no longer fits an int4 — and that surfaces as a 500 instead
+     * of the 400 a bad parameter deserves.
+     */
+    it('rejects a page above what the database can offset', async () => {
+      const candidate = await seedCandidate('Ada');
+      const recruiter = await seedRecruiterWithCompany('Acme');
+
+      await httpRequest(app)
+        .get('/api/likes/sent?page=1e30')
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(400);
+      await httpRequest(app)
+        .get('/api/likes/received?page=1e30')
+        .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+        .expect(400);
     });
 
     it('rejects a limit outside its bounds', async () => {

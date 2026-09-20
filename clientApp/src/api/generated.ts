@@ -320,6 +320,8 @@ export interface OfferDetailDto {
   status?: OfferStatus;
   /** @nullable */
   jobFamilyId?: number | null;
+  liked?: boolean;
+  passed?: boolean;
 }
 
 export interface CreateOfferDto {
@@ -599,28 +601,30 @@ export type LikeControllerFindSentParams = {
   /**
    * Numéro de page, à partir de 1.
    * @minimum 1
+   * @maximum 2147483647
    */
-  page?: Object;
+  page?: number;
   /**
    * Nombre maximum de likes par page.
    * @minimum 1
    * @maximum 100
    */
-  limit?: Object;
+  limit?: number;
 };
 
 export type LikeControllerFindReceivedParams = {
   /**
    * Numéro de page, à partir de 1.
    * @minimum 1
+   * @maximum 2147483647
    */
-  page?: Object;
+  page?: number;
   /**
    * Nombre maximum de likes par page.
    * @minimum 1
    * @maximum 100
    */
-  limit?: Object;
+  limit?: number;
 };
 
 export type appControllerGetHelloResponse200 = {
@@ -1927,6 +1931,51 @@ export const offerControllerLike = async (
   });
 };
 
+export type offerControllerUnlikeResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type offerControllerUnlikeResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerUnlikeResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerUnlikeResponse409 = {
+  data: void;
+  status: 409;
+};
+
+export type offerControllerUnlikeResponseSuccess = offerControllerUnlikeResponse204 & {
+  headers: Headers;
+};
+export type offerControllerUnlikeResponseError = (
+  | offerControllerUnlikeResponse401
+  | offerControllerUnlikeResponse403
+  | offerControllerUnlikeResponse409
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerUnlikeUrl = (id: number) => {
+  return `/api/offers/${id}/like`;
+};
+
+export const offerControllerUnlike = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerUnlikeResponseSuccess> => {
+  return customFetch<offerControllerUnlikeResponseSuccess>(getOfferControllerUnlikeUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type offerControllerPassResponse201 = {
   data: void;
   status: 201;
@@ -1947,11 +1996,19 @@ export type offerControllerPassResponse404 = {
   status: 404;
 };
 
+export type offerControllerPassResponse409 = {
+  data: void;
+  status: 409;
+};
+
 export type offerControllerPassResponseSuccess = offerControllerPassResponse201 & {
   headers: Headers;
 };
 export type offerControllerPassResponseError = (
-  offerControllerPassResponse401 | offerControllerPassResponse403 | offerControllerPassResponse404
+  | offerControllerPassResponse401
+  | offerControllerPassResponse403
+  | offerControllerPassResponse404
+  | offerControllerPassResponse409
 ) & {
   headers: Headers;
 };

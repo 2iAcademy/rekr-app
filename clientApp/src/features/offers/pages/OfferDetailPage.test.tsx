@@ -8,7 +8,10 @@ import {
   offerControllerFindOneById,
   offerControllerLike,
   offerControllerPass,
+  offerControllerUnlike,
 } from '@/api/generated';
+import { ApiError } from '@/api/customFetch';
+import { Toaster } from '@/components/ui/sonner';
 
 vi.mock('@/api/generated', () => ({
   jobFamilyControllerFindAll: vi.fn(() =>
@@ -17,6 +20,7 @@ vi.mock('@/api/generated', () => ({
   offerControllerFindOneById: vi.fn(),
   offerControllerLike: vi.fn(),
   offerControllerPass: vi.fn(),
+  offerControllerUnlike: vi.fn(),
 }));
 
 const mockOffer = {
@@ -55,13 +59,30 @@ const renderPage = (props: Partial<ComponentProps<typeof OfferDetailPage>> = {})
       <Routes>
         <Route path="/offres/:id" element={<OfferDetailPage {...props} />} />
       </Routes>
+      <Toaster />
     </MemoryRouter>,
   );
 
+/** `liked` and `passed` are served to the candidate alone: on a recruiter's
+ * read the keys are absent, they are not `false`. */
+const offerSeenBy = (decision: { liked?: boolean; passed?: boolean }) =>
+  ({
+    data: { ...mockOffer, ...decision },
+  }) as unknown as Awaited<ReturnType<typeof offerControllerFindOneById>>;
+
+const apiError = (status: number, message: string) =>
+  new ApiError({ status, statusText: '', url: '/api/offers/1/like', data: { message } });
+
+const MATCH_CONFLICT = 'Cette offre a déjà donné lieu à un match : il ne peut pas être défait ici.';
+
 describe('OfferDetailPage', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(offerControllerPass).mockResolvedValue(
       undefined as unknown as Awaited<ReturnType<typeof offerControllerPass>>,
+    );
+    vi.mocked(offerControllerUnlike).mockResolvedValue(
+      undefined as unknown as Awaited<ReturnType<typeof offerControllerUnlike>>,
     );
     vi.mocked(offerControllerLike).mockResolvedValue({
       data: {
@@ -217,6 +238,84 @@ describe('OfferDetailPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Fermer' }));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('affiche l’état liké et non plus Passer / Liker', async () => {
+    vi.mocked(offerControllerFindOneById).mockResolvedValue(offerSeenBy({ liked: true }));
+    renderPage();
+
+    expect(await screen.findByText('Tu as liké cette offre')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retirer mon like' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Liker' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Passer' })).not.toBeInTheDocument();
+  });
+
+  it('retire le like puis revient à l’écran précédent', async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    vi.mocked(offerControllerFindOneById).mockResolvedValue(offerSeenBy({ liked: true }));
+    renderPage({ onBack });
+
+    await user.click(await screen.findByRole('button', { name: 'Retirer mon like' }));
+
+    await waitFor(() => expect(offerControllerUnlike).toHaveBeenCalledExactlyOnceWith(1));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Le cas arrive pour de vrai : le recruteur like au moment où le candidat
+   * retire le sien. Le serveur dit pourquoi, et il le dit mieux que nous.
+   */
+  it('affiche le motif du serveur quand un match interdit le retrait', async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    vi.mocked(offerControllerFindOneById).mockResolvedValue(offerSeenBy({ liked: true }));
+    vi.mocked(offerControllerUnlike).mockRejectedValue(apiError(409, MATCH_CONFLICT));
+    renderPage({ onBack });
+
+    await user.click(await screen.findByRole('button', { name: 'Retirer mon like' }));
+
+    expect(await screen.findByText(MATCH_CONFLICT)).toBeVisible();
+    expect(onBack).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Retirer mon like' })).toBeEnabled();
+  });
+
+  it('affiche l’état passé en laissant la possibilité de liker', async () => {
+    const user = userEvent.setup();
+    vi.mocked(offerControllerFindOneById).mockResolvedValue(offerSeenBy({ passed: true }));
+    renderPage();
+
+    expect(await screen.findByText('Tu as passé cette offre')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Passer' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Liker' }));
+
+    await waitFor(() => expect(offerControllerLike).toHaveBeenCalledExactlyOnceWith(1));
+  });
+
+  // Parcours feed : l'offre n'a été ni likée ni passée, l'écran ne change pas.
+  it('garde Passer / Liker quand l’offre n’a été ni likée ni passée', async () => {
+    vi.mocked(offerControllerFindOneById).mockResolvedValue(
+      offerSeenBy({ liked: false, passed: false }),
+    );
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: 'Passer' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Liker' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retirer mon like' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Tu as liké cette offre')).not.toBeInTheDocument();
+  });
+
+  // Les deux clés sont absentes pour un recruteur : aucun état de candidature
+  // ne doit s'afficher, et surtout pas le retrait de like.
+  it('n’affiche aucun état de candidature quand les clés sont absentes', async () => {
+    renderPage();
+
+    await screen.findByRole('heading', { level: 2, name: mockOffer.title });
+
+    expect(screen.queryByRole('button', { name: 'Retirer mon like' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Tu as liké cette offre')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tu as passé cette offre')).not.toBeInTheDocument();
   });
 
   it('affiche un message de chargement puis le contenu', async () => {

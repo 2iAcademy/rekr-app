@@ -135,7 +135,7 @@ describe('MatchesPage', () => {
   it('affiche les matches récupérés depuis l’API', async () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { name: 'Tes matches' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Matches' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Matches' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByText('Acme Corp')).toBeInTheDocument();
   });
@@ -379,6 +379,91 @@ describe('MatchesPage', () => {
     await openTab(user, 'Matches');
 
     expect(screen.queryByRole('button', { name: 'Voir plus' })).not.toBeInTheDocument();
+  });
+
+  // Le titre nomme ce qui est affiché : un recruteur sur « Reçus » ne lit pas
+  // « Tes matches ».
+  it('titre l’écran avec l’onglet ouvert', async () => {
+    const user = userEvent.setup();
+    authenticateAs('recruiter');
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Matches' })).toBeInTheDocument();
+
+    await openTab(user, 'Reçus');
+
+    expect(screen.getByRole('heading', { name: 'Reçus' })).toBeInTheDocument();
+  });
+
+  /**
+   * Le bouton est le seul garde-fou : tant que la page en vol n'est pas
+   * arrivée, un second clic ne doit ni partir ni sauter une page.
+   */
+  it('désactive « Voir plus » et le dit pendant le chargement de la page suivante', async () => {
+    const user = userEvent.setup();
+    let releaseSecondPage!: (data: LikeListItemDto[]) => void;
+    const secondPage = new Promise<Awaited<ReturnType<typeof likeControllerFindSent>>>(
+      (resolve) => {
+        releaseSecondPage = (data) => resolve(likes(data));
+      },
+    );
+
+    getSent.mockResolvedValueOnce(likes(aFullPageOfSentLikes(100)));
+    getSent.mockReturnValueOnce(secondPage);
+    renderPage();
+
+    await openTab(user, 'Mes likes');
+    await screen.findByText('Société 100');
+
+    await user.click(screen.getByRole('button', { name: 'Voir plus' }));
+
+    const pending = await screen.findByRole('button', { name: 'Chargement…' });
+    expect(pending).toBeDisabled();
+
+    await user.click(pending);
+    releaseSecondPage(aFullPageOfSentLikes(200).slice(0, 4));
+
+    expect(await screen.findByText('Société 200')).toBeInTheDocument();
+    expect(getSent.mock.calls.map(([query]) => query?.page)).toEqual([1, 2]);
+    expect(screen.getByText('Société 100')).toBeInTheDocument();
+  });
+
+  it('garde les lignes déjà chargées quand la page suivante échoue', async () => {
+    const user = userEvent.setup();
+    getSent.mockResolvedValueOnce(likes(aFullPageOfSentLikes(100)));
+    getSent.mockRejectedValueOnce(new Error('API indisponible'));
+    renderPage();
+
+    await openTab(user, 'Mes likes');
+    await screen.findByText('Société 100');
+
+    await user.click(screen.getByRole('button', { name: 'Voir plus' }));
+
+    // Le message ne nomme pas la liste : elle est sous les yeux du lecteur.
+    expect(await screen.findByRole('alert')).toHaveTextContent('Impossible de charger la suite.');
+    expect(screen.queryByText(/Impossible de charger tes likes/)).not.toBeInTheDocument();
+    expect(screen.getByText('Société 100')).toBeInTheDocument();
+    expect(screen.getByText('Société 149')).toBeInTheDocument();
+  });
+
+  it('permet de réessayer la page suivante après son échec', async () => {
+    const user = userEvent.setup();
+    getSent.mockResolvedValueOnce(likes(aFullPageOfSentLikes(100)));
+    getSent.mockRejectedValueOnce(new Error('API indisponible'));
+    getSent.mockResolvedValueOnce(likes(aFullPageOfSentLikes(200).slice(0, 3)));
+    renderPage();
+
+    await openTab(user, 'Mes likes');
+    await screen.findByText('Société 100');
+
+    await user.click(screen.getByRole('button', { name: 'Voir plus' }));
+    await user.click(await screen.findByRole('button', { name: 'Réessayer' }));
+
+    expect(await screen.findByText('Société 200')).toBeInTheDocument();
+    expect(screen.getByText('Société 100')).toBeInTheDocument();
+    // La page rejetée est redemandée, pas sautée.
+    expect(getSent.mock.calls.map(([query]) => query?.page)).toEqual([1, 2, 2]);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('n’expose que les lignes de l’onglet ouvert dans sa liste', async () => {

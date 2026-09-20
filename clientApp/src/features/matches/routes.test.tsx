@@ -73,14 +73,14 @@ describe('navigation vers le match', () => {
     authenticateAs('candidate');
     renderAt('/matches');
 
-    expect(await screen.findByRole('heading', { name: 'Tes matches' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Matches' })).toBeInTheDocument();
   });
 
   it('renvoie un visiteur anonyme vers la connexion depuis la liste des matches', async () => {
     renderAt('/matches');
 
     expect(await screen.findByRole('button', { name: 'Se connecter' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Matches' })).not.toBeInTheDocument();
   });
 
   // L'écran sert désormais les deux rôles : le recruteur y lit ses matches et
@@ -90,7 +90,7 @@ describe('navigation vers le match', () => {
     const router = renderAt('/matches');
 
     expect(
-      await screen.findByRole('heading', { name: 'Tes matches' }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: 'Matches' }, { timeout: 5000 }),
     ).toBeInTheDocument();
     await waitFor(() => expect(router.state.location.pathname).toBe('/matches'));
     expect(screen.getByRole('tab', { name: 'Reçus' })).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe('navigation vers le match', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}) as Promise<Response>);
     renderAt('/matches');
 
-    expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Matches' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Se connecter' })).not.toBeInTheDocument();
   });
 

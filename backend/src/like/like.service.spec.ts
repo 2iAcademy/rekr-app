@@ -31,7 +31,6 @@ const receivedRow = {
   likedAt: new Date('2026-08-18T10:00:00.000Z'),
   offerTitle: 'Développeur Full-Stack',
   firstName: 'Ada',
-  lastName: 'Lovelace',
   picture: 'candidates/7/avatar.webp',
   desiredJobTitle: 'Développeuse',
 };
@@ -125,12 +124,27 @@ describe('LikeService', () => {
           counterpart: {
             kind: 'candidate',
             id: 7,
-            name: 'Ada Lovelace',
+            name: 'Ada',
             avatarUrl: 'candidates/7/avatar.webp',
             headline: 'Développeuse',
           },
         },
       ]);
+    });
+
+    /**
+     * The surname is not trimmed from the payload, it is never read: a column
+     * left in the `SELECT` is a column that has already left the database, and
+     * the next mapper to spread the row puts it back on the wire.
+     */
+    it('never claims the surname from the database', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 8 });
+      prisma.$queryRaw.mockResolvedValue([]);
+
+      await service.findReceived({ id: 3, userType: 'recruiter' });
+
+      const [query] = prisma.$queryRaw.mock.calls[0] as [{ sql: string }];
+      expect(query.sql).not.toContain('last_name');
     });
 
     it('scopes the read to the company and the caller, and paginates in SQL', async () => {

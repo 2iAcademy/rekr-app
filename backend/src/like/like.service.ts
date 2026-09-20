@@ -40,7 +40,6 @@ interface ReceivedRow {
   likedAt: Date;
   offerTitle: string;
   firstName: string;
-  lastName: string;
   picture: string | null;
   desiredJobTitle: string | null;
 }
@@ -114,8 +113,10 @@ export class LikeService {
              cl.fk_offer             AS "offerId",
              cl.liked_at             AS "likedAt",
              o.title                 AS "offerTitle",
+             -- The first name alone, as the applicants list serves it: the
+             -- surname comes with the match, and a column selected here has
+             -- already left the database whatever the mapper does with it.
              cp.first_name           AS "firstName",
-             cp.last_name            AS "lastName",
              cp.picture              AS "picture",
              cp.desired_job_title    AS "desiredJobTitle"
       FROM candidate_likes_offer cl
@@ -150,7 +151,7 @@ export class LikeService {
       counterpart: {
         kind: 'candidate',
         id: row.candidateUserId,
-        name: `${row.firstName} ${row.lastName}`,
+        name: row.firstName,
         avatarUrl: row.picture,
         headline: row.desiredJobTitle,
       },

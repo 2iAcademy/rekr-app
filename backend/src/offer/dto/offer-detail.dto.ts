@@ -240,4 +240,15 @@ export class OfferDetailDto {
    */
   @ApiPropertyOptional({ type: Number, nullable: true, example: 13 })
   jobFamilyId?: number | null;
+
+  /**
+   * The answer the calling candidate already gave on this offer. Absent, not
+   * false, for a recruiter: they have no answer to give, and `false` would
+   * read as « not liked yet ».
+   */
+  @ApiPropertyOptional({ type: Boolean, example: true })
+  liked?: boolean;
+
+  @ApiPropertyOptional({ type: Boolean, example: false })
+  passed?: boolean;
 }
