@@ -18,6 +18,7 @@ import { OfferModule } from './offer/offer.module';
 import { JobFamilyModule } from './job-family/job-family.module';
 import { SectorModule } from './sector/sector.module';
 import { StorageModule } from './storage/storage.module';
+import { LikeModule } from './like/like.module';
 import { MatchModule } from './match/match.module';
 
 @Module({
@@ -41,6 +42,7 @@ import { MatchModule } from './match/match.module';
     SectorModule,
     StorageModule,
     MatchModule,
+    LikeModule,
   ],
   controllers: [AppController],
   providers: [

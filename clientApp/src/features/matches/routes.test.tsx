@@ -6,6 +6,8 @@ import { AuthProvider } from '@/features/auth/AuthProvider';
 import { routes } from '@/router';
 
 vi.mock('@/api/generated', () => ({
+  likeControllerFindSent: vi.fn().mockResolvedValue({ data: [] }),
+  likeControllerFindReceived: vi.fn().mockResolvedValue({ data: [] }),
   authControllerLogin: vi.fn(),
   authControllerLogout: vi.fn(),
   authControllerSignup: vi.fn(),
@@ -16,7 +18,6 @@ vi.mock('@/api/generated', () => ({
   matchControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerCreate: vi.fn(),
   offerControllerFindFeed: vi.fn().mockResolvedValue({ data: [] }),
-  offerControllerFindLiked: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerLike: vi.fn(),
   sectorControllerFindAll: vi.fn(),
@@ -82,19 +83,26 @@ describe('navigation vers le match', () => {
     expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
   });
 
-  // La vue du recruteur est son annonce : il lit qui s'y intéresse depuis
-  // « Mes offres », pas depuis une liste de matches tous postes confondus.
-  it('écarte un recruteur de la liste des matches, vers ses offres', async () => {
+  // L'écran sert désormais les deux rôles : le recruteur y lit ses matches et
+  // les candidats qui ont liké une de ses offres sans réponse de sa part.
+  it('ouvre la liste des matches à un recruteur connecté', async () => {
     authenticateAs('recruiter');
     const router = renderAt('/matches');
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/recruteur/offres'), {
-      timeout: 5000,
-    });
     expect(
-      await screen.findByRole('heading', { name: 'Vos offres' }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: 'Tes matches' }, { timeout: 5000 }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Tes matches' })).not.toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/matches'));
+    expect(screen.getByRole('tab', { name: 'Reçus' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Mes likes' })).not.toBeInTheDocument();
+  });
+
+  it('réserve l’onglet des likes envoyés au candidat', async () => {
+    authenticateAs('candidate');
+    renderAt('/matches');
+
+    expect(await screen.findByRole('tab', { name: 'Mes likes' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Reçus' })).not.toBeInTheDocument();
   });
 
   it('n’affiche pas la liste des matches tant que la session est en cours de vérification', () => {

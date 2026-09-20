@@ -487,6 +487,18 @@ export interface SectorDto {
   label: string;
 }
 
+export interface LikeListItemDto {
+  offerId: number;
+  /**
+   * Null sur /likes/sent, où le candidat est l’appelant.
+   * @nullable
+   */
+  candidateUserId: number | null;
+  likedAt: string;
+  offer: MatchOfferDto;
+  counterpart: MatchCounterpartDto;
+}
+
 export type CandidateProfileControllerReplacePictureBody = {
   file: Blob | File;
 };
@@ -577,6 +589,34 @@ export type MatchControllerFindMineParams = {
   page?: Object;
   /**
    * Nombre maximum de matchs par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: Object;
+};
+
+export type LikeControllerFindSentParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   */
+  page?: Object;
+  /**
+   * Nombre maximum de likes par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: Object;
+};
+
+export type LikeControllerFindReceivedParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   */
+  page?: Object;
+  /**
+   * Nombre maximum de likes par page.
    * @minimum 1
    * @maximum 100
    */
@@ -2149,4 +2189,112 @@ export const sectorControllerFindAll = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type likeControllerFindSentResponse200 = {
+  data: LikeListItemDto[];
+  status: 200;
+};
+
+export type likeControllerFindSentResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type likeControllerFindSentResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type likeControllerFindSentResponseSuccess = likeControllerFindSentResponse200 & {
+  headers: Headers;
+};
+export type likeControllerFindSentResponseError = (
+  likeControllerFindSentResponse401 | likeControllerFindSentResponse403
+) & {
+  headers: Headers;
+};
+
+export const getLikeControllerFindSentUrl = (params?: LikeControllerFindSentParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/likes/sent?${stringifiedParams}` : `/api/likes/sent`;
+};
+
+export const likeControllerFindSent = async (
+  params?: LikeControllerFindSentParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<likeControllerFindSentResponseSuccess> => {
+  return customFetch<likeControllerFindSentResponseSuccess>(getLikeControllerFindSentUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type likeControllerFindReceivedResponse200 = {
+  data: LikeListItemDto[];
+  status: 200;
+};
+
+export type likeControllerFindReceivedResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type likeControllerFindReceivedResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type likeControllerFindReceivedResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type likeControllerFindReceivedResponseSuccess = likeControllerFindReceivedResponse200 & {
+  headers: Headers;
+};
+export type likeControllerFindReceivedResponseError = (
+  | likeControllerFindReceivedResponse401
+  | likeControllerFindReceivedResponse403
+  | likeControllerFindReceivedResponse404
+) & {
+  headers: Headers;
+};
+
+export const getLikeControllerFindReceivedUrl = (params?: LikeControllerFindReceivedParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/likes/received?${stringifiedParams}`
+    : `/api/likes/received`;
+};
+
+export const likeControllerFindReceived = async (
+  params?: LikeControllerFindReceivedParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<likeControllerFindReceivedResponseSuccess> => {
+  return customFetch<likeControllerFindReceivedResponseSuccess>(
+    getLikeControllerFindReceivedUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
