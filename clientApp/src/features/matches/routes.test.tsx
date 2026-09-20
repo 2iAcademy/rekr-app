@@ -97,6 +97,19 @@ describe('navigation vers le match', () => {
     expect(screen.queryByRole('tab', { name: 'Mes likes' })).not.toBeInTheDocument();
   });
 
+  // Changer d'onglet n'est pas une étape du parcours : l'empiler rendrait le
+  // bouton Retour du navigateur inutilisable.
+  it('n’empile pas d’entrée d’historique en changeant d’onglet', async () => {
+    const user = userEvent.setup();
+    authenticateAs('candidate');
+    const router = renderAt('/matches');
+
+    await user.click(await screen.findByRole('tab', { name: 'Mes likes' }));
+
+    await waitFor(() => expect(router.state.location.search).toBe('?onglet=mes-likes'));
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+
   it('réserve l’onglet des likes envoyés au candidat', async () => {
     authenticateAs('candidate');
     renderAt('/matches');

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import {
   likeControllerFindReceived,
   likeControllerFindSent,
@@ -13,6 +13,10 @@ import { fileUrl } from '@/lib/fileUrl';
 import { cn, timeSince } from '@/lib/utils';
 
 const PAGE_SIZE = 50;
+
+// The open tab lives in the URL: a detail screen can then come back to it, and
+// a reload does not land the reader somewhere they never chose.
+const TAB_PARAM = 'onglet';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -112,6 +116,8 @@ const MORE_FAILURE = 'Impossible de charger la suite.';
  */
 interface TabModel {
   value: TabValue;
+  /** How the tab spells itself in the URL. */
+  slug: string;
   label: string;
   empty: string;
   failure: string;
@@ -122,6 +128,7 @@ interface TabModel {
 
 const MATCHES_TAB: TabModel = {
   value: 'matches',
+  slug: 'matches',
   label: 'Matches',
   empty: 'Aucun match pour le moment.',
   failure: 'Impossible de charger tes matches.',
@@ -132,6 +139,7 @@ const MATCHES_TAB: TabModel = {
 
 const SENT_TAB: TabModel = {
   value: 'sent',
+  slug: 'mes-likes',
   label: 'Mes likes',
   empty: 'Vous n’avez encore liké aucune offre.',
   failure: 'Impossible de charger tes likes.',
@@ -142,6 +150,7 @@ const SENT_TAB: TabModel = {
 
 const RECEIVED_TAB: TabModel = {
   value: 'received',
+  slug: 'recus',
   label: 'Reçus',
   empty: 'Aucun candidat n’a encore liké tes offres.',
   failure: 'Impossible de charger les likes reçus.',
@@ -255,7 +264,7 @@ function usePagedList(load: LoadPage, enabled: boolean): PagedList {
   return { rows, state, more, hasMore, loadMore };
 }
 
-function Row({ row }: { row: ListRow }) {
+function Row({ row, from }: { row: ListRow; from: string }) {
   const body = (
     <>
       <span
@@ -300,6 +309,9 @@ function Row({ row }: { row: ListRow }) {
         // a keyboard and openable in a new tab.
         <Link
           to={row.to}
+          // Where the reader came from, so the screen they open can bring them
+          // back to this very tab rather than to the role's home.
+          state={{ from }}
           className={cn(
             shell,
             'transition-shadow hover:shadow-[0_10px_26px_-16px_rgba(11,27,23,0.55)]',
@@ -314,13 +326,19 @@ function Row({ row }: { row: ListRow }) {
 
 export function MatchesPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabValue>('matches');
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   // Fetched when a tab is first opened, not on mount: half the readers never
   // open the second one, and the list does not change while they sit on the
-  // other.
-  const [opened, setOpened] = useState<readonly TabValue[]>(['matches']);
+  // other. The open tab needs no entry here, being enabled by being open.
+  const [opened, setOpened] = useState<readonly TabValue[]>([]);
 
-  const wasOpened = (value: TabValue) => opened.includes(value);
+  const tabs = tabsFor(user?.userType);
+  // An unknown slug, or one naming a tab this role does not have, reads as no
+  // tab at all: a link a reader was sent cannot break their screen.
+  const tab = tabs.find((candidate) => candidate.slug === searchParams.get(TAB_PARAM)) ?? tabs[0];
+
+  const wasOpened = (value: TabValue) => value === tab.value || opened.includes(value);
 
   const lists: Record<TabValue, PagedList> = {
     matches: usePagedList(MATCHES_TAB.load, wasOpened('matches')),
@@ -328,13 +346,24 @@ export function MatchesPage() {
     received: usePagedList(RECEIVED_TAB.load, wasOpened('received')),
   };
 
-  const tabs = tabsFor(user?.userType);
-  const tab = tabs.find((candidate) => candidate.value === activeTab) ?? tabs[0];
   const list = lists[tab.value];
+  const from = `${location.pathname}${location.search}`;
 
-  const open = (value: TabValue): void => {
-    setActiveTab(value);
-    setOpened((current) => (current.includes(value) ? current : [...current, value]));
+  const open = (opening: TabModel): void => {
+    setOpened((current) =>
+      current.includes(opening.value) ? current : [...current, opening.value],
+    );
+    // Replaced, not pushed: reading the other tab is not a step of the journey,
+    // and one history entry per click would bury the way back.
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set(TAB_PARAM, opening.slug);
+
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   return (
@@ -352,7 +381,7 @@ export function MatchesPage() {
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => open(item.value)}
+                onClick={() => open(item)}
                 className={cn(
                   '-mb-px cursor-pointer border-b-2 px-0.5 pb-2 text-[0.65rem] transition-colors sm:text-xs',
                   isActive
@@ -379,7 +408,8 @@ export function MatchesPage() {
         {list.state === 'ready' && list.rows.length === 0 && (
           <li className="px-3 py-4 text-sm text-ink-muted">{tab.empty}</li>
         )}
-        {list.state === 'ready' && list.rows.map((row) => <Row key={row.key} row={row} />)}
+        {list.state === 'ready' &&
+          list.rows.map((row) => <Row key={row.key} row={row} from={from} />)}
       </ul>
       {list.state === 'ready' && list.more === 'failed' && (
         <p role="alert" className="mt-4 text-sm text-destructive">

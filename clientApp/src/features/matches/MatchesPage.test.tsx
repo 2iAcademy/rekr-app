@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   likeControllerFindReceived,
@@ -106,12 +106,29 @@ const aFullPageOfMatches = (from: number) =>
     counterpart: { ...aMatch.counterpart, name: `Société ${from + index}` },
   }));
 
-const renderPage = () =>
+/** Reads back what the page wrote in the URL, the tab being part of it now. */
+function LocationProbe() {
+  const location = useLocation();
+
+  return (
+    <>
+      <span data-testid="location">{`${location.pathname}${location.search}`}</span>
+      <span data-testid="state">{JSON.stringify(location.state)}</span>
+    </>
+  );
+}
+
+const renderPage = (entry = '/matches') =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <MatchesPage />
+      <LocationProbe />
     </MemoryRouter>,
   );
+
+const currentUrl = () => screen.getByTestId('location').textContent;
+
+const currentState = () => JSON.parse(screen.getByTestId('state').textContent || 'null') as unknown;
 
 const openTab = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
   await user.click(screen.getByRole('tab', { name }));
@@ -464,6 +481,56 @@ describe('MatchesPage', () => {
     // La page rejetée est redemandée, pas sautée.
     expect(getSent.mock.calls.map(([query]) => query?.page)).toEqual([1, 2, 2]);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // L'onglet vit dans l'URL : c'est ce qui permet d'y revenir depuis un écran
+  // de détail, et de le retrouver après un rechargement.
+  it('ouvre l’onglet nommé par l’URL', async () => {
+    authenticateAs('recruiter');
+    renderPage('/matches?onglet=recus');
+
+    expect(screen.getByRole('tab', { name: 'Reçus' })).toHaveAttribute('aria-selected', 'true');
+    await screen.findByText('Camille Durand');
+  });
+
+  it.each([
+    ['inconnu', '/matches?onglet=n-importe-quoi'],
+    ['absent', '/matches'],
+  ])('retombe sur le premier onglet quand le paramètre est %s', (_, entry) => {
+    renderPage(entry);
+
+    expect(screen.getByRole('tab', { name: 'Matches' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  // Un candidat n'a pas d'onglet « Reçus » : l'URL ne doit pas lui en ouvrir un.
+  it('retombe sur le premier onglet quand l’URL nomme un onglet interdit au rôle', () => {
+    renderPage('/matches?onglet=recus');
+
+    expect(screen.getByRole('tab', { name: 'Matches' })).toHaveAttribute('aria-selected', 'true');
+    expect(getReceived).not.toHaveBeenCalled();
+  });
+
+  it('inscrit l’onglet ouvert dans l’URL', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(currentUrl()).toBe('/matches');
+
+    await openTab(user, 'Mes likes');
+
+    expect(currentUrl()).toBe('/matches?onglet=mes-likes');
+  });
+
+  it('transporte l’origine dans le lien d’une ligne', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await openTab(user, 'Mes likes');
+    await user.click(await screen.findByRole('link', { name: /Orbit/ }));
+
+    // Le lien mène au détail, en disant d'où on vient : l'onglet compris.
+    expect(currentUrl()).toBe('/offres/30');
+    expect(currentState()).toEqual({ from: '/matches?onglet=mes-likes' });
   });
 
   it('n’expose que les lignes de l’onglet ouvert dans sa liste', async () => {

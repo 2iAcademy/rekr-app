@@ -492,6 +492,7 @@ export class OfferService {
    */
   async like(candidateUserId: number, offerId: number): Promise<LikeResultDto> {
     return this.prisma.$transaction(async (tx) => {
+      await this.lockAnswer(tx, candidateUserId, offerId);
       const offer = await tx.offer.findFirst({
         where: { id: offerId, status: 'open' },
         select: { id: true, companyId: true },
@@ -531,6 +532,7 @@ export class OfferService {
   /** Records a candidate's decision not to pursue an open offer. */
   async pass(candidateUserId: number, offerId: number): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await this.lockAnswer(tx, candidateUserId, offerId);
       const offer = await tx.offer.findFirst({
         where: { id: offerId, status: 'open' },
         select: { id: true },
@@ -557,11 +559,46 @@ export class OfferService {
    */
   async unlike(candidateUserId: number, offerId: number): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await this.lockAnswer(tx, candidateUserId, offerId);
       await this.assertNotMatched(tx, candidateUserId, offerId);
       await tx.candidateLikesOffer.deleteMany({
         where: { candidateUserId, offerId },
       });
     });
+  }
+
+  /**
+   * Serialises everything that decides what a candidate and a recruiter
+   * answered about one offer.
+   *
+   * The answers live in four tables — the two likes, the pass, the match — and
+   * each holds only its own primary key, so no constraint can say that they
+   * exclude one another or that a match rests on a like. Under READ COMMITTED
+   * the checks that stand in for those constraints all read a state the
+   * concurrent transaction has not committed yet, and both sides then write:
+   * a like and a pass standing together, and a match left on a like that was
+   * being withdrawn — which is worse than it looks, because the candidate is
+   * then engaged on an application they no longer have and `unlike` answers
+   * 409 from that point on.
+   *
+   * A transaction-scoped advisory lock is preferred over `Serializable`, which
+   * would need a P2034 replay loop around four handlers and would still let a
+   * retried write land after the client gave up, and over folding the two
+   * answers into one table, which is a migration and a model rewrite to buy an
+   * invariant these two lines already hold. Cost: one round trip per write,
+   * and contention bounded by the pair — only one candidate double-tapping one
+   * offer ever waits, never two candidates, never two offers.
+   *
+   * Taken before any read, since a lock acquired after the check it is meant
+   * to protect guards nothing. Run through `$executeRaw` rather than
+   * `$queryRaw`, which cannot decode the `void` the function returns.
+   */
+  private lockAnswer(
+    tx: Prisma.TransactionClient,
+    candidateUserId: number,
+    offerId: number,
+  ): Promise<number> {
+    return tx.$executeRaw`SELECT pg_advisory_xact_lock(${candidateUserId}::int, ${offerId}::int)`;
   }
 
   /**
@@ -693,6 +730,7 @@ export class OfferService {
     candidateUserId: number,
   ): Promise<LikeResultDto> {
     return this.prisma.$transaction(async (tx) => {
+      await this.lockAnswer(tx, candidateUserId, offerId);
       const [offer, profile] = await Promise.all([
         tx.offer.findFirst({
           where: { id: offerId, status: 'open' },
