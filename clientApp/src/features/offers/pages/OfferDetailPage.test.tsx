@@ -63,9 +63,9 @@ const renderPage = (props: Partial<ComponentProps<typeof OfferDetailPage>> = {})
     </MemoryRouter>,
   );
 
-/** `liked` and `passed` are served to the candidate alone: on a recruiter's
- * read the keys are absent, they are not `false`. */
-const offerSeenBy = (decision: { liked?: boolean; passed?: boolean }) =>
+/** `liked`, `passed` and `matched` are served to the candidate alone: on a
+ * recruiter's read the keys are absent, they are not `false`. */
+const offerSeenBy = (decision: { liked?: boolean; passed?: boolean; matched?: boolean }) =>
   ({
     data: { ...mockOffer, ...decision },
   }) as unknown as Awaited<ReturnType<typeof offerControllerFindOneById>>;
@@ -280,6 +280,35 @@ describe('OfferDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Retirer mon like' })).toBeEnabled();
   });
 
+  /**
+   * Un match n'efface pas le like : sans cet état, l'offre se présenterait comme
+   * simplement likée, et « Retirer mon like » répondrait 409.
+   */
+  it('affiche l’état matché et n’offre aucune des trois actions', async () => {
+    vi.mocked(offerControllerFindOneById).mockResolvedValue(
+      offerSeenBy({ liked: true, matched: true }),
+    );
+    renderPage();
+
+    expect(await screen.findByText('Cette offre a donné lieu à un match')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retirer mon like' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Liker' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Passer' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Tu as liké cette offre')).not.toBeInTheDocument();
+  });
+
+  // `matched` l'emporte sur `passed` aussi : le match est le dernier mot.
+  it('affiche l’état matché même quand l’offre avait été passée', async () => {
+    vi.mocked(offerControllerFindOneById).mockResolvedValue(
+      offerSeenBy({ passed: true, matched: true }),
+    );
+    renderPage();
+
+    expect(await screen.findByText('Cette offre a donné lieu à un match')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Liker' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Tu as passé cette offre')).not.toBeInTheDocument();
+  });
+
   it('affiche l’état passé en laissant la possibilité de liker', async () => {
     const user = userEvent.setup();
     vi.mocked(offerControllerFindOneById).mockResolvedValue(offerSeenBy({ passed: true }));
@@ -316,6 +345,7 @@ describe('OfferDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Retirer mon like' })).not.toBeInTheDocument();
     expect(screen.queryByText('Tu as liké cette offre')).not.toBeInTheDocument();
     expect(screen.queryByText('Tu as passé cette offre')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cette offre a donné lieu à un match')).not.toBeInTheDocument();
   });
 
   it('affiche un message de chargement puis le contenu', async () => {

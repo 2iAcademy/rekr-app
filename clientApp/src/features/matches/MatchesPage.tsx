@@ -5,7 +5,9 @@ import {
   likeControllerFindSent,
   matchControllerFindMine,
   type LikeListItemDto,
+  type MatchCounterpartDto,
   type MatchListItemDto,
+  type MatchOfferDto,
 } from '@/api/generated';
 import { isCandidate, isRecruiter } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
@@ -35,10 +37,12 @@ type MoreState = 'idle' | 'loading' | 'failed';
  */
 interface ListRow {
   key: string;
-  /** Where the row leads. Absent on a match, which has no screen of its own. */
+  /** Where the row leads. Absent when the reader has no screen to be sent to. */
   to?: string;
   name: string;
   role: string;
+  /** The offer at stake, when the row does not already name it. */
+  offer?: string;
   time: string;
   avatarClass: string;
   avatarUrl: string | null;
@@ -49,14 +53,33 @@ const avatarClasses = ['bg-brand', 'bg-violet', 'bg-[#e8a712]', 'bg-[#0ea5b5]', 
 
 const initial = (name: string) => name.charAt(0).toUpperCase();
 
+/**
+ * A recruiter reads their own offers on these rows and has several of them, so
+ * the counterpart alone leaves them guessing. A candidate does not: the API
+ * fills a company's headline with the very title of the offer, so spelling it
+ * out again would cost a line and say nothing.
+ */
+const offerLine = (counterpart: MatchCounterpartDto, offer: MatchOfferDto): string | undefined =>
+  counterpart.kind === 'candidate' ? `Offre : ${offer.title}` : undefined;
+
+/**
+ * There is no standalone candidate screen: the applicants of the offer are
+ * where a recruiter answers them.
+ */
+const applicantsPath = (offerId: number) => `/recruteur/offres/${offerId}/candidats`;
+
 function matchRow(match: MatchListItemDto): ListRow {
   const age = Date.now() - new Date(match.matchedAt).getTime();
 
   return {
     key: `match-${match.id}`,
+    to:
+      match.counterpart.kind === 'candidate'
+        ? applicantsPath(match.offer.id)
+        : `/offres/${match.offer.id}`,
     name: match.counterpart.name,
-    // Le titre du poste, quand l'entreprise n'a pas d'accroche à afficher.
     role: match.counterpart.headline ?? match.offer.title,
+    offer: offerLine(match.counterpart, match.offer),
     time: timeSince(match.matchedAt),
     avatarClass: avatarClasses[match.id % avatarClasses.length],
     avatarUrl: fileUrl(match.counterpart.avatarUrl),
@@ -81,11 +104,10 @@ function receivedRow(like: LikeListItemDto): ListRow {
     // The same candidate may have liked several offers, so neither identifier
     // is unique on its own.
     key: `received-${like.offerId}-${like.counterpart.id}`,
-    // There is no standalone candidate screen: the applicants of the offer they
-    // liked is where a recruiter answers them.
-    to: `/recruteur/offres/${like.offerId}/candidats`,
+    to: applicantsPath(like.offerId),
     name: like.counterpart.name,
     role: like.counterpart.headline ?? like.offer.title,
+    offer: offerLine(like.counterpart, like.offer),
     time: timeSince(like.likedAt),
     avatarClass: avatarClasses[like.counterpart.id % avatarClasses.length],
     avatarUrl: fileUrl(like.counterpart.avatarUrl),
@@ -292,6 +314,11 @@ function Row({ row, from }: { row: ListRow; from: string }) {
         <span className="mt-0.5 block truncate text-[0.6rem] text-ink-muted sm:text-xs">
           {row.role}
         </span>
+        {row.offer !== undefined && (
+          <span className="block truncate text-[0.55rem] text-ink-faint sm:text-xs">
+            {row.offer}
+          </span>
+        )}
       </span>
       <time className="shrink-0 text-[0.55rem] text-ink-faint sm:text-xs">{row.time}</time>
     </>

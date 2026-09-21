@@ -21,6 +21,7 @@ type PrismaMock = {
   candidateProfile: { findUnique: jest.Mock };
   candidateLikesOffer: { findUnique: jest.Mock };
   candidatePassesOffer: { findUnique: jest.Mock };
+  match: { findUnique: jest.Mock };
   candidateJobFamily: { findMany: jest.Mock };
   offerTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
@@ -40,6 +41,7 @@ const buildPrismaMock = (): PrismaMock => {
     candidateProfile: { findUnique: jest.fn().mockResolvedValue(null) },
     candidateLikesOffer: { findUnique: jest.fn().mockResolvedValue(null) },
     candidatePassesOffer: { findUnique: jest.fn().mockResolvedValue(null) },
+    match: { findUnique: jest.fn().mockResolvedValue(null) },
     candidateJobFamily: { findMany: jest.fn().mockResolvedValue([]) },
     offerTag: { deleteMany: jest.fn(), createMany: jest.fn() },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
@@ -680,6 +682,7 @@ describe('OfferService', () => {
       ...EXPECTED_PAYLOAD,
       liked: false,
       passed: false,
+      matched: false,
     };
 
     const EXPECTED_SELECT = {
@@ -765,8 +768,35 @@ describe('OfferService', () => {
         ...EXPECTED_CANDIDATE_PAYLOAD,
         liked: true,
         passed: false,
+        matched: false,
       });
       expect(prisma.candidateLikesOffer.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            candidateUserId_offerId: { candidateUserId: 7, offerId: 50 },
+          },
+        }),
+      );
+    });
+
+    /**
+     * A match leaves the like in place, so without this key a matched offer
+     * reads as a plain like and the screen offers to withdraw it — which the
+     * like endpoint then refuses with a 409.
+     */
+    it('tells a candidate the offer has become a match', async () => {
+      prisma.candidateLikesOffer.findUnique.mockResolvedValue({ offerId: 50 });
+      prisma.match.findUnique.mockResolvedValue({ offerId: 50 });
+      serveRow(offerRow());
+
+      const result = await service.findOneById(candidate, 50);
+
+      expect(result).toEqual({
+        ...EXPECTED_CANDIDATE_PAYLOAD,
+        liked: true,
+        matched: true,
+      });
+      expect(prisma.match.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             candidateUserId_offerId: { candidateUserId: 7, offerId: 50 },
@@ -792,7 +822,7 @@ describe('OfferService', () => {
      * the key would read as « not liked yet » — the same convention as
      * `postalCode` and `status`.
      */
-    it('leaves liked and passed out of every recruiter payload', async () => {
+    it('leaves liked, passed and matched out of every recruiter payload', async () => {
       prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
       serveRow(offerRow({ status: 'draft' }));
 
@@ -800,8 +830,10 @@ describe('OfferService', () => {
 
       expect(result).not.toHaveProperty('liked');
       expect(result).not.toHaveProperty('passed');
+      expect(result).not.toHaveProperty('matched');
       expect(prisma.candidateLikesOffer.findUnique).not.toHaveBeenCalled();
       expect(prisma.candidatePassesOffer.findUnique).not.toHaveBeenCalled();
+      expect(prisma.match.findUnique).not.toHaveBeenCalled();
     });
 
     /**

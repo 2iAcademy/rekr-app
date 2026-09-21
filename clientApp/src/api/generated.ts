@@ -322,6 +322,7 @@ export interface OfferDetailDto {
   jobFamilyId?: number | null;
   liked?: boolean;
   passed?: boolean;
+  matched?: boolean;
 }
 
 export interface CreateOfferDto {
@@ -479,10 +480,6 @@ export interface OfferApplicantDto {
   recruiterPassedAt: string | null;
 }
 
-export interface Object {
-  [key: string]: unknown;
-}
-
 export interface SectorDto {
   id: number;
   /** @maxLength 100 */
@@ -587,14 +584,15 @@ export type MatchControllerFindMineParams = {
   /**
    * Numéro de page, à partir de 1.
    * @minimum 1
+   * @maximum 2147483647
    */
-  page?: Object;
+  page?: number;
   /**
    * Nombre maximum de matchs par page.
    * @minimum 1
    * @maximum 100
    */
-  limit?: Object;
+  limit?: number;
 };
 
 export type LikeControllerFindSentParams = {

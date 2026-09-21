@@ -1637,9 +1637,15 @@ describe('Offer (e2e)', () => {
       'title',
     ];
 
-    // A candidate reads two keys more than a stranger: their own answer on the
-    // offer, which the detail screen needs before it offers « Passer / Liker ».
-    const CANDIDATE_DETAIL_KEYS = [...DETAIL_KEYS, 'liked', 'passed'].sort();
+    // A candidate reads three keys more than a stranger: their own answer on
+    // the offer, which the detail screen needs before it offers
+    // « Passer / Liker », and whether that answer has turned into a match.
+    const CANDIDATE_DETAIL_KEYS = [
+      ...DETAIL_KEYS,
+      'liked',
+      'passed',
+      'matched',
+    ].sort();
 
     const OWNER_KEYS = [
       'city',
@@ -1940,9 +1946,81 @@ describe('Offer (e2e)', () => {
         'candidate',
       ).expect(200);
 
-      expect(liked.body).toMatchObject({ liked: true, passed: false });
-      expect(passed.body).toMatchObject({ liked: false, passed: true });
-      expect(untouched.body).toMatchObject({ liked: false, passed: false });
+      expect(liked.body).toMatchObject({
+        liked: true,
+        passed: false,
+        matched: false,
+      });
+      expect(passed.body).toMatchObject({
+        liked: false,
+        passed: true,
+        matched: false,
+      });
+      expect(untouched.body).toMatchObject({
+        liked: false,
+        passed: false,
+        matched: false,
+      });
+    });
+
+    /**
+     * A match does not clear the like, so a matched offer would otherwise read
+     * as a plain like — and the screen would offer to withdraw a like the like
+     * endpoint refuses to withdraw (409).
+     */
+    it('tells the matched candidate, and only them, that the offer matched', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const matchedCandidate = await createUser('candidate');
+      const otherCandidate = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+      await prisma.candidateLikesOffer.createMany({
+        data: [
+          { candidateUserId: matchedCandidate.id, offerId: offer.id },
+          { candidateUserId: otherCandidate.id, offerId: offer.id },
+        ],
+      });
+      await prisma.match.create({
+        data: {
+          candidateUserId: matchedCandidate.id,
+          offerId: offer.id,
+          recruiterUserId: user.id,
+        },
+      });
+
+      const mine = await getDetail(
+        offer.id,
+        matchedCandidate.id,
+        'candidate',
+      ).expect(200);
+      const theirs = await getDetail(
+        offer.id,
+        otherCandidate.id,
+        'candidate',
+      ).expect(200);
+
+      expect(mine.body).toMatchObject({ liked: true, matched: true });
+      expect(theirs.body).toMatchObject({ liked: true, matched: false });
+    });
+
+    // Absent, not false: a recruiter has no answer to give on an offer.
+    it('leaves matched out of the payload served to a recruiter', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const candidateUser = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+      await prisma.candidateLikesOffer.create({
+        data: { candidateUserId: candidateUser.id, offerId: offer.id },
+      });
+      await prisma.match.create({
+        data: {
+          candidateUserId: candidateUser.id,
+          offerId: offer.id,
+          recruiterUserId: user.id,
+        },
+      });
+
+      const res = await getDetail(offer.id, user.id, 'recruiter').expect(200);
+
+      expect('matched' in (res.body as Record<string, unknown>)).toBe(false);
     });
 
     it('hides a draft offer from a recruiter without a company behind a 404', async () => {

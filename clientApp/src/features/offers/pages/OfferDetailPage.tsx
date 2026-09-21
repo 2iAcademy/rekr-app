@@ -131,10 +131,13 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
   };
 
   const { company, tags, salaryMin, salaryMax, remotePolicy, city } = offer;
-  // Both keys are served to the candidate alone: on a recruiter's read they are
-  // absent, which is not the same answer as `false` and must not read as one.
-  const liked = offer.liked === true;
-  const passed = offer.passed === true;
+  // The three keys are served to the candidate alone: on a recruiter's read they
+  // are absent, which is not the same answer as `false` and must not read as one.
+  // A match does not erase the like, so `matched` is read first: taken the other
+  // way round, the screen would offer a withdrawal the server refuses.
+  const matched = offer.matched === true;
+  const liked = !matched && offer.liked === true;
+  const passed = !matched && offer.passed === true;
   const companyLogoUrl = fileUrl(company.logo);
   const labelsOf = (...categories: TagCategory[]) =>
     tags.filter((tag) => categories.includes(tag.category)).map((tag) => tag.label);
@@ -230,12 +233,16 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
       </section>
 
       <div className="sticky bottom-0 flex flex-col gap-3 bg-background/80 px-6 py-4 backdrop-blur-md">
-        {(liked || passed) && (
+        {(matched || liked || passed) && (
           <p className="text-center text-sm text-ink-muted">
-            {liked ? 'Tu as liké cette offre' : 'Tu as passé cette offre'}
+            {matched
+              ? 'Cette offre a donné lieu à un match'
+              : liked
+                ? 'Tu as liké cette offre'
+                : 'Tu as passé cette offre'}
           </p>
         )}
-        {liked ? (
+        {matched ? null : liked ? (
           <Button
             type="button"
             variant="outline"

@@ -874,13 +874,16 @@ export class OfferService {
    * The deck never shows an offer that carries one — `findFeed` excludes both
    * — but the likes list links straight to the detail screen, so the screen
    * has to know before it offers « Passer / Liker » again.
+   *
+   * A match does not clear the like, so it is read alongside: the two states
+   * are otherwise indistinguishable on the wire.
    */
   private async readCandidateAnswer(
     candidateUserId: number,
     offerId: number,
-  ): Promise<{ liked: boolean; passed: boolean }> {
+  ): Promise<{ liked: boolean; passed: boolean; matched: boolean }> {
     const key = { candidateUserId_offerId: { candidateUserId, offerId } };
-    const [liked, passed] = await Promise.all([
+    const [liked, passed, matched] = await Promise.all([
       this.prisma.candidateLikesOffer.findUnique({
         where: key,
         select: { offerId: true },
@@ -889,9 +892,17 @@ export class OfferService {
         where: key,
         select: { offerId: true },
       }),
+      this.prisma.match.findUnique({
+        where: key,
+        select: { offerId: true },
+      }),
     ]);
 
-    return { liked: liked !== null, passed: passed !== null };
+    return {
+      liked: liked !== null,
+      passed: passed !== null,
+      matched: matched !== null,
+    };
   }
 
   /**

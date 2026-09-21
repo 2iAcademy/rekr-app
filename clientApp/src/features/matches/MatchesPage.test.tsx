@@ -84,6 +84,20 @@ const aReceivedLike: LikeListItemDto = {
   },
 };
 
+/** Côté recruteur, la contrepartie du match est le candidat, pas la société. */
+const aRecruiterMatch: MatchListItemDto = {
+  id: 21,
+  matchedAt: new Date().toISOString(),
+  offer: { id: 41, title: 'Développeur Back-End' },
+  counterpart: {
+    id: 77,
+    kind: 'candidate',
+    name: 'Camille Durand',
+    headline: 'Développeuse Back-End',
+    avatarUrl: null,
+  },
+};
+
 const matches = (data: MatchListItemDto[]) =>
   ({ data }) as Awaited<ReturnType<typeof matchControllerFindMine>>;
 
@@ -303,6 +317,65 @@ describe('MatchesPage', () => {
       'href',
       '/recruteur/offres/41/candidats',
     );
+  });
+
+  /**
+   * Le métier du candidat ne dit pas pour quelle offre il a postulé, et le
+   * recruteur en a plusieurs : sans l'offre, la liste est illisible.
+   */
+  it('affiche l’offre concernée sur une ligne de like reçu', async () => {
+    const user = userEvent.setup();
+    authenticateAs('recruiter');
+    renderPage();
+
+    await openTab(user, 'Reçus');
+
+    expect(await screen.findByText('Développeuse Back-End')).toBeInTheDocument();
+    expect(screen.getByText('Offre : Développeur Back-End')).toBeInTheDocument();
+  });
+
+  it('affiche l’offre concernée sur une ligne de match de recruteur', async () => {
+    authenticateAs('recruiter');
+    getMatches.mockResolvedValue(matches([aRecruiterMatch]));
+    renderPage();
+
+    expect(await screen.findByText('Développeuse Back-End')).toBeInTheDocument();
+    expect(screen.getByText('Offre : Développeur Back-End')).toBeInTheDocument();
+  });
+
+  it('mène du match aux candidats de l’offre côté recruteur', async () => {
+    authenticateAs('recruiter');
+    getMatches.mockResolvedValue(matches([aRecruiterMatch]));
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: /Camille Durand/ })).toHaveAttribute(
+      'href',
+      '/recruteur/offres/41/candidats',
+    );
+  });
+
+  /**
+   * Le détail de l'offre connaît désormais l'état matché : il n'y propose plus
+   * le retrait de like qui répondait 409, et la ligne peut y mener.
+   */
+  it('mène du match au détail de l’offre côté candidat', async () => {
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: /Acme Corp/ })).toHaveAttribute(
+      'href',
+      '/offres/4',
+    );
+  });
+
+  /**
+   * Côté candidat, l'accroche de la société est déjà le titre de l'offre :
+   * l'afficher une seconde fois ne dirait rien de plus.
+   */
+  it('ne répète pas l’offre côté candidat', async () => {
+    renderPage();
+
+    expect(await screen.findByText('Développeur Full-Stack')).toBeInTheDocument();
+    expect(screen.queryByText(/^Offre :/)).not.toBeInTheDocument();
   });
 
   it('convertit la clé de stockage de l’avatar en URL de fichier', async () => {

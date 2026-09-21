@@ -251,4 +251,12 @@ export class OfferDetailDto {
 
   @ApiPropertyOptional({ type: Boolean, example: false })
   passed?: boolean;
+
+  /**
+   * Whether that like has already become a match. A match leaves the like
+   * standing, so without this the screen cannot tell the two apart and offers
+   * to withdraw a like the like endpoint refuses to withdraw.
+   */
+  @ApiPropertyOptional({ type: Boolean, example: false })
+  matched?: boolean;
 }
