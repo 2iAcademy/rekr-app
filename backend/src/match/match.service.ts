@@ -82,11 +82,28 @@ export class MatchService {
   ): Promise<MatchListItem[]> {
     const viewer: Viewer =
       user.userType === 'recruiter' ? 'recruiter' : 'candidate';
+
+    // Same scope rule as `assertOwnedOffer`: the company, not whoever
+    // concluded the match. Every listed row then points at an offer screen its
+    // reader can actually open, and a match a colleague concluded stops
+    // vanishing between the two tabs.
+    let where: Prisma.MatchWhereInput;
+    if (viewer === 'candidate') {
+      where = { candidateUserId: user.id, offer: { status: 'open' } };
+    } else {
+      const profile = await this.prisma.recruiterProfile.findUnique({
+        where: { userId: user.id },
+        select: { companyId: true },
+      });
+      // Deliberately unlike `/likes/received`, which answers 404 here: this
+      // endpoint has always answered 200 for a recruiter without a company,
+      // and the screen is out of reach for them anyway.
+      if (!profile) return [];
+      where = { offer: { status: 'open', companyId: profile.companyId } };
+    }
+
     const matches = await this.prisma.match.findMany({
-      where:
-        viewer === 'candidate'
-          ? { candidateUserId: user.id, offer: { status: 'open' } }
-          : { recruiterUserId: user.id, offer: { status: 'open' } },
+      where,
       orderBy: { matchedAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,

@@ -4,10 +4,12 @@ import { MatchService } from './match.service';
 
 type PrismaMock = {
   match: { findMany: jest.Mock; createMany: jest.Mock; findUnique: jest.Mock };
+  recruiterProfile: { findUnique: jest.Mock };
 };
 
 const buildPrismaMock = (): PrismaMock => ({
   match: { findMany: jest.fn(), createMany: jest.fn(), findUnique: jest.fn() },
+  recruiterProfile: { findUnique: jest.fn() },
 });
 
 const matchRow = {
@@ -69,7 +71,8 @@ describe('MatchService', () => {
     );
   });
 
-  it('returns only a recruiter’s own matched candidates', async () => {
+  it('returns the matched candidates of the recruiter’s company', async () => {
+    prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 8 });
     prisma.match.findMany.mockResolvedValue([matchRow]);
 
     const matches = await service.findMine(
@@ -83,13 +86,30 @@ describe('MatchService', () => {
       id: 7,
       name: 'Ada Lovelace',
     });
+    expect(prisma.recruiterProfile.findUnique).toHaveBeenCalledWith({
+      where: { userId: 3 },
+      select: { companyId: true },
+    });
     expect(prisma.match.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { recruiterUserId: 3, offer: { status: 'open' } },
+        where: { offer: { status: 'open', companyId: 8 } },
         skip: 20,
         take: 10,
       }),
     );
+    const [args] = prisma.match.findMany.mock.calls[0] as [
+      { where: Record<string, unknown> },
+    ];
+    expect(args.where).not.toHaveProperty('recruiterUserId');
+  });
+
+  it('returns an empty list for a recruiter without a company', async () => {
+    prisma.recruiterProfile.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.findMine({ id: 3, userType: 'recruiter' }),
+    ).resolves.toEqual([]);
+    expect(prisma.match.findMany).not.toHaveBeenCalled();
   });
 
   it('creates exactly once and retrieves the winning match after a duplicate race', async () => {

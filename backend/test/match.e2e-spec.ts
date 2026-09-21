@@ -58,9 +58,9 @@ describe('Match (e2e)', () => {
 
   /**
    * The same endpoint serves each role's own matches. The recruiter response
-   * must be isolated by recruiter id and expose the candidate counterpart.
+   * must be isolated by company and expose the candidate counterpart.
    */
-  it("returns only the recruiter's own matches with candidate counterparts", async () => {
+  it("returns only the company's matches with candidate counterparts", async () => {
     const recruiter = await seedRecruiterWithCompany('Acme');
     const otherRecruiter = await seedRecruiterWithCompany('Globex');
     const candidate = await createUser('candidate');
@@ -124,6 +124,97 @@ describe('Match (e2e)', () => {
       },
     });
     expect(match?.matchedAt).toEqual(expect.any(String));
+  });
+
+  /**
+   * The list points at `/recruteur/offres/:id/candidats`, which is guarded by
+   * the company. A match concluded by a colleague still belongs to the
+   * company, so it must be listed rather than hidden.
+   */
+  it('returns a match concluded by a colleague of the same company', async () => {
+    const recruiter = await seedRecruiterWithCompany('Acme');
+    const colleague = await createUser('recruiter');
+    await prisma.recruiterProfile.create({
+      data: {
+        userId: colleague.id,
+        companyId: recruiter.company.id,
+        firstName: 'C',
+        lastName: 'D',
+      },
+    });
+    const candidate = await createUser('candidate');
+    await prisma.candidateProfile.create({
+      data: { userId: candidate.id, firstName: 'Ada', lastName: 'Lovelace' },
+    });
+    const offer = await prisma.offer.create({
+      data: { title: 'Own', status: 'open', companyId: recruiter.company.id },
+    });
+    const match = await prisma.match.create({
+      data: {
+        candidateUserId: candidate.id,
+        offerId: offer.id,
+        recruiterUserId: colleague.id,
+      },
+    });
+
+    const res = await httpRequest(app)
+      .get('/api/matches')
+      .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+      .expect(200);
+
+    expect(res.body).toHaveLength(1);
+    expect((res.body as { id: number }[])[0].id).toBe(match.id);
+  });
+
+  /**
+   * The case observed in QA: the recruiter concluded the match, then the offer
+   * moved to another company. The row would still show, but the screen it
+   * points at answers 404.
+   */
+  it('hides a match whose offer has left the recruiter’s company', async () => {
+    const recruiter = await seedRecruiterWithCompany('Acme');
+    const other = await seedRecruiterWithCompany('Globex');
+    const candidate = await createUser('candidate');
+    await prisma.candidateProfile.create({
+      data: { userId: candidate.id, firstName: 'Ada', lastName: 'Lovelace' },
+    });
+    const movedOffer = await prisma.offer.create({
+      data: {
+        title: 'ZZ Offre deja matchee',
+        status: 'open',
+        companyId: other.company.id,
+      },
+    });
+    await prisma.match.create({
+      data: {
+        candidateUserId: candidate.id,
+        offerId: movedOffer.id,
+        recruiterUserId: recruiter.user.id,
+      },
+    });
+
+    const res = await httpRequest(app)
+      .get('/api/matches')
+      .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+      .expect(200);
+
+    expect(res.body).toEqual([]);
+  });
+
+  /**
+   * Diverges from `GET /likes/received`, which answers 404: `/matches` has
+   * always answered 200 for a recruiter without a company, and the screen is
+   * unreachable for them anyway.
+   */
+  it('returns an empty list for a recruiter without a company', async () => {
+    const recruiter = await createUser('recruiter');
+
+    const res = await httpRequest(app)
+      .get('/api/matches')
+      .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
+      .expect(200);
+
+    expect(res.body).toEqual([]);
   });
 
   it('rejects an unauthenticated read with 401', async () => {
