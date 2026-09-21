@@ -2225,6 +2225,51 @@ export const matchControllerFindMine = async (
   );
 };
 
+export type matchControllerUnmatchResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type matchControllerUnmatchResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type matchControllerUnmatchResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type matchControllerUnmatchResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type matchControllerUnmatchResponseSuccess = matchControllerUnmatchResponse204 & {
+  headers: Headers;
+};
+export type matchControllerUnmatchResponseError = (
+  | matchControllerUnmatchResponse401
+  | matchControllerUnmatchResponse403
+  | matchControllerUnmatchResponse404
+) & {
+  headers: Headers;
+};
+
+export const getMatchControllerUnmatchUrl = (id: number) => {
+  return `/api/matches/${id}`;
+};
+
+export const matchControllerUnmatch = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<matchControllerUnmatchResponseSuccess> => {
+  return customFetch<matchControllerUnmatchResponseSuccess>(getMatchControllerUnmatchUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type sectorControllerFindAllResponse200 = {
   data: SectorDto[];
   status: 200;
