@@ -130,52 +130,53 @@ export class MatchService {
   /**
    * Puts an end to a match, and to everything that would re-create it.
    *
-   * Either party may pull the plug, and the whole answer trail of the pair goes
-   * with the row. Deleting the match alone is not an option: `/likes/sent` and
-   * `/likes/received` hide a pair by the existence of the match, not by the
-   * like, so both screens would show the withdrawn application again the
-   * instant the match disappeared — and the offer would walk straight back
-   * into the feed it was matched out of. Both sides are therefore recorded as
-   * having passed, which is also the truthful reading of what just happened.
+   * Either party may pull the plug, and the answer trail that produced the
+   * match goes with the row. Deleting the match alone is not an option:
+   * `/likes/sent` and `/likes/received` hide a pair by the existence of the
+   * match, not by the like, so both screens would show the withdrawn
+   * application again the instant the match disappeared — and the offer would
+   * walk straight back into the feed it was matched out of, which is what the
+   * candidate pass prevents.
+   *
+   * No recruiter pass is written, deliberately. `recruiter_passes_candidate`
+   * is read twice over: `/likes/received` filters on it per recruiter, and
+   * `findApplicants` serves it as `recruiterPassedAt`, which the applicants
+   * screen reads as a decision that recruiter made. Writing it here would
+   * credit one recruiter with a refusal they never pronounced — the candidate
+   * may well be the one who ended the match — and nothing purges it
+   * afterwards, since `likeApplicant` has no counterpart to the
+   * `candidatePassesOffer` delete `like` performs. A later application would
+   * then stay invisible to them while their colleagues see it. Dropping the
+   * likes is what keeps this pair apart; a new like is a new decision, and it
+   * deserves to be seen.
    *
    * Nothing here is reversible on purpose: re-liking is how the pair starts
    * over, and that path already exists.
    */
   async unmatch(user: AuthUser, id: number): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      // The advisory lock is keyed on (candidate, offer), and this endpoint is
-      // addressed by the match id — so the pair is not known until the row has
-      // been read, and this first read cannot be the one the lock protects.
-      // Hence read, lock, read again: the second read is the one every decision
-      // below rests on, and a row that vanished in between (a concurrent
-      // unmatch, a cascading account or offer deletion) answers 404 rather than
-      // writing a teardown for a match that no longer exists. Locking on the id
-      // instead would leave `like`/`pass`/`unlike` free to run on the pair
-      // under a different key, which is the race this lock exists to close.
-      const pair = await tx.match.findUnique({
-        where: { id },
-        select: { candidateUserId: true, offerId: true },
-      });
-      if (!pair) throw new NotFoundException('Match not found');
-      const { candidateUserId, offerId } = pair;
-
-      await lockAnswer(tx, candidateUserId, offerId);
-
-      const match = await tx.match.findUnique({
+      // The advisory lock is keyed on (candidate, offer) while this endpoint is
+      // addressed by the match id, so the pair is not known until the row has
+      // been read. Hence read, decide, lock, read again — and the decision
+      // comes before the lock on purpose: holding the pair of a match that is
+      // none of the caller's business would let a stranger serialise the writes
+      // of the two people it belongs to.
+      const scope = await tx.match.findUnique({
         where: { id },
         select: {
-          id: true,
-          recruiterUserId: true,
+          candidateUserId: true,
+          offerId: true,
           offer: { select: { companyId: true } },
         },
       });
-      if (!match) throw new NotFoundException('Match not found');
+      if (!scope) throw new NotFoundException('Match not found');
+      const { candidateUserId, offerId } = scope;
 
       // Same scope rule as `findMine` and `assertOwnedOffer`: the company, not
       // whoever concluded the match — a recruiter acts on what their matches
       // tab shows them, colleague's match or not. And one single answer for
-      // « no such match » and « not yours », because a 403 on someone else's
-      // match confirms the id exists, which is the whole of what an enumeration
+      // "no such match" and "not yours", because a 403 on someone else's match
+      // confirms the id exists, which is the whole of what an enumeration
       // needs.
       if (user.userType === 'candidate') {
         if (candidateUserId !== user.id)
@@ -185,11 +186,25 @@ export class MatchService {
           where: { userId: user.id },
           select: { companyId: true },
         });
-        if (!profile || profile.companyId !== match.offer.companyId)
+        if (!profile || profile.companyId !== scope.offer.companyId)
           throw new NotFoundException('Match not found');
       }
 
-      await tx.match.delete({ where: { id: match.id } });
+      await lockAnswer(tx, candidateUserId, offerId);
+
+      // The row the decision rests on was read with nothing holding it. Read it
+      // again under the lock, and a match that vanished in between — a
+      // concurrent unmatch, a cascading account or offer deletion — answers 404
+      // instead of having a teardown written for it. Its existence is all this
+      // read is for: no value from it feeds a write, so nothing else here needs
+      // the lock's protection.
+      const held = await tx.match.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (!held) throw new NotFoundException('Match not found');
+
+      await tx.match.delete({ where: { id } });
       await tx.candidateLikesOffer.deleteMany({
         where: { candidateUserId, offerId },
       });
@@ -203,23 +218,6 @@ export class MatchService {
         data: [{ candidateUserId, offerId }],
         skipDuplicates: true,
       });
-      // `recruiterUserId` is nullable — the relation is `onDelete: SetNull`, so
-      // a closed recruiter account leaves the match standing without one. There
-      // is then no recruiter to record a pass for, and the pivot's primary key
-      // could not hold the row anyway. The candidate pass above is what keeps
-      // the pair apart in that case.
-      if (match.recruiterUserId !== null) {
-        await tx.recruiterPassesCandidate.createMany({
-          data: [
-            {
-              recruiterUserId: match.recruiterUserId,
-              candidateUserId,
-              offerId,
-            },
-          ],
-          skipDuplicates: true,
-        });
-      }
     });
   }
 

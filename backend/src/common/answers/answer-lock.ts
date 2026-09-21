@@ -4,9 +4,9 @@ import { Prisma } from '../../../generated/prisma/client';
  * Serialises everything that decides what a candidate and a recruiter
  * answered about one offer.
  *
- * The answers live in five tables — the two likes, the two passes, the match —
- * and each holds only its own primary key, so no constraint can say that they
- * exclude one another or that a match rests on a like. Under READ COMMITTED
+ * The answers live in four tables — the two likes, the candidate pass, the
+ * match — and each holds only its own primary key, so no constraint can say
+ * that they exclude one another or that a match rests on a like. Under READ COMMITTED
  * the checks that stand in for those constraints all read a state the
  * concurrent transaction has not committed yet, and both sides then write: a
  * like and a pass standing together, and a match left on a like that was being
@@ -15,7 +15,7 @@ import { Prisma } from '../../../generated/prisma/client';
  * that point on.
  *
  * A transaction-scoped advisory lock is preferred over `Serializable`, which
- * would need a P2034 replay loop around five handlers and would still let a
+ * would need a P2034 replay loop around four handlers and would still let a
  * retried write land after the client gave up, and over folding the answers
  * into one table, which is a migration and a model rewrite to buy an invariant
  * this one line already holds. Cost: one round trip per write, and contention
@@ -23,7 +23,11 @@ import { Prisma } from '../../../generated/prisma/client';
  * waits, never two candidates, never two offers.
  *
  * Taken before any read that decides an answer, since a lock acquired after
- * the check it is meant to protect guards nothing. Run through `$executeRaw`
+ * the check it is meant to protect guards nothing. A read that only decides
+ * whether the caller may act at all is the one thing that may come first, and
+ * `unmatch` does exactly that: holding the pair of a match that turns out to
+ * be none of the caller's business would let a stranger serialise the writes
+ * of the two people it belongs to. Run through `$executeRaw`
  * rather than `$queryRaw`, which cannot decode the `void` the function
  * returns.
  *

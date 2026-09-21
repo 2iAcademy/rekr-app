@@ -249,8 +249,8 @@ describe('MatchService', () => {
      * Deleting the match alone would resurrect the like: `/likes/sent` and
      * `/likes/received` hide a pair by the existence of the match, not by the
      * like, so the row reappears on both screens the moment the match goes.
-     * The passes are what keeps the offer from walking straight back into the
-     * feed the pair was just removed from.
+     * The candidate pass is what keeps the offer from walking straight back
+     * into the feed the pair was just removed from.
      */
     it('tears the whole answer trail of the pair down for the candidate', async () => {
       prisma.match.findUnique.mockResolvedValue(unmatchRow);
@@ -277,10 +277,29 @@ describe('MatchService', () => {
         data: [{ candidateUserId: 7, offerId: 4 }],
         skipDuplicates: true,
       });
-      expect(prisma.recruiterPassesCandidate.createMany).toHaveBeenCalledWith({
-        data: [{ recruiterUserId: 3, candidateUserId: 7, offerId: 4 }],
-        skipDuplicates: true,
-      });
+    });
+
+    /**
+     * `recruiter_passes_candidate` is read twice over — `/likes/received`
+     * filters on it per recruiter, and `findApplicants` serves it as
+     * `recruiterPassedAt`, which the applicants screen reads as that
+     * recruiter's own decision. A pass written here would credit someone with a
+     * refusal they never pronounced, since the candidate may be the one who
+     * ended the match, and nothing purges it afterwards: `likeApplicant` has no
+     * counterpart to the `candidatePassesOffer` delete `like` performs, so the
+     * candidate's next application would stay invisible to that recruiter while
+     * their colleagues see it.
+     */
+    it('records no recruiter pass, whoever ends the match', async () => {
+      prisma.match.findUnique.mockResolvedValue(unmatchRow);
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 8 });
+      prisma.match.delete.mockResolvedValue(unmatchRow);
+
+      await service.unmatch({ id: 7, userType: 'candidate' }, 11);
+      await service.unmatch({ id: 99, userType: 'recruiter' }, 11);
+
+      expect(prisma.candidatePassesOffer.createMany).toHaveBeenCalledTimes(2);
+      expect(prisma.recruiterPassesCandidate.createMany).not.toHaveBeenCalled();
     });
 
     /**
@@ -308,6 +327,11 @@ describe('MatchService', () => {
      * One answer for « no such match » and « not yours »: a 403 on someone
      * else's match confirms the id exists, which is the whole of what an
      * enumeration needs — the convention `assertOwnedOffer` already sets.
+     *
+     * And nothing is locked on the way out. The lock is keyed on the pair, so
+     * taking it for a caller who turns out to have no business with the match
+     * would let a stranger serialise the writes of the two people it belongs
+     * to.
      */
     it.each([
       [
@@ -325,16 +349,21 @@ describe('MatchService', () => {
         { id: 99, userType: 'recruiter' as const },
         null as { companyId: number } | null,
       ],
-    ])('answers 404 to %s', async (_label, user, profile) => {
-      prisma.match.findUnique.mockResolvedValue(unmatchRow);
-      prisma.recruiterProfile.findUnique.mockResolvedValue(profile);
+    ])(
+      'answers 404 to %s, without locking the pair',
+      async (_label, user, profile) => {
+        prisma.match.findUnique.mockResolvedValue(unmatchRow);
+        prisma.recruiterProfile.findUnique.mockResolvedValue(profile);
 
-      await expect(service.unmatch(user, 11)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
-      expect(prisma.match.delete).not.toHaveBeenCalled();
-      expect(prisma.candidatePassesOffer.createMany).not.toHaveBeenCalled();
-    });
+        await expect(service.unmatch(user, 11)).rejects.toBeInstanceOf(
+          NotFoundException,
+        );
+        expect(prisma.$executeRaw).not.toHaveBeenCalled();
+        expect(prisma.match.findUnique).toHaveBeenCalledTimes(1);
+        expect(prisma.match.delete).not.toHaveBeenCalled();
+        expect(prisma.candidatePassesOffer.createMany).not.toHaveBeenCalled();
+      },
+    );
 
     it('answers 404 on an unknown match', async () => {
       prisma.match.findUnique.mockResolvedValue(null);
@@ -346,13 +375,35 @@ describe('MatchService', () => {
     });
 
     /**
-     * The advisory lock is keyed on the pair, and the pair is only known once
-     * the row has been read — so the first read cannot be protected by it. The
-     * row is therefore read again under the lock, and a row that disappeared in
-     * between answers 404 rather than writing a teardown for a match that no
-     * longer exists (two concurrent unmatches, or a like withdrawn meanwhile).
+     * The order is the whole of the lock's value: taken after the read it is
+     * meant to protect, it guards nothing. Counting the calls cannot see that
+     * — a lock moved past the second read leaves every count untouched — so
+     * the assertion is on the order the calls were made in.
      */
-    it('locks the pair and re-reads the match under the lock', async () => {
+    it('takes the lock before the read the teardown rests on', async () => {
+      prisma.match.findUnique.mockResolvedValue(unmatchRow);
+      prisma.match.delete.mockResolvedValue(unmatchRow);
+
+      await service.unmatch({ id: 7, userType: 'candidate' }, 11);
+
+      const [scopeRead, heldRead] =
+        prisma.match.findUnique.mock.invocationCallOrder;
+      const [lock] = prisma.$executeRaw.mock.invocationCallOrder;
+      expect(scopeRead).toBeLessThan(lock);
+      expect(lock).toBeLessThan(heldRead);
+      expect(heldRead).toBeLessThan(
+        prisma.match.delete.mock.invocationCallOrder[0],
+      );
+    });
+
+    /**
+     * The pair is only known once the row has been read, so the first read
+     * cannot be protected by the lock it derives the key from. The row is
+     * therefore read again under the lock, and a match that disappeared in
+     * between — two concurrent unmatches, a cascading deletion — answers 404
+     * rather than having a teardown written for a match that no longer exists.
+     */
+    it('answers 404 when the match vanishes under the lock', async () => {
       prisma.match.findUnique
         .mockResolvedValueOnce(unmatchRow)
         .mockResolvedValueOnce(null);
@@ -364,25 +415,6 @@ describe('MatchService', () => {
       expect(prisma.match.findUnique).toHaveBeenCalledTimes(2);
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
       expect(prisma.match.delete).not.toHaveBeenCalled();
-    });
-
-    /**
-     * `recruiterUserId` is nullable — the relation is `onDelete: SetNull`, so a
-     * closed recruiter account leaves the match standing without one. There is
-     * no recruiter to record a pass for, and writing the row with a null key
-     * would violate the pivot's primary key.
-     */
-    it('writes no recruiter pass when the match carries no recruiter', async () => {
-      prisma.match.findUnique.mockResolvedValue({
-        ...unmatchRow,
-        recruiterUserId: null,
-      });
-      prisma.match.delete.mockResolvedValue(unmatchRow);
-
-      await service.unmatch({ id: 7, userType: 'candidate' }, 11);
-
-      expect(prisma.candidatePassesOffer.createMany).toHaveBeenCalledTimes(1);
-      expect(prisma.recruiterPassesCandidate.createMany).not.toHaveBeenCalled();
     });
   });
 });
