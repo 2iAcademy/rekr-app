@@ -30,7 +30,7 @@ export function ShowcaseStep({ state, onChange, invalidField }: StepProps) {
         maxLength={MAX_FREE_TEXT_LENGTH}
         value={state.bio}
         onChange={(bio) => onChange({ bio })}
-        placeholder="Votre parcours, ce que vous cherchez, ce qui vous motive…"
+        placeholder="Parcours, poste recherché, motivations…"
       />
 
       <TextField

@@ -34,6 +34,12 @@ describe('AccountPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Mon compte' })).toBeInTheDocument();
   });
 
+  it('affiche l’initiale de l’utilisateur dans son avatar', () => {
+    renderPage();
+
+    expect(screen.getByText('C')).toBeInTheDocument();
+  });
+
   it('affiche l’email et le libellé de rôle de l’utilisateur', () => {
     renderPage();
 
@@ -54,10 +60,10 @@ describe('AccountPage', () => {
     expect(screen.getByText('Section candidat')).toBeInTheDocument();
   });
 
-  // La déconnexion a rejoint le chrome, à côté de l'identité qu'elle termine :
-  // elle n'attend plus au bas d'un formulaire qu'il faut dérouler pour la
-  // trouver.
-  it('ne porte plus la déconnexion, désormais dans le chrome', () => {
+  // La page reste présentationnelle : la déconnexion du téléphone est ajoutée
+  // par la route (voir routes.test.tsx), la tablette et le bureau ont la leur
+  // dans le chrome.
+  it('ne porte pas elle-même la déconnexion', () => {
     renderPage();
 
     expect(screen.queryByRole('button', { name: 'Se déconnecter' })).not.toBeInTheDocument();

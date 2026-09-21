@@ -1,0 +1,541 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-21T17:59:27.684513+00:00",
+  "title": "Design System: Rekr",
+  "extensions": {
+    "colorMeta": {
+      "ink-violet": {
+        "role": "primary",
+        "displayName": "Ink Violet",
+        "canonical": "#5b3fd6",
+        "tonalRamp": [
+          "#1c1247",
+          "#2f1f7a",
+          "#4a31b8",
+          "#5b3fd6",
+          "#7a62e2",
+          "#9a86ea",
+          "#c9c0f5",
+          "#eeeafd"
+        ]
+      },
+      "ink-violet-strong": {
+        "role": "primary",
+        "displayName": "Deep Ink Violet",
+        "canonical": "#4a31b8",
+        "tonalRamp": [
+          "#1c1247",
+          "#2f1f7a",
+          "#4a31b8",
+          "#5b3fd6",
+          "#7a62e2",
+          "#9a86ea",
+          "#c9c0f5",
+          "#eeeafd"
+        ]
+      },
+      "ink-violet-tint": {
+        "role": "primary",
+        "displayName": "Violet Wash",
+        "canonical": "#eeeafd",
+        "tonalRamp": [
+          "#1c1247",
+          "#2f1f7a",
+          "#4a31b8",
+          "#5b3fd6",
+          "#7a62e2",
+          "#9a86ea",
+          "#c9c0f5",
+          "#eeeafd"
+        ]
+      },
+      "cool-ground": {
+        "role": "neutral",
+        "displayName": "Cool Ground",
+        "canonical": "#f6f6f8",
+        "tonalRamp": [
+          "#111827",
+          "#374151",
+          "#525a68",
+          "#656d7b",
+          "#9ca3af",
+          "#d7dae0",
+          "#e5e7eb",
+          "#f6f6f8"
+        ]
+      },
+      "card-white": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#111827",
+          "#374151",
+          "#525a68",
+          "#656d7b",
+          "#9ca3af",
+          "#d7dae0",
+          "#e5e7eb",
+          "#f6f6f8"
+        ]
+      },
+      "quiet-surface": {
+        "role": "neutral",
+        "displayName": "Quiet Surface",
+        "canonical": "#f3f4f6",
+        "tonalRamp": [
+          "#111827",
+          "#374151",
+          "#525a68",
+          "#656d7b",
+          "#9ca3af",
+          "#d7dae0",
+          "#e5e7eb",
+          "#f6f6f8"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e5e7eb",
+        "tonalRamp": [
+          "#111827",
+          "#374151",
+          "#525a68",
+          "#656d7b",
+          "#9ca3af",
+          "#d7dae0",
+          "#e5e7eb",
+          "#f6f6f8"
+        ]
+      },
+      "field-stroke": {
+        "role": "neutral",
+        "displayName": "Field Stroke",
+        "canonical": "#d7dae0",
+        "tonalRamp": [
+          "#111827",
+          "#374151",
+          "#525a68",
+          "#656d7b",
+          "#9ca3af",
+          "#d7dae0",
+          "#e5e7eb",
+          "#f6f6f8"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#111827",
+        "tonalRamp": [
+          "#111827",
+          "#374151",
+          "#525a68",
+          "#656d7b",
+          "#9ca3af",
+          "#d7dae0",
+          "#e5e7eb",
+          "#f6f6f8"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Ink Soft",
+        "canonical": "#374151",
+        "tonalRamp": [
+          "#111827",
+          "#374151",
+          "#525a68",
+          "#656d7b",
+          "#9ca3af",
+          "#d7dae0",
+          "#e5e7eb",
+          "#f6f6f8"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink Muted",
+        "canonical": "#525a68",
+        "tonalRamp": [
+          "#111827",
+          "#374151",
+          "#525a68",
+          "#656d7b",
+          "#9ca3af",
+          "#d7dae0",
+          "#e5e7eb",
+          "#f6f6f8"
+        ]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Ink Faint",
+        "canonical": "#656d7b",
+        "tonalRamp": [
+          "#111827",
+          "#374151",
+          "#525a68",
+          "#656d7b",
+          "#9ca3af",
+          "#d7dae0",
+          "#e5e7eb",
+          "#f6f6f8"
+        ]
+      },
+      "success": {
+        "role": "status",
+        "displayName": "Go Green",
+        "canonical": "#047857",
+        "tonalRamp": [
+          "#022c22",
+          "#064e3b",
+          "#047857",
+          "#059669",
+          "#34d399",
+          "#6ee7b7",
+          "#a7f3d0",
+          "#d1fae5"
+        ]
+      },
+      "success-tint": {
+        "role": "status",
+        "displayName": "Go Green Wash",
+        "canonical": "#d1fae5",
+        "tonalRamp": [
+          "#022c22",
+          "#064e3b",
+          "#047857",
+          "#059669",
+          "#34d399",
+          "#6ee7b7",
+          "#a7f3d0",
+          "#d1fae5"
+        ]
+      },
+      "warning": {
+        "role": "status",
+        "displayName": "Caution Amber",
+        "canonical": "#92400e",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#f59e0b",
+          "#fcd34d",
+          "#fde68a",
+          "#fef3c7"
+        ]
+      },
+      "warning-tint": {
+        "role": "status",
+        "displayName": "Caution Amber Wash",
+        "canonical": "#fef3c7",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#f59e0b",
+          "#fcd34d",
+          "#fde68a",
+          "#fef3c7"
+        ]
+      },
+      "destructive": {
+        "role": "status",
+        "displayName": "Stop Red",
+        "canonical": "#c8321f",
+        "tonalRamp": [
+          "#3f0d07",
+          "#6e1a10",
+          "#9c2517",
+          "#c8321f",
+          "#e0604e",
+          "#f09a8e",
+          "#f8c9c2",
+          "#fdecea"
+        ]
+      },
+      "destructive-tint": {
+        "role": "status",
+        "displayName": "Stop Red Wash",
+        "canonical": "#fdecea",
+        "tonalRamp": [
+          "#3f0d07",
+          "#6e1a10",
+          "#9c2517",
+          "#c8321f",
+          "#e0604e",
+          "#f09a8e",
+          "#f8c9c2",
+          "#fdecea"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Match headline; page titles from tablet up."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles on phones; splash headline."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Offer or candidate title inside a card (1.5rem from 640px)."
+      },
+      "section": {
+        "displayName": "Section",
+        "purpose": "Rubric above a block of detail, shared by both sides."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Row text, descriptions, form text; values in 700 with tabular figures."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "One-line explanation under a headline; decision-button label size."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Meta lines, status badges, progress captions."
+      },
+      "tab-label": {
+        "displayName": "Tab label",
+        "purpose": "Bottom tab-bar captions."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "The rekr. logotype (1.375 / 1.75 / 2.75rem)."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-card",
+        "value": "0 1px 2px rgb(17 24 39 / 0.04), 0 6px 20px -12px rgb(17 24 39 / 0.22)",
+        "purpose": "Every card, list container and tablet-width sticky action bar; always paired with a hairline border."
+      },
+      {
+        "name": "shadow-raised",
+        "value": "0 12px 32px -14px rgb(17 24 39 / 0.32)",
+        "purpose": "Things that arrive: toasts and the match-screen avatars."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-settle",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Match avatars fade and slide in over 500ms; motion-safe only."
+      },
+      {
+        "name": "match-badge-fade",
+        "value": "300ms fade, 150ms delay",
+        "purpose": "The Intérêt réciproque pill after the avatars settle."
+      },
+      {
+        "name": "state-transition",
+        "value": "150ms background-color, border-color, color",
+        "purpose": "Hover and selection colour changes on controls."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "base",
+        "value": "375px"
+      },
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "desktop",
+        "value": "1440px"
+      }
+    ],
+    "layoutTokens": [
+      {
+        "name": "--tabbar-h",
+        "value": "calc(4rem + env(safe-area-inset-bottom)) below 768px, 0rem from 768px",
+        "purpose": "Bottom offset for every sticky action bar."
+      }
+    ],
+    "darkTheme": {
+      "brand": "#8b76ec",
+      "brand-strong": "#a594f1",
+      "brand-tint": "#2a2350",
+      "ground": "#111318",
+      "card": "#181b21",
+      "surface": "#1c1f25",
+      "line": "#2b2f37",
+      "ink": "#f3f4f6"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one violet action on a screen: Ça m'intéresse, Écrire un message, Publier.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z\"/></svg>Ça m'intéresse</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 24px;border-radius:14px;font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;font-size:0.9375rem;font-weight:700;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s;background:var(--brand,#5b3fd6);color:#fff;border:1px solid transparent;}.ds-btn-primary:hover{background:var(--brand-strong,#4a31b8);}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(91 63 214 / 0.3);}.ds-btn-primary:active{transform:translateY(1px);}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The neutral partner of the primary: Passer, Se connecter, Modifier.",
+      "html": "<button class=\"ds-btn-outline\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/></svg>Passer</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 24px;border-radius:14px;font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;font-size:0.9375rem;font-weight:700;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s;background:#fff;color:var(--ink,#111827);border:1px solid var(--input,#d7dae0);}.ds-btn-outline:hover{background:var(--surface,#f3f4f6);}.ds-btn-outline:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(91 63 214 / 0.3);}.ds-btn-outline:active{transform:translateY(1px);}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "48px white field, hairline stroke, violet border and ring on focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Adresse email\" />",
+      "css": ".ds-input{height:48px;width:280px;padding:0 16px;border-radius:14px;border:1px solid var(--line,#e5e7eb);background:#fff;color:var(--ink,#111827);font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;font-size:0.875rem;outline:none;transition:border-color .15s,box-shadow .15s;}.ds-input::placeholder{color:var(--ink-muted,#525a68);}.ds-input:focus-visible{border-color:var(--brand,#5b3fd6);box-shadow:0 0 0 3px rgb(91 63 214 / 0.2);}"
+    },
+    {
+      "name": "Option Chips",
+      "kind": "chip",
+      "refersTo": "option-selected",
+      "description": "Selectable option pills in the wizards and filters; selected is violet wash with a check.",
+      "html": "<div class=\"ds-options\"><span class=\"ds-option ds-option-on\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>CDI</span><span class=\"ds-option\">Alternance</span><span class=\"ds-option\">Freelance</span></div>",
+      "css": ".ds-options{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;}.ds-option{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px;border-radius:14px;border:1px solid var(--line,#e5e7eb);background:#fff;color:var(--ink,#111827);font-size:0.875rem;cursor:pointer;transition:border-color .15s,background-color .15s;}.ds-option:hover{border-color:rgb(101 109 123 / 0.4);}.ds-option-on{border-color:var(--brand,#5b3fd6);background:var(--brand-tint,#eeeafd);color:var(--brand-strong,#4a31b8);font-weight:600;}"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "status-positive",
+      "description": "Semantic offer status pill with a leading dot; never the brand accent.",
+      "html": "<span class=\"ds-status ds-status-pos\">Publiée</span> <span class=\"ds-status ds-status-warn\">En pause</span> <span class=\"ds-status ds-status-muted\">Fermée</span>",
+      "css": ".ds-status{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:9999px;border:1px solid transparent;font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;font-size:0.75rem;font-weight:600;white-space:nowrap;}.ds-status::before{content:'';width:6px;height:6px;border-radius:9999px;background:currentColor;}.ds-status-pos{background:var(--success-tint,#d1fae5);color:var(--success,#047857);}.ds-status-warn{background:#fef3c7;color:#92400e;}.ds-status-muted{background:var(--surface,#f3f4f6);color:var(--ink-muted,#525a68);}"
+    },
+    {
+      "name": "Feed Card (Hairline Ledger)",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The signature: company row, 20px title, label/value rows split by hairlines, skill chips, detail link.",
+      "html": "<article class=\"ds-card\"><div class=\"ds-owner\"><span class=\"ds-avatar\">A</span><div><p class=\"ds-owner-name\">Atelier Morel</p><p class=\"ds-owner-meta\">TPE · Lyon</p></div></div><h2 class=\"ds-title\">Électricien·ne bâtiment</h2><dl class=\"ds-ledger\"><div><dt>Contrat</dt><dd>CDI</dd></div><div><dt>Rythme</dt><dd>Temps plein</dd></div><div><dt>Expérience</dt><dd>2 à 5 ans</dd></div><div><dt>Salaire</dt><dd>28 000 – 34 000 €</dd></div></dl><ul class=\"ds-chips\"><li>Habilitation BR</li><li>Tableaux</li><li>Domotique</li></ul><a class=\"ds-link\" href=\"#\">Voir l'offre complète<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a></article>",
+      "css": ".ds-card{display:flex;flex-direction:column;width:340px;padding:20px;border-radius:18px;border:1px solid var(--line,#e5e7eb);background:#fff;box-shadow:0 1px 2px rgb(17 24 39 / 0.04), 0 6px 20px -12px rgb(17 24 39 / 0.22);color:var(--ink,#111827);font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;}.ds-owner{display:flex;align-items:center;gap:12px;}.ds-owner p{margin:0;}.ds-avatar{display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:9999px;background:var(--brand-tint,#eeeafd);color:var(--brand-strong,#4a31b8);font-weight:800;}.ds-owner-name{font-size:0.875rem;font-weight:700;}.ds-owner-meta{font-size:0.75rem;color:var(--ink-muted,#525a68);}.ds-title{margin:16px 0 0;font-size:1.25rem;line-height:1.25;font-weight:800;letter-spacing:-0.02em;}.ds-ledger{margin:16px 0 0;border-top:1px solid var(--line,#e5e7eb);font-size:0.875rem;}.ds-ledger div{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--line,#e5e7eb);}.ds-ledger dt{color:var(--ink-muted,#525a68);}.ds-ledger dd{margin:0;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;}.ds-chips{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0;padding:0;list-style:none;}.ds-chips li{padding:4px 12px;border-radius:8px;background:var(--surface,#f3f4f6);color:var(--ink-soft,#374151);font-size:0.8125rem;font-weight:600;}.ds-link{display:inline-flex;align-items:center;gap:6px;margin-top:16px;align-self:flex-start;color:var(--brand-strong,#4a31b8);font-size:0.875rem;font-weight:700;text-decoration:none;text-underline-offset:4px;border-radius:6px;}.ds-link:hover{text-decoration:underline;}.ds-link:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(91 63 214 / 0.3);}"
+    },
+    {
+      "name": "Bottom Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "Phone navigation: white, top hairline, active tab in deep violet with a 2px violet bar on the top edge.",
+      "html": "<nav class=\"ds-tabbar\"><a class=\"ds-tab ds-tab-on\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"2\" y=\"7\" width=\"20\" height=\"14\" rx=\"2\"/><path d=\"M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"/></svg>Offres</a><a class=\"ds-tab\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z\"/></svg>Matchs</a><a class=\"ds-tab\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"8\" r=\"5\"/><path d=\"M20 21a8 8 0 0 0-16 0\"/></svg>Profil</a></nav>",
+      "css": ".ds-tabbar{display:flex;width:360px;height:64px;background:#fff;border-top:1px solid var(--line,#e5e7eb);font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;}.ds-tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:0.6875rem;font-weight:600;color:var(--ink-faint,#656d7b);text-decoration:none;transition:color .15s;}.ds-tab::before{content:'';position:absolute;top:0;width:32px;height:2px;border-radius:9999px;background:transparent;}.ds-tab:hover{color:var(--ink,#111827);}.ds-tab-on{color:var(--brand-strong,#4a31b8);}.ds-tab-on::before{background:var(--brand,#5b3fd6);}.ds-tab:focus-visible{outline:2px solid var(--brand,#5b3fd6);outline-offset:-2px;}"
+    },
+    {
+      "name": "Header Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Header destinations from tablet width up: violet wash when active, quiet-surface hover when idle.",
+      "html": "<ul class=\"ds-navlist\"><li><a class=\"ds-nav ds-nav-on\" href=\"#\">Mes offres</a></li><li><a class=\"ds-nav\" href=\"#\">Matchs</a></li><li><a class=\"ds-nav\" href=\"#\">Profil</a></li></ul>",
+      "css": ".ds-navlist{display:flex;gap:4px;margin:0;padding:0;list-style:none;font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;font-size:0.875rem;}.ds-nav{display:flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;font-weight:600;color:var(--ink-muted,#525a68);text-decoration:none;transition:background-color .15s,color .15s;}.ds-nav:hover{background:var(--surface,#f3f4f6);color:var(--ink,#111827);}.ds-nav-on{background:var(--brand-tint,#eeeafd);color:var(--brand-strong,#4a31b8);}.ds-nav:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(91 63 214 / 0.3);}"
+    },
+    {
+      "name": "Match Badge",
+      "kind": "custom",
+      "refersTo": "match-badge",
+      "description": "The violet pill announcing a mutual interest on the match screen.",
+      "html": "<p class=\"ds-match-badge\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z\"/></svg>Intérêt réciproque</p>",
+      "css": ".ds-match-badge{display:inline-flex;align-items:center;gap:6px;margin:0;padding:4px 12px;border-radius:9999px;background:var(--brand,#5b3fd6);color:#fff;font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;font-size:0.75rem;font-weight:700;animation:ds-fade .3s .15s both;}@keyframes ds-fade{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:reduce){.ds-match-badge{animation:none;}}"
+    },
+    {
+      "name": "Wordmark",
+      "kind": "custom",
+      "refersTo": "wordmark",
+      "description": "rekr. in Manrope 800, -0.04em, violet full stop.",
+      "html": "<span class=\"ds-wordmark\">rekr<span>.</span></span>",
+      "css": ".ds-wordmark{font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;font-size:1.75rem;font-weight:800;letter-spacing:-0.04em;line-height:1;color:var(--ink,#111827);}.ds-wordmark span{color:var(--brand,#5b3fd6);}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Straight Ledger",
+    "overview": "Rekr is the category standard executed with care: a cool, near-white ground, white cards that lift just off it, and decisions laid out as aligned label/value rows separated by hairlines. Nothing is a metaphor. A job offer, a candidate and a match all read the same way: who, what, then the facts that decide it, each on its own ruled line, value flush right in bold so a missing one shows as a gap rather than hiding in a sentence.\n\nOne accent carries the whole product. Ink violet marks what you can do next (the primary action, the active tab, a selected option, a link, the match badge) and nothing else. Candidates and recruiters get the same palette and the same components; which side you are on reads from navigation and content, never from colour. Status (published, paused, closed, error) uses semantic greens, ambers and reds that are never borrowed for decoration.\n\nThe density is calm and phone-first: one card per decision, 20px of card padding, 10px rows, generous 48px thumb targets for the two decision buttons. Motion is almost absent; the match screen is the one place anything moves.",
+    "keyCharacteristics": [
+      "Cool grey ground (#f6f6f8), white 18px cards with a soft, low offset shadow and a hairline border.",
+      "Hairline label/value rows as the signature: muted label left, bold value right, tabular figures.",
+      "Each detail screen is ONE card, its sections split by hairlines rather than stacked cards.",
+      "One accent, ink violet, shared by both audiences; semantic colours only for status.",
+      "Manrope everywhere, 800 for headings with tight tracking (-0.02em).",
+      "Bottom tab bar on phones, the header with inline nav from tablet width up, at every larger width too.",
+      "One motion moment: the match screen's avatars settling together."
+    ],
+    "rules": [
+      {
+        "name": "The One Ink Rule",
+        "body": "Ink violet appears only on the primary action, the active navigation item, a selected option or filter, a link, and the match badge. If it is on anything else, it is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status Is Not Brand Rule",
+        "body": "Green, amber and red mean state (published, paused, error). They are never used as decoration, and violet never signals a status.",
+        "section": "colors"
+      },
+      {
+        "name": "The Shared Palette Rule",
+        "body": "Candidates and recruiters see identical colours. Role reads from navigation and content, not from a role colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight Not Size Rule",
+        "body": "Hierarchy comes from Manrope's weights before sizes; the ramp stays between 0.6875rem and 1.75rem.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Salaries, counts, dates and positions use tabular figures so stacked numbers align.",
+        "section": "typography"
+      },
+      {
+        "name": "The Lowercase Wordmark Rule",
+        "body": "The logo is the word \"rekr\" in Manrope 800 at -0.04em tracking, followed by a violet full stop. No uppercase, no other lettering treatment.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tab Bar Floor Rule",
+        "body": "Anything fixed or sticky to the bottom reads `--tabbar-h`; nothing hard-codes the tab bar's height.",
+        "section": "layout"
+      },
+      {
+        "name": "The Two Heights Rule",
+        "body": "Surfaces are either on the ground (header, tab bar: flat, divided by hairlines) or on a card (shadow-card). Raised is reserved for things that arrive: a toast, the match.",
+        "section": "elevation"
+      },
+      {
+        "name": "The No Glass Rule",
+        "body": "No gradients, no blur, no translucency. Depth comes from white on cool grey plus one soft shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** lay decision facts out as hairline label/value rows, bold value flush right, tabular figures.",
+      "**Do** build each detail screen as ONE 18px card with sections split by hairline dividers.",
+      "**Do** keep ink violet to the primary action, active nav, selected option or filter, links and the match badge.",
+      "**Do** pair every card's hairline border with shadow-card; reserve the raised shadow for toasts and the match.",
+      "**Do** anchor every bottom-sticky bar at `var(--tabbar-h)`.",
+      "**Do** give touch targets at least 44px, and the two feed decisions 48px, equal width, outline left and primary right.",
+      "**Do** use Lucide icons at 16 to 20px, `aria-hidden`, always next to a word.",
+      "**Do** address people as \"vous\" on every screen, candidates and recruiters alike (decided 2026-09-21: the audience spans every profile and every company size); shared helpers may use an infinitive instead. Never \"tu\"."
+    ],
+    "donts": [
+      "**Don't** give candidates and recruiters different colours; the role reads from navigation and content.",
+      "**Don't** use gradients, glass, blur or translucency on any surface.",
+      "**Don't** stack several cards to build one detail screen, or pile facts into chips when they belong in rows.",
+      "**Don't** use green, amber or red for anything but status.",
+      "**Don't** animate anything outside the match screen beyond colour transitions and skeleton pulses.",
+      "**Don't** add a second typeface or uppercase tracked labels."
+    ]
+  }
+}

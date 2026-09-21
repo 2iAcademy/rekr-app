@@ -106,12 +106,6 @@ describe('CandidateOnboardingPage', () => {
     expect(screen.getByText('Étape 1 sur 4')).toBeInTheDocument();
   });
 
-  it('applique le thème candidat', () => {
-    render(<CandidateOnboardingPage userId={1} />);
-
-    expect(screen.getByRole('main')).toHaveAttribute('data-role', 'candidate');
-  });
-
   it('avance d’étape en étape jusqu’à la vitrine', async () => {
     const user = userEvent.setup({ delay: null });
     render(<CandidateOnboardingPage userId={1} />);

@@ -1,6 +1,5 @@
-// Mirrors the `CompanySize` enum, narrowed to Rekr's target: small and
-// mid-sized service companies.
-export const COMPANY_SIZES = ['TPE', 'PME'] as const;
+// Mirrors the `CompanySize` enum: Rekr serves companies of every size.
+export const COMPANY_SIZES = ['TPE', 'PME', 'ETI', 'GE'] as const;
 export const CONTRACT_TYPES = [
   'CDI',
   'CDD',

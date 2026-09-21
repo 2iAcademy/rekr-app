@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Option } from './OptionCards';
 
@@ -36,8 +37,8 @@ export function OptionChips<T extends string>({
   };
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <p id={legendId} className="text-xs text-ink-muted">
+    <div className="flex flex-col gap-2">
+      <p id={legendId} className="text-sm font-semibold text-ink">
         {legend}
       </p>
       <div
@@ -45,7 +46,7 @@ export function OptionChips<T extends string>({
         aria-labelledby={legendId}
         aria-invalid={invalid}
         aria-describedby={describedBy}
-        className={cn('grid gap-2.5', columns === 2 ? 'grid-cols-2' : 'grid-cols-3')}
+        className={cn('grid gap-2', columns === 2 ? 'grid-cols-2' : 'grid-cols-3')}
       >
         {options.map((option) => {
           const selected = values.includes(option.value);
@@ -54,10 +55,10 @@ export function OptionChips<T extends string>({
             <label
               key={option.value}
               className={cn(
-                'flex min-h-11 cursor-pointer items-center justify-center rounded-[0.9375rem] px-3 py-2.5 text-center text-sm transition-all has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-role/40',
+                'flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-center text-sm transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand/30',
                 selected
-                  ? 'bg-role-gradient font-semibold text-white shadow-role'
-                  : 'border border-line bg-card text-ink hover:border-role/30',
+                  ? 'border-brand bg-brand-tint font-semibold text-brand-strong'
+                  : 'border-line bg-card text-ink hover:border-ink-faint/40',
               )}
             >
               <input
@@ -68,6 +69,7 @@ export function OptionChips<T extends string>({
                 onChange={() => toggle(option.value)}
                 className="sr-only"
               />
+              {selected && <Check aria-hidden="true" className="size-4 shrink-0" />}
               {option.label}
             </label>
           );

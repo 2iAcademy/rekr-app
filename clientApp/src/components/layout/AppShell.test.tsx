@@ -3,12 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AuthContext, type AuthContextValue, type AuthStatus } from '@/features/auth/auth-context';
-import { ROLE_THEMES } from '@/lib/roleTheme';
-import { installDialogDouble } from '@/test/dialog';
 import { AppShell } from './AppShell';
-
-// jsdom 29 livre `HTMLDialogElement` sans `showModal`.
-installDialogDouble();
 
 type UserType = 'candidate' | 'recruiter';
 
@@ -63,26 +58,22 @@ const renderWith = (value: AuthContextValue) => {
 
 const renderShell = (userType: UserType) => renderWith(session(userType));
 
-const sidebar = () => screen.getByRole('complementary');
-
-const paletteScope = () => screen.getByRole('main').closest('[data-role]');
+const tabBar = () => screen.getByRole('navigation', { name: 'Onglets de navigation' });
 
 // A layout route mounts before its child gets a say, so the guards carried by
 // the child routes cannot keep the chrome off the screen. Unguarded, the shell
-// paints a complete, clickable frame — role label, palette, links — for the
+// paints a complete, clickable frame — role label, links — for the
 // whole boot refresh, showing a recruiter the candidate identity until the
 // session lands. Hence the same guard on the layout itself.
 describe('AppShell, session absente', () => {
   it('tient la mise en page sans rien dire de la session en cours de vérification', () => {
-    const { container } = renderWith(noSession('loading'));
+    renderWith(noSession('loading'));
 
     expect(screen.getByRole('status')).toHaveTextContent('Chargement de votre session');
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Mon profil' })).not.toBeInTheDocument();
     expect(screen.queryByRole('main')).not.toBeInTheDocument();
     expect(screen.queryByText('contenu')).not.toBeInTheDocument();
-    // The palette is what leaked before: the skeleton must not pick a side.
-    expect(container.querySelector('[data-role]')).toBeNull();
   });
 
   it('renvoie un visiteur anonyme vers la connexion sans peindre le chrome', () => {
@@ -124,18 +115,11 @@ describe('AppShell', () => {
    * Elle attendait au bas de la fiche de compte, après un formulaire qu'il
    * fallait dérouler en entier pour la trouver.
    *
-   * Trois paliers, trois porteurs : la barre latérale au-dessus de 1440, le
-   * menu burger en dessous de 768, et l'en-tête entre les deux — c'est la seule
-   * largeur que ni l'une ni l'autre ne sert.
+   * Deux porteurs : l'en-tête à partir de 768, l'écran « Mon compte » en
+   * dessous (la barre d'onglets n'a de place que pour les destinations).
    */
   describe('déconnexion', () => {
-    it('la propose depuis la barre latérale, à côté du bloc profil', () => {
-      renderShell('candidate');
-
-      expect(within(sidebar()).getByRole('button', { name: 'Se déconnecter' })).toBeInTheDocument();
-    });
-
-    it('la propose dans l’en-tête, pour la largeur que les deux autres ne servent pas', () => {
+    it('la propose dans l’en-tête', () => {
       renderShell('candidate');
 
       expect(
@@ -143,15 +127,27 @@ describe('AppShell', () => {
       ).toBeInTheDocument();
     });
 
-    it('la propose dans le menu mobile', async () => {
-      const user = userEvent.setup();
+    // jsdom loads no CSS: the utilities are the only trace of the breakpoint
+    // that keeps the header's control off the phone, where the account page
+    // carries it.
+    it('réserve celle de l’en-tête aux écrans à partir de la tablette', () => {
       renderShell('candidate');
 
-      await user.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
+      const inHeader = within(screen.getByRole('banner')).getByRole('button', {
+        name: 'Se déconnecter',
+      });
+
+      expect(inHeader.className).toContain('hidden');
+      expect(inHeader.className).toContain('md:flex');
+      expect(inHeader.className).not.toContain('desktop:hidden');
+    });
+
+    it('ne l’ajoute pas à la barre d’onglets', () => {
+      renderShell('candidate');
 
       expect(
-        within(screen.getByRole('dialog')).getByRole('button', { name: 'Se déconnecter' }),
-      ).toBeInTheDocument();
+        within(tabBar()).queryByRole('button', { name: 'Se déconnecter' }),
+      ).not.toBeInTheDocument();
     });
 
     // La chaîne complète : le clic termine la session, et c'est la garde du
@@ -161,34 +157,60 @@ describe('AppShell', () => {
       const logout = vi.fn().mockResolvedValue(undefined);
       const { router } = renderWith({ ...session('candidate'), logout });
 
-      await user.click(within(sidebar()).getByRole('button', { name: 'Se déconnecter' }));
+      await user.click(
+        within(screen.getByRole('banner')).getByRole('button', { name: 'Se déconnecter' }),
+      );
 
       await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
       expect(router.state.location.pathname).toBe('/');
     });
   });
 
-  it('monte les deux chromes du shell', () => {
+  // The header serves every width from tablet up: the sidebar it replaced is
+  // gone, and the phone keeps its tab bar.
+  it('monte l’en-tête et la barre d’onglets, sans barre latérale', () => {
     renderShell('recruiter');
 
-    expect(screen.getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Navigation principale' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('navigation', { name: 'Navigation de la barre supérieure' }),
     ).toBeInTheDocument();
+    expect(tabBar()).toBeInTheDocument();
+  });
+
+  it('ne propose plus de menu burger', () => {
+    renderShell('candidate');
+
+    expect(screen.queryByRole('button', { name: /menu/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   // Le recruteur ne swipe plus de candidats : ses annonces sont son point
-  // d'entrée, et « Feed » ne lui est plus proposé du tout.
+  // d'entrée, et le feed ne lui est plus proposé du tout.
   it('ne montre aucun feed au recruteur, dans aucun chrome', () => {
     renderShell('recruiter');
 
-    expect(screen.queryAllByRole('link', { name: 'Feed' })).toEqual([]);
+    expect(screen.queryAllByRole('link', { name: 'Offres' })).toEqual([]);
+  });
+
+  it('ouvre les matchs au recruteur dans les deux chromes', () => {
+    renderShell('recruiter');
+
+    const matchLinks = screen.getAllByRole('link', { name: 'Matchs' });
+
+    expect(matchLinks).toHaveLength(2);
+    for (const link of matchLinks) {
+      expect(link).toHaveAttribute('href', '/matches');
+    }
   });
 
   it('envoie le candidat sur son feed d’offres dans les deux chromes', () => {
     renderShell('candidate');
 
-    const feedLinks = screen.getAllByRole('link', { name: 'Feed' });
+    const feedLinks = screen.getAllByRole('link', { name: 'Offres' });
 
     expect(feedLinks).toHaveLength(2);
     for (const link of feedLinks) {
@@ -217,59 +239,36 @@ describe('AppShell', () => {
     expect(screen.queryByRole('link', { name: 'Mes offres' })).not.toBeInTheDocument();
   });
 
-  it('pointe le bloc profil des deux chromes sur l’écran profil', () => {
+  it('pointe l’avatar de l’en-tête sur l’écran profil, avec l’initiale du nom dérivé de l’email', () => {
     renderShell('recruiter');
 
-    const profileLinks = screen.getAllByRole('link', { name: 'Mon profil' });
+    const profile = screen.getByRole('link', { name: 'Mon profil' });
 
-    expect(profileLinks).toHaveLength(2);
-    for (const link of profileLinks) {
-      expect(link).toHaveAttribute('href', '/profil');
-    }
+    expect(profile).toHaveAttribute('href', '/profil');
+    expect(profile).toHaveTextContent(/^S$/);
   });
 
-  it('dérive le nom affiché de l’email et affiche le libellé du rôle', () => {
-    renderShell('recruiter');
+  // The palette is gone: one accent for both roles, so nothing in the shell may
+  // still switch on the user type.
+  it('ne porte plus de portée de palette par rôle', () => {
+    const { container } = renderShell('recruiter');
 
-    const profile = within(sidebar()).getByRole('link', { name: 'Mon profil' });
-
-    expect(profile).toHaveTextContent('sacha');
-    expect(profile).toHaveTextContent('Recruteur');
+    expect(container.querySelector('[data-role]')).toBeNull();
   });
 
-  it('affiche le libellé candidat pour un candidat', () => {
-    renderShell('candidate');
+  // The phone tab bar is fixed, so it takes no room in the flow: the shell
+  // publishes its height as `--tabbar-h` — zero from tablet width, where there
+  // is none — and the main column reserves it. The sticky action bars of the
+  // pages read the same variable to sit on the bar rather than under it.
+  it('réserve la hauteur de la barre d’onglets sous le contenu', () => {
+    const { container } = renderShell('candidate');
 
-    expect(within(sidebar()).getByRole('link', { name: 'Mon profil' })).toHaveTextContent(
-      'Candidat',
-    );
-  });
+    const root = container.firstElementChild;
 
-  // The palette is a set of CSS custom properties redefined under `[data-role=…]`
-  // in index.css, and custom properties only cascade to descendants. So the
-  // attribute has to sit above the chromes, not on the `main`: scoped to the
-  // `main` alone, the sidebar and the header keep the candidate `--line` on a
-  // recruiter screen. Asserting the containment, and not just the attribute,
-  // is what makes this spec fail if someone pushes it back down.
-  it('englobe le chrome dans la portée de la palette du rôle', () => {
-    renderShell('recruiter');
-
-    const scope = paletteScope();
-
-    expect(scope).toHaveAttribute('data-role', 'recruiter');
-    expect(scope).toContainElement(
-      screen.getByRole('navigation', { name: 'Navigation principale' }),
-    );
-    expect(scope).toContainElement(screen.getByRole('banner'));
-    // Vitest loads no CSS: the attribute value is the only guard against the
-    // French/English mismatch that once turned every recruiter screen green.
-    expect(ROLE_THEMES).toContain('recruiter');
-  });
-
-  it('bascule la palette pour un candidat', () => {
-    renderShell('candidate');
-
-    expect(paletteScope()).toHaveAttribute('data-role', 'candidate');
+    expect(root?.className).toContain('[--tabbar-h:');
+    expect(root?.className).toContain('md:[--tabbar-h:0rem]');
+    expect(root).toContainElement(tabBar());
+    expect(screen.getByRole('main').className).toContain('var(--tabbar-h)');
   });
 
   // jsdom loads no CSS, so the ticket's "no horizontal scroll" rule is only

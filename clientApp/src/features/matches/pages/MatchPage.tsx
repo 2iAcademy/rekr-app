@@ -1,120 +1,142 @@
-import { MessageCircle } from 'lucide-react';
-import { BrandMark } from '@/components/brand/BrandMark';
+import { Building2, Heart, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { fileUrl } from '@/lib/fileUrl';
+import { FactList } from '@/components/ui/fact-list';
 
 interface MatchPerson {
   name: string;
   avatarUrl?: string | null;
 }
 
+interface MatchOffer {
+  title: string;
+  contract?: string | null;
+  city?: string | null;
+}
+
 interface MatchPageProps {
   currentUser: MatchPerson;
-  matchedProfile: MatchPerson;
+  /** Absent when the screen is opened without knowing who matched. */
+  matchedProfile?: MatchPerson | null;
+  offer?: MatchOffer | null;
   onContinue?: () => void;
   onWriteMessage?: () => void;
 }
 
-function Avatar({ person, className }: { person: MatchPerson; className?: string }) {
-  const initial = person.name.trim().charAt(0).toUpperCase();
-  const avatarUrl =
-    person.avatarUrl?.startsWith('/') || person.avatarUrl?.startsWith('http')
-      ? person.avatarUrl
-      : fileUrl(person.avatarUrl);
+/**
+ * The avatars slide in towards each other and settle with an exponential
+ * ease-out. Only under `motion-safe`: with reduced motion they are simply there,
+ * and in every case the resting state is the plain layout, so nothing depends
+ * on the animation finishing.
+ */
+const SETTLE =
+  'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.16,1,0.3,1)]';
+
+/** A ready URL is kept as is; a storage key is turned into one. */
+const avatarSrc = (avatarUrl: string | null | undefined): string | null =>
+  avatarUrl?.startsWith('/') || avatarUrl?.startsWith('http') ? avatarUrl : fileUrl(avatarUrl);
+
+function Avatar({ person, className }: { person: MatchPerson | null; className?: string }) {
+  const initial = person?.name.trim().charAt(0).toUpperCase();
+  const src = avatarSrc(person?.avatarUrl);
 
   return (
     <div
       className={cn(
-        'flex aspect-square items-center justify-center overflow-hidden rounded-full border-4 border-white/90 bg-white/20 font-heading text-3xl font-bold text-white shadow-xl',
+        'flex size-22 shrink-0 items-center justify-center overflow-hidden rounded-full text-3xl font-extrabold shadow-raised ring-4 ring-white',
         className,
       )}
     >
-      {avatarUrl ? (
-        <img src={avatarUrl} alt={person.name} className="size-full object-cover" />
-      ) : (
+      {src ? (
+        <img src={src} alt={person?.name ?? ''} className="size-full object-cover" />
+      ) : initial ? (
         <span aria-hidden>{initial}</span>
+      ) : (
+        <Building2 aria-hidden="true" className="size-9" />
       )}
     </div>
   );
 }
 
-/** Full-screen celebration displayed as soon as both parties like each other. */
+/** Full-screen moment displayed as soon as both parties like each other. */
 export function MatchPage({
   currentUser,
   matchedProfile,
+  offer,
   onContinue,
   onWriteMessage,
 }: MatchPageProps) {
+  const matchedName = matchedProfile?.name.trim() || null;
+  const recap = offer
+    ? [
+        { label: 'Offre', value: offer.title },
+        { label: 'Contrat', value: offer.contract },
+        { label: 'Ville', value: offer.city },
+      ].filter((row): row is { label: string; value: string } => Boolean(row.value?.trim()))
+    : [];
+
   return (
-    <main className="fixed inset-0 z-50 isolate flex min-h-dvh w-full overflow-y-auto bg-brand-strong-gradient text-white">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-30"
-        aria-hidden="true"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 12% 18%, white 0 3px, transparent 4px), radial-gradient(circle at 84% 12%, white 0 5px, transparent 6px), radial-gradient(circle at 92% 50%, white 0 3px, transparent 4px), radial-gradient(circle at 10% 70%, white 0 4px, transparent 5px), radial-gradient(circle at 74% 78%, white 0 3px, transparent 4px)',
-        }}
-      />
-
-      <section className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pt-8 pb-8 sm:px-8">
-        <div className="flex justify-center">
-          <BrandMark className="w-20 drop-shadow-lg" />
-        </div>
-
-        <div className="mt-9 text-center">
-          <p className="text-sm font-medium tracking-[0.2em] text-white/75 uppercase">
-            Félicitations
-          </p>
-          <h1 className="mt-2 font-heading text-4xl font-bold tracking-tight sm:text-5xl">
-            C&apos;est un match !
-          </h1>
-          <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-white/85">
-            Vous avez tous les deux manifesté votre intérêt. Lancez la conversation.
-          </p>
-        </div>
-
-        <div
-          className="relative mx-auto mt-12 flex w-full max-w-xs items-center justify-center"
-          aria-label={`Match entre vous et ${matchedProfile.name}`}
-        >
+    <main className="fixed inset-0 z-50 flex min-h-dvh w-full overflow-y-auto bg-card text-ink">
+      <section className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pt-16 pb-8 sm:px-8">
+        <div className="flex flex-col items-center text-center">
           <div
-            className="absolute size-44 rounded-full border border-white/20 bg-white/10 blur-[1px]"
-            aria-hidden="true"
-          />
-          <Avatar
-            person={currentUser}
-            className="relative z-10 -mr-5 size-32 rotate-[-6deg] sm:size-36"
-          />
-          <Avatar
-            person={matchedProfile}
-            className="relative z-20 -ml-5 size-32 rotate-[6deg] sm:size-36"
-          />
+            role="group"
+            aria-label={matchedName ? `Match entre vous et ${matchedName}` : 'Votre match'}
+            className="flex items-center justify-center"
+          >
+            <Avatar
+              person={currentUser}
+              className={cn(
+                'relative z-10 -mr-3 bg-amber-100 text-amber-900',
+                SETTLE,
+                'motion-safe:slide-in-from-left-6',
+              )}
+            />
+            <Avatar
+              person={matchedProfile ?? null}
+              className={cn(
+                '-ml-3 bg-brand-tint text-brand-strong',
+                SETTLE,
+                'motion-safe:slide-in-from-right-6',
+              )}
+            />
+          </div>
+
+          <p className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1 text-xs font-bold text-white motion-safe:animate-in motion-safe:fade-in motion-safe:delay-150 motion-safe:duration-300 motion-safe:fill-mode-both">
+            <Heart aria-hidden="true" className="size-3.5 fill-current" />
+            Intérêt réciproque
+          </p>
+
+          <h1 className="mt-4 text-[1.75rem] leading-tight font-extrabold break-words text-ink">
+            {matchedName ? `${matchedName} a aussi retenu votre profil` : 'Nouveau match'}
+          </h1>
+          <p className="mt-2 max-w-xs text-[0.9375rem] leading-relaxed text-ink-muted">
+            Vous pouvez écrire dès maintenant pour lancer la conversation.
+          </p>
         </div>
 
-        <div className="mt-8 grid grid-cols-2 gap-3 text-center">
-          <p className="truncate text-sm font-semibold">Toi</p>
-          <p className="truncate text-sm font-semibold">{matchedProfile.name}</p>
-        </div>
+        {recap.length > 0 && (
+          <FactList
+            facts={recap}
+            className="mt-8 rounded-2xl border border-line bg-card px-5 py-2 shadow-card"
+          />
+        )}
 
-        <div className="mt-auto flex flex-col gap-3 pt-12">
+        <div className="mt-auto flex flex-col gap-2 pt-10">
           <Button
             type="button"
-            variant="soft"
+            variant="brand"
             size="xl"
-            className="w-full text-brand-strong"
+            className="w-full"
             onClick={onWriteMessage}
           >
-            <MessageCircle className="size-5" />
+            <MessageCircle aria-hidden="true" />
             Écrire un message
           </Button>
-          <button
-            type="button"
-            onClick={onContinue}
-            className="flex h-13 cursor-pointer items-center justify-center rounded-2xl font-heading text-[0.95rem] font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          >
+          <Button type="button" variant="ghost" size="xl" className="w-full" onClick={onContinue}>
             Continuer à swiper
-          </button>
+          </Button>
         </div>
       </section>
     </main>

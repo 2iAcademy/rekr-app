@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { ApiError } from '@/api/customFetch';
@@ -69,6 +69,11 @@ const renderLoaded = async () => {
 
   return rendered;
 };
+
+const filterBy = (label: string) =>
+  within(screen.getByRole('group', { name: 'Filtrer par statut' })).getByRole('button', {
+    name: label,
+  });
 
 const statusSelect = () =>
   screen.getByRole('combobox', { name: 'Statut de l’offre Développeuse backend' });
@@ -145,7 +150,7 @@ describe('RecruiterOffersPage', () => {
   it('donne en permanence un accès à la création d’une offre', async () => {
     await renderLoaded();
 
-    expect(screen.getByRole('link', { name: 'Créer une offre' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Nouvelle offre' })).toHaveAttribute(
       'href',
       '/recruteur/offres/nouvelle',
     );
@@ -155,10 +160,10 @@ describe('RecruiterOffersPage', () => {
     const user = userEvent.setup();
     await renderLoaded();
 
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Filtrer par statut' }),
-      'paused',
-    );
+    await user.click(filterBy('En pause'));
+
+    expect(filterBy('En pause')).toHaveAttribute('aria-pressed', 'true');
+    expect(filterBy('Toutes')).toHaveAttribute('aria-pressed', 'false');
 
     await waitFor(() =>
       expect(findMine).toHaveBeenLastCalledWith({
@@ -173,13 +178,16 @@ describe('RecruiterOffersPage', () => {
     await renderLoaded();
 
     findMine.mockResolvedValue(answer([]));
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Filtrer par statut' }),
-      'filled',
-    );
+    await user.click(filterBy('Pourvue'));
 
     expect(await screen.findByText('Aucune offre avec ce statut.')).toBeVisible();
     expect(screen.queryByText('Vous n’avez pas encore publié d’offre.')).not.toBeInTheDocument();
+
+    findMine.mockResolvedValue(answer([offer()]));
+    await user.click(screen.getByRole('button', { name: 'Voir toutes les offres' }));
+
+    expect(await screen.findByRole('heading', { name: 'Développeuse backend' })).toBeVisible();
+    expect(filterBy('Toutes')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('confirme le changement de statut et repeint le badge', async () => {

@@ -50,33 +50,40 @@ describe('ApplicantRow', () => {
   it('remonte le like et le passage', async () => {
     const user = userEvent.setup();
     const { onLike, onPass } = renderRow();
-    await user.click(screen.getByRole('button', { name: 'Liker Camille' }));
-    await user.click(screen.getByRole('button', { name: 'Passer Camille' }));
+    await user.click(screen.getByRole('button', { name: "Ça m'intéresse : Camille" }));
+    await user.click(screen.getByRole('button', { name: 'Passer : Camille' }));
     expect(onLike).toHaveBeenCalledTimes(1);
     expect(onPass).toHaveBeenCalledTimes(1);
   });
 
-  it('affiche la décision sauvegardée et désactive les deux actions', () => {
+  // Une décision enregistrée n'est plus à prendre : les deux actions laissent
+  // place à une marque désactivée qui dit ce qui a été fait.
+  it('affiche la décision sauvegardée et retire les deux actions', () => {
     renderRow({ decision: { kind: 'liked', at: '2026-09-16T09:30:00.000Z' } });
-    expect(screen.getByRole('status')).toHaveTextContent('Intérêt déjà enregistré');
-    const actions = screen.getAllByRole('button', { name: /Camille, Intérêt déjà enregistré/ });
-    expect(actions).toHaveLength(2);
-    actions.forEach((button) => expect(button).toBeDisabled());
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Intérêt déjà enregistré');
+    expect(status).toHaveAttribute('title', 'Décision enregistrée le 2026-09-16T09:30:00.000Z');
+    expect(screen.getByRole('button', { name: 'Camille, intérêt enregistré' })).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: "Ça m'intéresse : Camille" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Passer : Camille' })).not.toBeInTheDocument();
   });
 
-  it('affiche un passage sauvegardé et désactive les deux actions', () => {
+  it('affiche un passage sauvegardé et retire les deux actions', () => {
     renderRow({ decision: { kind: 'passed', at: '2026-09-16T09:30:00.000Z' } });
     expect(screen.getByRole('status')).toHaveTextContent('Candidat déjà passé');
-    expect(screen.getAllByRole('button', { name: /Camille, Candidat déjà passé/ })).toHaveLength(2);
-    screen
-      .getAllByRole('button', { name: /Camille, Candidat déjà passé/ })
-      .forEach((button) => expect(button).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Camille, candidat passé' })).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: "Ça m'intéresse : Camille" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Passer : Camille' })).not.toBeInTheDocument();
   });
 
   it('désactive les deux actions pendant l’envoi', () => {
     renderRow({ pending: true });
-    expect(screen.getByRole('button', { name: 'Liker Camille' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Passer Camille' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: "Ça m'intéresse : Camille" })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Passer : Camille' })).toBeDisabled();
   });
 
   it('masque le poste recherché quand il n’est pas renseigné', () => {

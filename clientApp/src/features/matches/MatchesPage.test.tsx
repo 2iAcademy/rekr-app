@@ -181,8 +181,8 @@ describe('MatchesPage', () => {
   it('affiche les matches récupérés depuis l’API', async () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { name: 'Matches' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Matches' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Matchs' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Matchs' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByText('Acme Corp')).toBeInTheDocument();
   });
 
@@ -192,17 +192,17 @@ describe('MatchesPage', () => {
    * serait vide par construction de son côté, et « Reçus » impossible côté
    * candidat.
    */
-  it('propose Matches et Mes likes au candidat, sans onglet Reçus', () => {
+  it('propose Matchs et Mes likes au candidat, sans onglet Reçus', () => {
     renderPage();
 
-    expect(tabLabels()).toEqual(['Matches', 'Mes likes']);
+    expect(tabLabels()).toEqual(['Matchs', 'Mes likes']);
   });
 
-  it('propose Matches et Reçus au recruteur, sans onglet Mes likes', () => {
+  it('propose Matchs et Reçus au recruteur, sans onglet Mes likes', () => {
     authenticateAs('recruiter');
     renderPage();
 
-    expect(tabLabels()).toEqual(['Matches', 'Reçus']);
+    expect(tabLabels()).toEqual(['Matchs', 'Reçus']);
   });
 
   it('liste les offres likées sans match depuis /likes/sent', async () => {
@@ -244,19 +244,32 @@ describe('MatchesPage', () => {
   });
 
   it.each([
-    ['Matches', 'Aucun match pour le moment.'],
-    ['Mes likes', 'Vous n’avez encore liké aucune offre.'],
+    ['Matchs', 'Aucun match pour le moment'],
+    ['Mes likes', 'Aucune offre likée'],
   ])('affiche un état vide propre à l’onglet %s', async (tab, message) => {
     const user = userEvent.setup();
     getMatches.mockResolvedValue(matches([]));
     getSent.mockResolvedValue(likes([]));
     renderPage();
 
-    if (tab !== 'Matches') {
+    if (tab !== 'Matchs') {
       await openTab(user, tab);
     }
 
     expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  // Un état vide mène quelque part : le candidat vers les offres, le recruteur
+  // vers ses annonces, là où naissent les likes de chacun.
+  it.each([
+    ['candidate', 'Parcourir les offres', '/candidat/offres'],
+    ['recruiter', 'Voir mes offres', '/recruteur/offres'],
+  ] as const)('propose une suite à un %s sans match', async (userType, action, path) => {
+    authenticateAs(userType);
+    getMatches.mockResolvedValue(matches([]));
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: action })).toHaveAttribute('href', path);
   });
 
   it('affiche un état vide propre à l’onglet Reçus', async () => {
@@ -267,21 +280,19 @@ describe('MatchesPage', () => {
 
     await openTab(user, 'Reçus');
 
-    expect(
-      await screen.findByText('Aucun candidat n’a encore liké tes offres.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Aucun like reçu pour le moment')).toBeInTheDocument();
   });
 
   it.each([
-    ['Matches', 'Impossible de charger tes matches.'],
-    ['Mes likes', 'Impossible de charger tes likes.'],
+    ['Matchs', 'Impossible de charger vos matchs.'],
+    ['Mes likes', 'Impossible de charger vos likes.'],
   ])('signale l’échec de chargement de l’onglet %s', async (tab, message) => {
     const user = userEvent.setup();
     getMatches.mockRejectedValue(new Error('API indisponible'));
     getSent.mockRejectedValue(new Error('API indisponible'));
     renderPage();
 
-    if (tab !== 'Matches') {
+    if (tab !== 'Matchs') {
       await openTab(user, tab);
     }
 
@@ -304,7 +315,7 @@ describe('MatchesPage', () => {
 
     expect(screen.getByText('Chargement…')).toBeInTheDocument();
     expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument();
-    expect(screen.queryByText('Aucun match pour le moment.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Aucun match pour le moment')).not.toBeInTheDocument();
   });
 
   // Un lien, pas un `div` cliquable : la ligne doit être atteignable au clavier
@@ -481,19 +492,19 @@ describe('MatchesPage', () => {
     await openTab(user, 'Mes likes');
     expect(await screen.findByRole('button', { name: 'Voir plus' })).toBeInTheDocument();
 
-    await openTab(user, 'Matches');
+    await openTab(user, 'Matchs');
 
     expect(screen.queryByRole('button', { name: 'Voir plus' })).not.toBeInTheDocument();
   });
 
   // Le titre nomme ce qui est affiché : un recruteur sur « Reçus » ne lit pas
-  // « Tes matches ».
+  // « Matchs ».
   it('titre l’écran avec l’onglet ouvert', async () => {
     const user = userEvent.setup();
     authenticateAs('recruiter');
     renderPage();
 
-    expect(screen.getByRole('heading', { name: 'Matches' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Matchs' })).toBeInTheDocument();
 
     await openTab(user, 'Reçus');
 
@@ -546,7 +557,7 @@ describe('MatchesPage', () => {
 
     // Le message ne nomme pas la liste : elle est sous les yeux du lecteur.
     expect(await screen.findByRole('alert')).toHaveTextContent('Impossible de charger la suite.');
-    expect(screen.queryByText(/Impossible de charger tes likes/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Impossible de charger vos likes/)).not.toBeInTheDocument();
     expect(screen.getByText('Société 100')).toBeInTheDocument();
     expect(screen.getByText('Société 149')).toBeInTheDocument();
   });
@@ -587,14 +598,14 @@ describe('MatchesPage', () => {
   ])('retombe sur le premier onglet quand le paramètre est %s', (_, entry) => {
     renderPage(entry);
 
-    expect(screen.getByRole('tab', { name: 'Matches' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Matchs' })).toHaveAttribute('aria-selected', 'true');
   });
 
   // Un candidat n'a pas d'onglet « Reçus » : l'URL ne doit pas lui en ouvrir un.
   it('retombe sur le premier onglet quand l’URL nomme un onglet interdit au rôle', () => {
     renderPage('/matches?onglet=recus');
 
-    expect(screen.getByRole('tab', { name: 'Matches' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Matchs' })).toHaveAttribute('aria-selected', 'true');
     expect(getReceived).not.toHaveBeenCalled();
   });
 
@@ -719,7 +730,7 @@ describe('MatchesPage', () => {
       await waitFor(() => expect(unmatch).toHaveBeenCalledExactlyOnceWith(12));
       await waitFor(() => expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument());
       expect(await screen.findByText('Le match avec Acme Corp est terminé.')).toBeVisible();
-      expect(screen.getByText('Aucun match pour le moment.')).toBeInTheDocument();
+      expect(screen.getByText('Aucun match pour le moment')).toBeInTheDocument();
     });
 
     /**
@@ -737,7 +748,7 @@ describe('MatchesPage', () => {
       await user.click(confirmButton('Acme Corp'));
 
       await waitFor(() => expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument());
-      expect(screen.getByText('Aucun match pour le moment.')).toBeInTheDocument();
+      expect(screen.getByText('Aucun match pour le moment')).toBeInTheDocument();
     });
 
     it('garde la ligne et permet de réessayer quand le serveur échoue', async () => {

@@ -7,8 +7,9 @@ interface SwipeHintProps {
 }
 
 /**
- * Colour laid over the dragged card: green for a like, red for a pass, fading in
- * with the distance travelled so the outcome is read before the release.
+ * Colour laid over the dragged card: the brand violet for a like, the
+ * destructive red for a pass, fading in with the distance travelled so the
+ * outcome is read before the release.
  *
  * It covers the whole card rather than sitting as a strip along its edge: on a
  * phone the card spans nearly the full width, so an edge strip leaves the screen
@@ -33,17 +34,17 @@ export const SwipeHint = ({ offset, threshold }: SwipeHintProps) => {
       className="pointer-events-none absolute inset-0 flex items-center justify-center"
     >
       <div
-        className={`absolute inset-0 rounded-3xl ${isLike ? 'bg-brand' : 'bg-destructive'}`}
+        className={`absolute inset-0 rounded-2xl ${isLike ? 'bg-brand' : 'bg-destructive'}`}
         style={{ opacity: progress * 0.5 }}
       />
       <span
-        className="relative flex size-24 items-center justify-center rounded-full bg-white shadow-lg"
+        className="relative flex size-20 items-center justify-center rounded-full bg-white shadow-raised"
         style={{ opacity: progress }}
       >
         {isLike ? (
-          <Heart className="size-12 fill-brand text-brand" />
+          <Heart className="size-10 fill-brand text-brand" />
         ) : (
-          <X className="size-12 text-destructive" strokeWidth={3} />
+          <X className="size-10 text-destructive" strokeWidth={3} />
         )}
       </span>
     </div>

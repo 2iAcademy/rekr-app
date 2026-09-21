@@ -3,19 +3,14 @@ import { cn } from '@/lib/utils';
 
 type AvatarBannerSize = 'md' | 'lg';
 
-const BANNER: Record<AvatarBannerSize, string> = {
-  md: 'h-[8.4375rem] shrink-0 sm:h-[11.25rem]',
-  lg: 'relative h-52 pt-12',
-};
-
 const MEDIA: Record<AvatarBannerSize, string> = {
-  md: 'size-[5.625rem] bg-card',
-  lg: 'size-24 bg-white shadow-md',
+  md: 'size-14',
+  lg: 'size-20',
 };
 
 const INITIAL: Record<AvatarBannerSize, string> = {
-  md: 'text-4xl text-role',
-  lg: 'text-3xl text-brand',
+  md: 'text-xl',
+  lg: 'text-3xl',
 };
 
 interface AvatarBannerProps extends ComponentProps<'div'> {
@@ -25,13 +20,14 @@ interface AvatarBannerProps extends ComponentProps<'div'> {
 }
 
 /**
- * The gradient band with a round avatar that both the candidate card and the
- * offer detail open on.
+ * The round avatar a detail header opens on — a logo, or the initial on the
+ * brand tint, the same treatment as the feed card's avatar. No band behind it:
+ * the header card it sits in is the frame.
  *
- * The initial is `aria-hidden`: the name is always spelled out by the heading
- * right below, and a lone letter read aloud is noise. The URL is normalised
- * rather than compared to `null`, because an empty string is a valid
- * `string | null` and the API is free to send one.
+ * The initial is `aria-hidden`: the name is always spelled out right next to
+ * it, and a lone letter read aloud is noise. The URL is normalised rather than
+ * compared to `null`, because an empty string is a valid `string | null` and
+ * the API is free to send one.
  */
 export function AvatarBanner({
   name,
@@ -45,17 +41,17 @@ export function AvatarBanner({
   return (
     <div
       data-slot="avatar-banner"
-      className={cn('flex items-center justify-center bg-role-gradient', BANNER[size], className)}
+      className={cn('flex shrink-0 items-center justify-center', className)}
       {...props}
     >
       <span
         className={cn(
-          'flex shrink-0 items-center justify-center overflow-hidden rounded-full',
+          'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-tint',
           MEDIA[size],
         )}
       >
         {source === null ? (
-          <span aria-hidden="true" className={cn('font-heading font-bold', INITIAL[size])}>
+          <span aria-hidden="true" className={cn('font-extrabold text-brand-strong', INITIAL[size])}>
             {name.trim().charAt(0).toUpperCase()}
           </span>
         ) : (

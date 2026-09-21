@@ -131,13 +131,26 @@ describe('OfferApplicantsPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Liker Camille' }));
+    await user.click(await screen.findByRole('button', { name: "Ça m'intéresse : Camille" }));
 
     await waitFor(() => expect(likeApplicant).toHaveBeenCalledWith(12, 1));
     expect(await screen.findByRole('status')).toHaveTextContent('Intérêt déjà enregistré');
-    const actions = screen.getAllByRole('button', { name: /Camille, Intérêt déjà enregistré/ });
-    expect(actions).toHaveLength(2);
-    actions.forEach((button) => expect(button).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Camille, intérêt enregistré' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Passer : Camille' })).not.toBeInTheDocument();
+  });
+
+  it('enregistre le passage du recruteur sur un candidat', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Passer : Camille' }));
+
+    await waitFor(() => expect(passApplicant).toHaveBeenCalledWith(12, 1));
+    expect(await screen.findByRole('status')).toHaveTextContent('Candidat déjà passé');
+    expect(screen.getByRole('button', { name: 'Camille, candidat passé' })).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: "Ça m'intéresse : Camille" }),
+    ).not.toBeInTheDocument();
   });
 
   it('signale le nouveau match avec les informations du candidat retournées par l’API', async () => {
@@ -164,7 +177,7 @@ describe('OfferApplicantsPage', () => {
     } as unknown as Awaited<ReturnType<typeof offerControllerLikeApplicant>>);
     const { onMatch } = renderPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Liker Camille' }));
+    await user.click(await screen.findByRole('button', { name: "Ça m'intéresse : Camille" }));
 
     await waitFor(() =>
       expect(onMatch).toHaveBeenCalledWith({

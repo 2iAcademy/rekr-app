@@ -10,7 +10,7 @@ export function TextField({ label, ...props }: TextFieldProps) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-xs text-ink-muted">
+      <label htmlFor={id} className="text-sm font-semibold text-ink">
         {label}
       </label>
       <Input id={id} {...props} />

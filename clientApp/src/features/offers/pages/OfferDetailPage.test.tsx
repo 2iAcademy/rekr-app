@@ -135,19 +135,39 @@ describe('OfferDetailPage', () => {
   it("affiche le nom de l'entreprise, taille et localisation", async () => {
     renderPage();
 
-    await waitFor(() => {
-      expect(
-        screen.getByText(`${mockOffer.company.name} · ${mockOffer.company.size} · Lyon`),
-      ).toBeInTheDocument();
+    expect(await screen.findByText(mockOffer.company.name)).toBeInTheDocument();
+    expect(screen.getByText(`${mockOffer.company.size} · Lyon`)).toBeInTheDocument();
+  });
+
+  // Les mêmes lignes libellé / valeur que la carte du feed : le candidat
+  // retrouve sur le détail exactement ce qu'il a lu avant de l'ouvrir.
+  it('présente les faits clés comme sur la carte du feed', async () => {
+    renderPage();
+
+    await screen.findByRole('heading', { level: 2, name: mockOffer.title });
+    const facts = Object.fromEntries(
+      screen
+        .getAllByRole('term')
+        .map((term) => [term.textContent, term.nextElementSibling?.textContent]),
+    );
+
+    expect(facts).toEqual({
+      Contrat: 'CDI',
+      Télétravail: 'Hybride',
+      Expérience: 'Confirmé',
+      Salaire: '45–55 k€',
     });
   });
 
-  it('affiche le salaire en gras', async () => {
+  it('dit « Non précisé » plutôt que de laisser un fait vide', async () => {
+    vi.mocked(offerControllerFindOneById).mockResolvedValue({
+      data: { ...mockOffer, remotePolicy: null, minExperienceLevel: null },
+    } as unknown as Awaited<ReturnType<typeof offerControllerFindOneById>>);
+
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByText('45 - 55 k€')).toBeInTheDocument();
-    });
+    await screen.findByRole('heading', { level: 2, name: mockOffer.title });
+    expect(screen.getAllByText('Non précisé')).toHaveLength(2);
   });
 
   it('affiche la stack technique', async () => {
@@ -160,11 +180,11 @@ describe('OfferDetailPage', () => {
     });
   });
 
-  it('affiche les en-têtes de sections en majuscules', async () => {
+  it('affiche les rubriques du détail', async () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Stack technique')).toBeInTheDocument();
+      expect(screen.getByText('Compétences')).toBeInTheDocument();
       expect(screen.getByText('Salaire')).toBeInTheDocument();
       expect(screen.getByText('À propos du poste')).toBeInTheDocument();
       expect(screen.getByText("À propos de l'entreprise")).toBeInTheDocument();
@@ -187,13 +207,15 @@ describe('OfferDetailPage', () => {
     });
   });
 
-  it('affiche les boutons Passer et Liker', async () => {
+  // Même libellé que dans le feed : un seul mot pour une seule décision.
+  it("affiche les boutons Passer et Ça m'intéresse", async () => {
     renderPage();
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Passer' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Liker' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: "Ça m'intéresse" })).toBeInTheDocument();
     });
+    expect(screen.queryByRole('button', { name: 'Liker' })).not.toBeInTheDocument();
   });
 
   it('déclenche onPass au clic sur Passer', async () => {
@@ -209,22 +231,60 @@ describe('OfferDetailPage', () => {
     expect(onPass).toHaveBeenCalledTimes(1);
   });
 
-  it('déclenche onLike au clic sur Liker', async () => {
+  it("déclenche onMatch au clic sur Ça m'intéresse", async () => {
     const user = userEvent.setup();
     const onMatch = vi.fn();
     renderPage({ onMatch });
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Liker' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: "Ça m'intéresse" })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: 'Liker' }));
+    await user.click(screen.getByRole('button', { name: "Ça m'intéresse" }));
     await waitFor(() =>
       expect(onMatch).toHaveBeenCalledExactlyOnceWith({
         name: mockOffer.company.name,
         avatarUrl: '/api/files/companies/1/logo/acme.png',
       }),
     );
+  });
+
+  // Sans réciprocité, le like n'est qu'un intérêt : l'écran doit le dire et
+  // passer à l'état liké, au lieu de rester figé sur les mêmes boutons.
+  it('confirme un like sans match et bascule sur l’état liké', async () => {
+    const user = userEvent.setup();
+    const onMatch = vi.fn();
+    vi.mocked(offerControllerLike).mockResolvedValue({
+      data: { likeCreated: true, matchCreated: false, match: null },
+    } as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
+    vi.mocked(offerControllerFindOneById).mockResolvedValue(
+      offerSeenBy({ liked: false, passed: false, matched: false }),
+    );
+    renderPage({ onMatch });
+
+    await user.click(await screen.findByRole('button', { name: "Ça m'intéresse" }));
+
+    expect(await screen.findByText('Vous avez liké cette offre')).toBeInTheDocument();
+    expect(await screen.findByText(`Intérêt envoyé à ${mockOffer.company.name}.`)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Retirer mon like' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Passer' })).not.toBeInTheDocument();
+    expect(onMatch).not.toHaveBeenCalled();
+  });
+
+  it('remplace le passage par le like sur une offre déjà passée', async () => {
+    const user = userEvent.setup();
+    vi.mocked(offerControllerLike).mockResolvedValue({
+      data: { likeCreated: true, matchCreated: false, match: null },
+    } as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
+    vi.mocked(offerControllerFindOneById).mockResolvedValue(
+      offerSeenBy({ liked: false, passed: true, matched: false }),
+    );
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: "Ça m'intéresse" }));
+
+    expect(await screen.findByText('Vous avez liké cette offre')).toBeInTheDocument();
+    expect(screen.queryByText('Vous avez passé cette offre')).not.toBeInTheDocument();
   });
 
   it('déclenche onBack au clic sur le bouton fermer', async () => {
@@ -240,13 +300,13 @@ describe('OfferDetailPage', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('affiche l’état liké et non plus Passer / Liker', async () => {
+  it('affiche l’état liké et non plus Passer / Ça m’intéresse', async () => {
     vi.mocked(offerControllerFindOneById).mockResolvedValue(offerSeenBy({ liked: true }));
     renderPage();
 
-    expect(await screen.findByText('Tu as liké cette offre')).toBeInTheDocument();
+    expect(await screen.findByText('Vous avez liké cette offre')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retirer mon like' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Liker' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "Ça m'intéresse" })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Passer' })).not.toBeInTheDocument();
   });
 
@@ -292,9 +352,9 @@ describe('OfferDetailPage', () => {
 
     expect(await screen.findByText('Cette offre a donné lieu à un match')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retirer mon like' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Liker' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "Ça m'intéresse" })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Passer' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Tu as liké cette offre')).not.toBeInTheDocument();
+    expect(screen.queryByText('Vous avez liké cette offre')).not.toBeInTheDocument();
   });
 
   // `matched` l'emporte sur `passed` aussi : le match est le dernier mot.
@@ -305,34 +365,34 @@ describe('OfferDetailPage', () => {
     renderPage();
 
     expect(await screen.findByText('Cette offre a donné lieu à un match')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Liker' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Tu as passé cette offre')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "Ça m'intéresse" })).not.toBeInTheDocument();
+    expect(screen.queryByText('Vous avez passé cette offre')).not.toBeInTheDocument();
   });
 
-  it('affiche l’état passé en laissant la possibilité de liker', async () => {
+  it('affiche l’état passé en laissant la possibilité de dire son intérêt', async () => {
     const user = userEvent.setup();
     vi.mocked(offerControllerFindOneById).mockResolvedValue(offerSeenBy({ passed: true }));
     renderPage();
 
-    expect(await screen.findByText('Tu as passé cette offre')).toBeInTheDocument();
+    expect(await screen.findByText('Vous avez passé cette offre')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Passer' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Liker' }));
+    await user.click(screen.getByRole('button', { name: "Ça m'intéresse" }));
 
     await waitFor(() => expect(offerControllerLike).toHaveBeenCalledExactlyOnceWith(1));
   });
 
   // Parcours feed : l'offre n'a été ni likée ni passée, l'écran ne change pas.
-  it('garde Passer / Liker quand l’offre n’a été ni likée ni passée', async () => {
+  it('garde Passer / Ça m’intéresse quand l’offre n’a été ni likée ni passée', async () => {
     vi.mocked(offerControllerFindOneById).mockResolvedValue(
       offerSeenBy({ liked: false, passed: false }),
     );
     renderPage();
 
     expect(await screen.findByRole('button', { name: 'Passer' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Liker' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "Ça m'intéresse" })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retirer mon like' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Tu as liké cette offre')).not.toBeInTheDocument();
+    expect(screen.queryByText('Vous avez liké cette offre')).not.toBeInTheDocument();
   });
 
   // Les deux clés sont absentes pour un recruteur : aucun état de candidature
@@ -343,8 +403,8 @@ describe('OfferDetailPage', () => {
     await screen.findByRole('heading', { level: 2, name: mockOffer.title });
 
     expect(screen.queryByRole('button', { name: 'Retirer mon like' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Tu as liké cette offre')).not.toBeInTheDocument();
-    expect(screen.queryByText('Tu as passé cette offre')).not.toBeInTheDocument();
+    expect(screen.queryByText('Vous avez liké cette offre')).not.toBeInTheDocument();
+    expect(screen.queryByText('Vous avez passé cette offre')).not.toBeInTheDocument();
     expect(screen.queryByText('Cette offre a donné lieu à un match')).not.toBeInTheDocument();
   });
 
@@ -362,8 +422,6 @@ describe('OfferDetailPage', () => {
     vi.mocked(offerControllerFindOneById).mockRejectedValue(new Error('Not found'));
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByText('Offre introuvable.')).toBeInTheDocument();
-    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Offre introuvable.');
   });
 });

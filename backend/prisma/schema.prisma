@@ -32,6 +32,8 @@ enum UserType {
 enum CompanySize {
   TPE
   PME
+  ETI
+  GE
 
   @@map("company_size")
 }

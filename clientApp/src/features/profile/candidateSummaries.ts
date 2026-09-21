@@ -71,7 +71,7 @@ export const candidateSummaries = (form: CandidateAccountForm): CandidateSummari
   preferences: metaLine([
     labelOf(REMOTE_POLICY_OPTIONS, form.remotePolicy),
     labelOf(AVAILABILITY_OPTIONS, form.availability),
-    // Same wording as an offer's salary — « 42 - 48 k€ », not the raw figures:
+    // Same wording as an offer's salary — « 42–48 k€ », not the raw figures:
     // the candidate reads their own expectation in the unit the product uses
     // everywhere else. Null when neither bound is given, so the line drops
     // instead of announcing a range nobody named.

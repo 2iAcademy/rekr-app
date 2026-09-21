@@ -42,8 +42,11 @@ describe.each([
 });
 
 describe('libellés métier', () => {
-  it('ne propose que les tailles cibles du produit', () => {
-    expect(COMPANY_SIZE_OPTIONS.map((option) => option.value)).toEqual(['TPE', 'PME']);
+  it('propose toutes les tailles d’entreprise, dans l’ordre croissant', () => {
+    expect(COMPANY_SIZE_OPTIONS.map((option) => option.value)).toEqual(['TPE', 'PME', 'ETI', 'GE']);
+    expect(COMPANY_SIZE_OPTIONS.find((option) => option.value === 'GE')?.label).toBe(
+      'Grande entreprise',
+    );
   });
 
   it('traduit les niveaux d’expérience en français', () => {

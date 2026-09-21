@@ -124,7 +124,6 @@ export function CandidateOnboardingPage({ userId, onCompleted }: CandidateOnboar
 
   return (
     <WizardShell
-      role="candidate"
       title={CANDIDATE_STEPS[stepIndex].title}
       current={stepIndex + 1}
       total={CANDIDATE_STEPS.length}

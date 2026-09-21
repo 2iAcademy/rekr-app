@@ -1,12 +1,10 @@
 import type { FormEvent, ReactNode } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { RoleTheme } from '@/lib/roleTheme';
 import { WIZARD_ERROR_ID } from './wizardError';
 import { WizardProgress } from './WizardProgress';
 
 interface WizardShellProps {
-  role: RoleTheme;
   title: string;
   current: number;
   total: number;
@@ -20,7 +18,6 @@ interface WizardShellProps {
 }
 
 export function WizardShell({
-  role,
   title,
   current,
   total,
@@ -40,59 +37,75 @@ export function WizardShell({
   };
 
   return (
-    <main
-      data-role={role}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background px-6 pt-4 pb-8 md:max-w-3xl md:px-21 lg:max-w-none lg:items-center lg:justify-center lg:px-6 lg:py-10"
-    >
-      {/* Desktop lifts the form into a centred card; mobile and tablet keep the
-          full-height flow with the action bar pinned to the bottom. */}
-      <div className="flex w-full flex-1 flex-col lg:max-w-[32.5rem] lg:flex-none lg:rounded-3xl lg:bg-card lg:p-10 lg:shadow-lg">
-        <header className="relative flex h-9 items-center justify-center lg:justify-start">
+    <main className="flex min-h-dvh w-full flex-col bg-background">
+      <header className="sticky top-0 z-10 border-b border-line bg-card">
+        <div className="mx-auto flex min-h-16 w-full max-w-xl items-center gap-3 px-4 py-2">
           {canGoBack && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-lg"
               onClick={onBack}
               aria-label="Retour"
-              className="absolute left-0 flex size-9 cursor-pointer items-center justify-center rounded-full bg-card text-ink shadow-sm transition-colors hover:bg-muted lg:hidden"
+              className="-ml-2 size-11 rounded-xl text-ink"
             >
-              <ChevronLeft className="size-5" />
-            </button>
+              <ArrowLeft className="size-5" />
+            </Button>
           )}
-          <h1 className="font-heading text-base font-bold text-ink md:text-lg">{title}</h1>
-        </header>
-
-        <div className="mt-6">
-          <WizardProgress current={current} total={total} />
+          <div className="min-w-0 flex-1">
+            <WizardProgress current={current} total={total} />
+          </div>
         </div>
+      </header>
 
-        <form onSubmit={handleSubmit} className="mt-8 flex flex-1 flex-col">
-          <div className="flex flex-col gap-5">{children}</div>
+      {/* The action bar sits in the form's flow and sticks to the viewport: a
+          short step keeps it at the bottom of the screen, a long one scrolls
+          under it. The wizard runs before the app shell exists, hence a plain
+          `bottom-0`. */}
+      <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
+        <div className="mx-auto w-full max-w-xl flex-1 px-4 pt-6 pb-8 md:pt-10">
+          <h1 className="text-2xl font-extrabold text-ink md:text-[1.75rem]">{title}</h1>
+
+          <div className="mt-5 flex flex-col gap-5 rounded-2xl border border-line bg-card p-5 shadow-card sm:p-6">
+            {children}
+          </div>
 
           {error && (
-            <p id={WIZARD_ERROR_ID} role="alert" className="mt-5 text-xs text-destructive">
+            <p
+              id={WIZARD_ERROR_ID}
+              role="alert"
+              className="mt-4 rounded-xl bg-destructive-tint px-4 py-3 text-sm font-medium text-destructive"
+            >
               {error}
             </p>
           )}
+        </div>
 
-          <div className="mt-auto flex gap-3 pt-8 lg:mt-8 lg:pt-0">
+        <div className="sticky bottom-0 border-t border-line bg-card">
+          <div className="mx-auto flex w-full max-w-xl gap-3 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {canGoBack && (
               <Button
                 type="button"
-                variant="soft"
+                variant="outline"
                 size="xl"
                 onClick={onBack}
                 disabled={submitting}
-                className="flex-1"
               >
                 Retour
               </Button>
             )}
-            <Button type="submit" variant="role" size="xl" disabled={submitting} className="flex-1">
+            <Button
+              type="submit"
+              variant="brand"
+              size="xl"
+              disabled={submitting}
+              className="flex-1"
+            >
               {submitting ? submittingLabel : submitLabel}
             </Button>
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </main>
   );
 }

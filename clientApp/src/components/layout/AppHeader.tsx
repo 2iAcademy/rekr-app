@@ -1,17 +1,8 @@
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
-import { Menu } from 'lucide-react';
 import { Link, NavLink } from 'react-router';
 import { Logo } from '@/components/brand/Logo';
-import { MobileNavMenu } from './MobileNavMenu';
+import { cn } from '@/lib/utils';
 import type { NavigationItem, ShellUser } from './navigation';
-
-// Tailwind's `md` breakpoint, spelled in the same unit on purpose. The panel
-// carries `md:hidden`, so a threshold written in pixels drifts from it as soon
-// as the browser's default font size is not 16px: between the two values the
-// CSS hides a dialog this effect has not closed, and an open modal nobody
-// paints leaves the whole document inert.
-const INLINE_NAV_QUERY = '(min-width: 48rem)';
 
 interface AppHeaderProps {
   items: NavigationItem[];
@@ -23,78 +14,42 @@ interface AppHeaderProps {
    * specs — to a provider it otherwise never needs.
    */
   logoutIcon?: ReactNode;
-  logoutEntry?: ReactNode;
 }
 
-export function AppHeader({ items, user, profileTo, logoutIcon, logoutEntry }: AppHeaderProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const burgerRef = useRef<HTMLButtonElement>(null);
-
-  // The header owns the panel's lifetime, so it is the one that hands the focus
-  // back: closing unmounts the element that held it, and the focus would
-  // otherwise fall to the body.
-  const closeMenu = () => {
-    setIsMenuOpen(false);
-    burgerRef.current?.focus();
-  };
-
-  // Hiding the panel in CSS would leave it open: the focus would stay on a close
-  // button nobody can see, and coming back under the breakpoint would re-display
-  // a menu nobody asked for. No focus hand-back here — the burger is hidden at
-  // this width, so there is nothing to hand it to.
-  useEffect(() => {
-    const inlineNav =
-      typeof window.matchMedia === 'function' ? window.matchMedia(INLINE_NAV_QUERY) : null;
-
-    if (!inlineNav) {
-      return;
-    }
-
-    const closeWhenInlineNavTakesOver = () => {
-      if (inlineNav.matches) {
-        setIsMenuOpen(false);
-      }
-    };
-
-    inlineNav.addEventListener('change', closeWhenInlineNavTakesOver);
-
-    return () => inlineNav.removeEventListener('change', closeWhenInlineNavTakesOver);
-  }, []);
-
+/**
+ * Top bar at every width. On a phone it only carries the brand and the way to
+ * the account, the destinations living in the bottom tab bar; from tablet
+ * width up the destinations join it inline, and its content lines up with the
+ * page's centred column.
+ */
+export function AppHeader({ items, user, profileTo, logoutIcon }: AppHeaderProps) {
   return (
-    <>
-      <header className="flex w-full items-center gap-3 border-b border-line bg-card px-4 py-2 desktop:hidden">
-        <button
-          ref={burgerRef}
-          type="button"
-          aria-label="Ouvrir le menu"
-          aria-expanded={isMenuOpen}
-          onClick={() => setIsMenuOpen(true)}
-          className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-ink hover:bg-brand-tint md:hidden"
+    <header className="sticky top-0 z-30 w-full border-b border-line bg-card">
+      <div className="mx-auto flex h-15 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 md:px-10">
+        <Link
+          to="/"
+          aria-label="Accueil"
+          className="flex min-h-11 shrink-0 items-center rounded-md"
         >
-          <Menu className="size-5" />
-        </button>
-
-        {/* The burger and the profile link share the same footprint, which is
-            what centres the logo on mobile once the inline nav is hidden. */}
-        <Logo size="sm" className="mx-auto md:mx-0" />
+          <Logo size="sm" />
+        </Link>
 
         <nav
           aria-label="Navigation de la barre supérieure"
-          className="hidden min-w-0 flex-1 md:flex md:justify-center"
+          className="hidden min-w-0 flex-1 md:ml-6 md:flex"
         >
-          <ul className="flex min-w-0 items-center gap-1 text-sm text-ink-muted">
+          <ul className="flex min-w-0 items-center gap-1 text-sm">
             {items.map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
                   className={({ isActive }) =>
-                    [
-                      'flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 transition-colors',
+                    cn(
+                      'flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3.5 font-semibold transition-colors',
                       isActive
-                        ? 'bg-brand-tint font-semibold text-brand-strong'
-                        : 'hover:bg-brand-tint',
-                    ].join(' ')
+                        ? 'bg-brand-tint text-brand-strong'
+                        : 'text-ink-muted hover:bg-surface hover:text-ink',
+                    )
                   }
                 >
                   <span className="truncate">{item.label}</span>
@@ -104,25 +59,21 @@ export function AppHeader({ items, user, profileTo, logoutIcon, logoutEntry }: A
           </ul>
         </nav>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0">
           <Link
             to={profileTo}
             aria-label="Mon profil"
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink hover:bg-brand-tint"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full"
           >
-            <span className="flex size-8 items-center justify-center rounded-full bg-violet font-heading text-xs font-bold text-white shadow-violet">
+            <span className="flex size-9 items-center justify-center rounded-full bg-brand-tint text-sm font-bold text-brand-strong">
               {user.name.charAt(0).toUpperCase()}
             </span>
           </Link>
 
-          {/* Tablet only: below `md` the burger menu carries it, above
-              `desktop` the sidebar does. This is the one width served by
-              neither, and without it the session could not be ended there. */}
+          {/* From tablet width up: below `md` the account page carries it. */}
           {logoutIcon}
         </div>
-      </header>
-
-      {isMenuOpen && <MobileNavMenu items={items} onClose={closeMenu} logout={logoutEntry} />}
-    </>
+      </div>
+    </header>
   );
 }

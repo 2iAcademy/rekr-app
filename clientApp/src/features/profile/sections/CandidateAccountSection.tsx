@@ -20,6 +20,7 @@ import { TextField } from '@/components/form/TextField';
 import { ProfileSection, ProfileSections } from '@/components/ui/accordion';
 import { candidateSummaries } from '@/features/profile/candidateSummaries';
 import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import {
   AVAILABILITY_OPTIONS,
   CONTRACT_TYPE_OPTIONS,
@@ -195,7 +196,7 @@ export function CandidateAccountSection() {
 
   if (state.status === 'loading') {
     return (
-      <p role="status" className="mt-8 text-sm text-ink-muted">
+      <p role="status" className="mt-6 text-sm text-ink-muted">
         Chargement de vos informations…
       </p>
     );
@@ -203,7 +204,7 @@ export function CandidateAccountSection() {
 
   if (state.status === 'failed') {
     return (
-      <p role="alert" className="mt-8 text-sm text-destructive">
+      <p role="alert" className="mt-6 text-sm text-destructive">
         {LOAD_FAILURE}
       </p>
     );
@@ -211,16 +212,20 @@ export function CandidateAccountSection() {
 
   if (state.status === 'absent') {
     return (
-      <section className="mt-8 flex flex-col items-start gap-4 rounded-2xl border border-line bg-card p-5">
+      <section className="mt-6 flex flex-col items-start gap-4 rounded-2xl border border-line bg-card p-5 shadow-card">
         <p className="text-sm text-ink-soft">
-          Vous n’avez pas encore de profil candidat. Renseignez-le pour recevoir des offres et
-          pouvoir le modifier ici.
+          Pas encore de profil candidat. Le renseigner permet de recevoir des offres, puis de le
+          modifier ici.
         </p>
         {/* A plain anchor: the onboarding wizard lives outside the shell this
             section is mounted in, so there is no in-place navigation to keep. */}
         <a
           href="/candidat/onboarding"
-          className="flex min-h-11 items-center rounded-xl bg-role-gradient px-5 text-sm font-semibold text-white focus-visible:ring-3 focus-visible:ring-role/40 focus-visible:outline-none"
+          className={buttonVariants({
+            variant: 'brand',
+            size: 'xl',
+            className: 'w-full sm:w-auto',
+          })}
         >
           Compléter mon profil
         </a>
@@ -455,7 +460,7 @@ export function CandidateAccountSection() {
               maxLength={MAX_FREE_TEXT_LENGTH}
               value={form.bio}
               onChange={(bio) => change({ bio })}
-              placeholder="Votre parcours, ce que vous cherchez, ce qui vous motive…"
+              placeholder="Parcours, poste recherché, motivations…"
             />
 
             <TextField
@@ -478,13 +483,12 @@ export function CandidateAccountSection() {
 
         {/* Sticky, and opaque across the full width: the folded form is still
             tall enough that a button at the very bottom means scrolling past
-            everything to commit. A gradient let the content read through it and
-            the button sat on top of whatever happened to be behind — the page
-            reserves `pb-28` so the bar floats over empty space instead. */}
-        <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-line bg-background px-4 py-3 sm:-mx-6 sm:px-6">
+            everything to commit. It sits on the phone tab bar through
+            `--tabbar-h`, and rests in the flow once the form ends. */}
+        <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 mt-6 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:bottom-4 md:mx-0 md:rounded-2xl md:border md:px-5 md:shadow-float md:float-bar">
           <Button
             type="submit"
-            variant="role"
+            variant="brand"
             size="xl"
             disabled={saving}
             className="w-full sm:w-auto"

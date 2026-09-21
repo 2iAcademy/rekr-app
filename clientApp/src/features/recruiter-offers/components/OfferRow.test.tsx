@@ -67,7 +67,7 @@ describe('OfferRow', () => {
   it('reste accessible quand personne n’a encore manifesté d’intérêt', () => {
     renderRow({ applicantCount: 0 });
 
-    expect(screen.getByRole('link', { name: /Aucun candidat intéressé/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /0 candidat intéressé/ })).toHaveAttribute(
       'href',
       '/recruteur/offres/12/candidats',
     );
@@ -86,7 +86,7 @@ describe('OfferRow', () => {
     expect(screen.getByRole('heading', { name: 'Développeuse backend' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Publiée');
     expect(screen.getByText('Lyon · CDI')).toBeInTheDocument();
-    expect(screen.getByText('45 - 55 k€')).toBeInTheDocument();
+    expect(screen.getByText('45–55 k€')).toBeInTheDocument();
   });
 
   /** Every field but the title is nullable in the list payload: the row must
