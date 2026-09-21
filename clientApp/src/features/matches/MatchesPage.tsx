@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
+import { ApiError } from '@/api/customFetch';
 import {
   likeControllerFindReceived,
   likeControllerFindSent,
   matchControllerFindMine,
+  matchControllerUnmatch,
   type LikeListItemDto,
   type MatchCounterpartDto,
   type MatchListItemDto,
@@ -11,6 +13,8 @@ import {
 } from '@/api/generated';
 import { isCandidate, isRecruiter } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
+import type { BusinessMessages } from '@/lib/feedback/failureMessage';
+import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
 import { fileUrl } from '@/lib/fileUrl';
 import { cn, timeSince } from '@/lib/utils';
 
@@ -47,6 +51,12 @@ interface ListRow {
   avatarClass: string;
   avatarUrl: string | null;
   isNew?: boolean;
+  /**
+   * The match this row stands for, which is also what can be undone. Only the
+   * match rows carry it: a like without a match has no match to end, and the
+   * two like tabs exclude the pairs that have one.
+   */
+  matchId?: number;
 }
 
 const avatarClasses = ['bg-brand', 'bg-violet', 'bg-[#e8a712]', 'bg-[#0ea5b5]', 'bg-[#df3c7d]'];
@@ -84,6 +94,7 @@ function matchRow(match: MatchListItemDto): ListRow {
     avatarClass: avatarClasses[match.id % avatarClasses.length],
     avatarUrl: fileUrl(match.counterpart.avatarUrl),
     isNew: age >= 0 && age < DAY_IN_MS,
+    matchId: match.id,
   };
 }
 
@@ -203,6 +214,12 @@ interface PagedList {
   more: MoreState;
   hasMore: boolean;
   loadMore: () => void;
+  /**
+   * Drops one row without refetching. Asking the endpoint again would renumber
+   * the pages already read under the reader's eyes, for a single row they just
+   * watched disappear.
+   */
+  remove: (key: string) => void;
 }
 
 /**
@@ -283,10 +300,119 @@ function usePagedList(load: LoadPage, enabled: boolean): PagedList {
       });
   }, [load]);
 
-  return { rows, state, more, hasMore, loadMore };
+  const remove = useCallback((key: string) => {
+    setRows((previous) => previous.filter((row) => row.key !== key));
+  }, []);
+
+  return { rows, state, more, hasMore, loadMore, remove };
 }
 
-function Row({ row, from }: { row: ListRow; from: string }) {
+type UnmatchState = 'idle' | 'confirming' | 'pending';
+
+/** Nothing business-specific to say: 401, 403 and 500 all read as a failure. */
+const UNMATCH_FAILURE: BusinessMessages = {};
+
+/**
+ * A 404 means the match is already gone — the other member ended it, or this
+ * screen has been open a while. It counts as done: leaving the row would show
+ * something the server no longer knows about, and a second attempt would answer
+ * 404 again.
+ */
+const isAlreadyEnded = (cause: unknown): boolean =>
+  cause instanceof ApiError && cause.status === 404;
+
+/**
+ * Ending a match cannot be undone, so it is asked twice. The question is raised
+ * in the row rather than in a modal: this codebase has no dialog primitive, and
+ * a hand-rolled one would have to earn a focus trap, a restore and an escape
+ * key for a two-word question. In the row, the confirmation stays next to the
+ * name it is about and the focus never leaves the list.
+ */
+function UnmatchAction({
+  matchId,
+  name,
+  onEnded,
+}: {
+  matchId: number;
+  name: string;
+  onEnded: () => void;
+}) {
+  const [state, setState] = useState<UnmatchState>('idle');
+
+  const confirm = async (): Promise<void> => {
+    setState('pending');
+
+    try {
+      await matchControllerUnmatch(matchId);
+    } catch (cause) {
+      if (!isAlreadyEnded(cause)) {
+        notifyFailure(cause, UNMATCH_FAILURE);
+        // Back to the first step, not to the question: a failure is no reason to
+        // leave a confirmed deletion one click away from a reader who has just
+        // been told it did not happen.
+        setState('idle');
+
+        return;
+      }
+    }
+
+    notifySuccess(`Le match avec ${name} est terminé.`);
+    // Last: the row unmounts with it, and nothing may set state afterwards.
+    onEnded();
+  };
+
+  if (state === 'idle') {
+    return (
+      <button
+        type="button"
+        // The visible label is the same on every row, so the accessible one
+        // names the counterpart: it is the only thing telling two rows apart.
+        aria-label={`Mettre fin au match avec ${name}`}
+        onClick={() => setState('confirming')}
+        className="cursor-pointer self-end px-3 text-[0.55rem] font-semibold text-ink-faint underline transition-colors hover:text-destructive sm:text-xs"
+      >
+        Mettre fin au match
+      </button>
+    );
+  }
+
+  const isPending = state === 'pending';
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2 px-3 text-[0.55rem] sm:text-xs">
+      <span className="text-ink-muted">Mettre fin au match avec {name} ?</span>
+      <button
+        type="button"
+        aria-label={isPending ? undefined : `Confirmer la fin du match avec ${name}`}
+        disabled={isPending}
+        onClick={() => void confirm()}
+        className="cursor-pointer font-semibold text-destructive underline disabled:cursor-default disabled:text-ink-faint disabled:no-underline"
+      >
+        {isPending ? 'Suppression…' : 'Confirmer'}
+      </button>
+      <button
+        type="button"
+        // Nothing to cancel once the call is in flight: the server is already
+        // deciding, and re-offering the way out would promise a rollback.
+        disabled={isPending}
+        onClick={() => setState('idle')}
+        className="cursor-pointer font-semibold text-ink-muted underline disabled:cursor-default disabled:text-ink-faint disabled:no-underline"
+      >
+        Annuler
+      </button>
+    </div>
+  );
+}
+
+function Row({
+  row,
+  from,
+  onRemove,
+}: {
+  row: ListRow;
+  from: string;
+  onRemove: (key: string) => void;
+}) {
   const body = (
     <>
       <span
@@ -328,7 +454,9 @@ function Row({ row, from }: { row: ListRow; from: string }) {
     'flex w-full items-center gap-3 rounded-2xl bg-card px-3 py-2.5 text-left shadow-[0_8px_22px_-18px_rgba(11,27,23,0.5)] sm:min-h-15 sm:px-4';
 
   return (
-    <li>
+    // The action is a sibling of the link, never inside it: a button nested in
+    // an anchor is invalid, and a click on the row would then fire both.
+    <li className="flex flex-col gap-1">
       {row.to === undefined ? (
         <div className={shell}>{body}</div>
       ) : (
@@ -346,6 +474,9 @@ function Row({ row, from }: { row: ListRow; from: string }) {
         >
           {body}
         </Link>
+      )}
+      {row.matchId !== undefined && (
+        <UnmatchAction matchId={row.matchId} name={row.name} onEnded={() => onRemove(row.key)} />
       )}
     </li>
   );
@@ -436,7 +567,9 @@ export function MatchesPage() {
           <li className="px-3 py-4 text-sm text-ink-muted">{tab.empty}</li>
         )}
         {list.state === 'ready' &&
-          list.rows.map((row) => <Row key={row.key} row={row} from={from} />)}
+          list.rows.map((row) => (
+            <Row key={row.key} row={row} from={from} onRemove={list.remove} />
+          ))}
       </ul>
       {list.state === 'ready' && list.more === 'failed' && (
         <p role="alert" className="mt-4 text-sm text-destructive">

@@ -378,4 +378,207 @@ describe('Match (e2e)', () => {
       counterpart: { id: visible.id, name: 'Ada Lovelace' },
     });
   });
+
+  describe('DELETE /matches/:id', () => {
+    /**
+     * A pair in the state the endpoint has to undo: both likes written, the
+     * match standing on them. Seeded through Prisma rather than through the
+     * two like endpoints so the teardown is observed on its own, without a
+     * throttler or a swipe flow in the way.
+     */
+    const seedMatchedPair = async () => {
+      const recruiter = await seedRecruiterWithCompany('Acme');
+      const candidate = await createUser('candidate');
+      await prisma.candidateProfile.create({
+        data: { userId: candidate.id, firstName: 'Ada', lastName: 'Lovelace' },
+      });
+      const offer = await prisma.offer.create({
+        data: {
+          title: 'Développeur Full-Stack',
+          status: 'open',
+          companyId: recruiter.company.id,
+          createdById: recruiter.user.id,
+        },
+      });
+      await prisma.candidateLikesOffer.create({
+        data: { candidateUserId: candidate.id, offerId: offer.id },
+      });
+      await prisma.recruiterLikesCandidate.create({
+        data: {
+          recruiterUserId: recruiter.user.id,
+          candidateUserId: candidate.id,
+          offerId: offer.id,
+        },
+      });
+      const match = await prisma.match.create({
+        data: {
+          candidateUserId: candidate.id,
+          offerId: offer.id,
+          recruiterUserId: recruiter.user.id,
+        },
+      });
+      return { recruiter, candidate, offer, match };
+    };
+
+    /**
+     * Everything the row was hiding has to stay hidden. `/likes/sent` and
+     * `/likes/received` exclude a pair by the existence of the match, so
+     * deleting it alone republishes the withdrawn application on both screens
+     * — the surviving likes are what would resurrect it, and the passes are
+     * what keeps the offer out of the deck the pair just left.
+     */
+    it('lets the candidate end the match and leaves no trace of the pair', async () => {
+      const { recruiter, candidate, offer, match } = await seedMatchedPair();
+
+      await httpRequest(app)
+        .delete(`/api/matches/${match.id}`)
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(204);
+
+      const candidateMatches = await httpRequest(app)
+        .get('/api/matches')
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(200);
+      expect(candidateMatches.body).toEqual([]);
+
+      const recruiterMatches = await httpRequest(app)
+        .get('/api/matches')
+        .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+        .expect(200);
+      expect(recruiterMatches.body).toEqual([]);
+
+      const feed = await httpRequest(app)
+        .get('/api/offers/feed')
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(200);
+      expect(feed.body as Array<{ id: number }>).not.toContainEqual(
+        expect.objectContaining({ id: offer.id }),
+      );
+
+      const applicants = await httpRequest(app)
+        .get(`/api/offers/${offer.id}/likes`)
+        .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+        .expect(200);
+      expect(applicants.body).toEqual([]);
+
+      const received = await httpRequest(app)
+        .get('/api/likes/received')
+        .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+        .expect(200);
+      expect(received.body).toEqual([]);
+
+      const sent = await httpRequest(app)
+        .get('/api/likes/sent')
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(200);
+      expect(sent.body).toEqual([]);
+    });
+
+    /**
+     * The symmetric half: a match is a mutual commitment, so the recruiter
+     * ends it on exactly the same terms and with the same teardown.
+     */
+    it('lets a recruiter of the company end the match with the same teardown', async () => {
+      const { recruiter, candidate, offer, match } = await seedMatchedPair();
+
+      await httpRequest(app)
+        .delete(`/api/matches/${match.id}`)
+        .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+        .expect(204);
+
+      const recruiterMatches = await httpRequest(app)
+        .get('/api/matches')
+        .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+        .expect(200);
+      expect(recruiterMatches.body).toEqual([]);
+
+      const candidateMatches = await httpRequest(app)
+        .get('/api/matches')
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(200);
+      expect(candidateMatches.body).toEqual([]);
+
+      const feed = await httpRequest(app)
+        .get('/api/offers/feed')
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(200);
+      expect(feed.body as Array<{ id: number }>).not.toContainEqual(
+        expect.objectContaining({ id: offer.id }),
+      );
+
+      const applicants = await httpRequest(app)
+        .get(`/api/offers/${offer.id}/likes`)
+        .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+        .expect(200);
+      expect(applicants.body).toEqual([]);
+
+      const received = await httpRequest(app)
+        .get('/api/likes/received')
+        .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+        .expect(200);
+      expect(received.body).toEqual([]);
+    });
+
+    /**
+     * The tenant axis, observed rather than mocked. Both third parties hold a
+     * valid token of the right role, so nothing but the scope check stands
+     * between them and someone else's match — and a 403 would already tell
+     * them the id exists.
+     */
+    it('answers 404 to a third party and leaves the match standing', async () => {
+      const { recruiter, candidate, match } = await seedMatchedPair();
+      const stranger = await createUser('candidate');
+      const otherCompany = await seedRecruiterWithCompany('Globex');
+
+      for (const authorization of [
+        bearerFor(app, stranger.id, 'candidate'),
+        bearerFor(app, otherCompany.user.id, 'recruiter'),
+      ]) {
+        await httpRequest(app)
+          .delete(`/api/matches/${match.id}`)
+          .set('Authorization', authorization)
+          .expect(404);
+      }
+
+      const candidateMatches = await httpRequest(app)
+        .get('/api/matches')
+        .set('Authorization', bearerFor(app, candidate.id, 'candidate'))
+        .expect(200);
+      expect(candidateMatches.body).toHaveLength(1);
+
+      const recruiterMatches = await httpRequest(app)
+        .get('/api/matches')
+        .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+        .expect(200);
+      expect(recruiterMatches.body).toHaveLength(1);
+    });
+
+    it('rejects an unauthenticated deletion with 401', async () => {
+      const { match } = await seedMatchedPair();
+
+      await httpRequest(app).delete(`/api/matches/${match.id}`).expect(401);
+
+      expect(await prisma.match.count()).toBe(1);
+    });
+
+    /**
+     * No 409 and no tombstone: the row is gone, so the second call is an
+     * unknown id like any other. The client reads that 404 as « already
+     * removed » and drops the line anyway, which is what makes a double tap or
+     * a retry harmless.
+     */
+    it('answers 404 on a second deletion of the same match', async () => {
+      const { candidate, match } = await seedMatchedPair();
+      const authorization = bearerFor(app, candidate.id, 'candidate');
+
+      await httpRequest(app)
+        .delete(`/api/matches/${match.id}`)
+        .set('Authorization', authorization)
+        .expect(204);
+      await httpRequest(app)
+        .delete(`/api/matches/${match.id}`)
+        .set('Authorization', authorization)
+        .expect(404);
+    });
+  });
 });

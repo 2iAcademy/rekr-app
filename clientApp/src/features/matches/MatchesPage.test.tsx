@@ -2,19 +2,23 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@/api/customFetch';
 import {
   likeControllerFindReceived,
   likeControllerFindSent,
   matchControllerFindMine,
+  matchControllerUnmatch,
   type LikeListItemDto,
   type MatchListItemDto,
 } from '@/api/generated';
+import { Toaster } from '@/components/ui/sonner';
 import type { AuthContextValue, AuthenticatedUser } from '@/features/auth/auth-context';
 import { useAuth } from '@/features/auth/useAuth';
 import { MatchesPage } from './MatchesPage';
 
 vi.mock('@/api/generated', () => ({
   matchControllerFindMine: vi.fn(),
+  matchControllerUnmatch: vi.fn(),
   likeControllerFindSent: vi.fn(),
   likeControllerFindReceived: vi.fn(),
 }));
@@ -26,6 +30,7 @@ vi.mock('@/features/auth/useAuth', () => ({
 const getMatches = vi.mocked(matchControllerFindMine);
 const getSent = vi.mocked(likeControllerFindSent);
 const getReceived = vi.mocked(likeControllerFindReceived);
+const unmatch = vi.mocked(matchControllerUnmatch);
 const session = vi.mocked(useAuth);
 
 const PAGE_SIZE = 50;
@@ -137,8 +142,17 @@ const renderPage = (entry = '/matches') =>
     <MemoryRouter initialEntries={[entry]}>
       <MatchesPage />
       <LocationProbe />
+      <Toaster />
     </MemoryRouter>,
   );
+
+const noContent = () =>
+  ({ data: undefined, status: 204 }) as unknown as Awaited<
+    ReturnType<typeof matchControllerUnmatch>
+  >;
+
+const apiError = (status: number) =>
+  new ApiError({ status, statusText: '', url: '/api/matches/12', data: undefined });
 
 const currentUrl = () => screen.getByTestId('location').textContent;
 
@@ -161,6 +175,7 @@ describe('MatchesPage', () => {
     getMatches.mockResolvedValue(matches([aMatch]));
     getSent.mockResolvedValue(likes([aSentLike]));
     getReceived.mockResolvedValue(likes([aReceivedLike]));
+    unmatch.mockResolvedValue(noContent());
   });
 
   it('affiche les matches récupérés depuis l’API', async () => {
@@ -615,5 +630,191 @@ describe('MatchesPage', () => {
     const list = await screen.findByRole('list', { name: 'Mes likes liste' });
 
     expect(within(list).getByText('Orbit')).toBeInTheDocument();
+  });
+
+  /**
+   * Mettre fin à un match est irréversible et se joue dans une liste, à côté de
+   * lignes voisines : la confirmation en deux temps est là pour qu'un clic de
+   * trop ne défasse rien.
+   */
+  describe('fin du match', () => {
+    const endMatchButton = (name: string) =>
+      screen.getByRole('button', { name: `Mettre fin au match avec ${name}` });
+
+    const confirmButton = (name: string) =>
+      screen.getByRole('button', { name: `Confirmer la fin du match avec ${name}` });
+
+    it('propose de mettre fin au match sur une ligne de match côté candidat', async () => {
+      renderPage();
+
+      await screen.findByText('Acme Corp');
+
+      expect(endMatchButton('Acme Corp')).toBeInTheDocument();
+    });
+
+    it('propose de mettre fin au match sur une ligne de match côté recruteur', async () => {
+      authenticateAs('recruiter');
+      getMatches.mockResolvedValue(matches([aRecruiterMatch]));
+      renderPage();
+
+      await screen.findByText('Camille Durand');
+
+      expect(endMatchButton('Camille Durand')).toBeInTheDocument();
+    });
+
+    // Un like sans match n'a pas de match à défaire : l'action n'a rien à y faire.
+    it('ne propose pas de fin de match sur l’onglet Mes likes', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await openTab(user, 'Mes likes');
+      await screen.findByText('Orbit');
+
+      expect(screen.queryByRole('button', { name: /Mettre fin au match/ })).not.toBeInTheDocument();
+    });
+
+    it('ne propose pas de fin de match sur l’onglet Reçus', async () => {
+      const user = userEvent.setup();
+      authenticateAs('recruiter');
+      renderPage();
+
+      await openTab(user, 'Reçus');
+      await screen.findByText('Camille Durand');
+
+      expect(screen.queryByRole('button', { name: /Mettre fin au match/ })).not.toBeInTheDocument();
+    });
+
+    it('n’appelle rien avant confirmation', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await screen.findByText('Acme Corp');
+      await user.click(endMatchButton('Acme Corp'));
+
+      expect(unmatch).not.toHaveBeenCalled();
+      expect(confirmButton('Acme Corp')).toBeInTheDocument();
+    });
+
+    it('n’appelle rien quand la confirmation est annulée', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await screen.findByText('Acme Corp');
+      await user.click(endMatchButton('Acme Corp'));
+      await user.click(screen.getByRole('button', { name: 'Annuler' }));
+
+      expect(unmatch).not.toHaveBeenCalled();
+      expect(endMatchButton('Acme Corp')).toBeInTheDocument();
+      expect(screen.getByText('Acme Corp')).toBeInTheDocument();
+    });
+
+    it('retire la ligne et le confirme une fois le match supprimé', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await screen.findByText('Acme Corp');
+      await user.click(endMatchButton('Acme Corp'));
+      await user.click(confirmButton('Acme Corp'));
+
+      await waitFor(() => expect(unmatch).toHaveBeenCalledExactlyOnceWith(12));
+      await waitFor(() => expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument());
+      expect(await screen.findByText('Le match avec Acme Corp est terminé.')).toBeVisible();
+      expect(screen.getByText('Aucun match pour le moment.')).toBeInTheDocument();
+    });
+
+    /**
+     * Un 404 veut dire que le match n'est plus là — l'autre membre l'a défait,
+     * ou l'écran est resté ouvert. La ligne doit disparaître : la garder
+     * mentirait au lecteur.
+     */
+    it('retire la ligne quand le match a déjà été supprimé', async () => {
+      const user = userEvent.setup();
+      unmatch.mockRejectedValue(apiError(404));
+      renderPage();
+
+      await screen.findByText('Acme Corp');
+      await user.click(endMatchButton('Acme Corp'));
+      await user.click(confirmButton('Acme Corp'));
+
+      await waitFor(() => expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument());
+      expect(screen.getByText('Aucun match pour le moment.')).toBeInTheDocument();
+    });
+
+    it('garde la ligne et permet de réessayer quand le serveur échoue', async () => {
+      const user = userEvent.setup();
+      unmatch.mockRejectedValueOnce(apiError(500));
+      renderPage();
+
+      await screen.findByText('Acme Corp');
+      await user.click(endMatchButton('Acme Corp'));
+      await user.click(confirmButton('Acme Corp'));
+
+      expect(
+        await screen.findByText('Une erreur est survenue. Réessayez dans un instant.'),
+      ).toBeVisible();
+      expect(screen.getByText('Acme Corp')).toBeInTheDocument();
+
+      const retry = endMatchButton('Acme Corp');
+      expect(retry).toBeEnabled();
+
+      await user.click(retry);
+      await user.click(confirmButton('Acme Corp'));
+
+      await waitFor(() => expect(unmatch).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument());
+    });
+
+    /**
+     * La confirmation est le seul garde-fou : tant que l'appel est en vol, un
+     * second clic ne doit pas partir.
+     */
+    it('désactive la confirmation pendant l’appel', async () => {
+      const user = userEvent.setup();
+      let release!: () => void;
+      unmatch.mockReturnValueOnce(
+        new Promise((resolve) => {
+          release = () => resolve(noContent());
+        }),
+      );
+      renderPage();
+
+      await screen.findByText('Acme Corp');
+      await user.click(endMatchButton('Acme Corp'));
+      await user.click(confirmButton('Acme Corp'));
+
+      const pending = await screen.findByRole('button', { name: 'Suppression…' });
+      expect(pending).toBeDisabled();
+
+      await user.click(pending);
+      release();
+
+      await waitFor(() => expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument());
+      expect(unmatch).toHaveBeenCalledTimes(1);
+    });
+
+    // Chaque ligne porte son propre match : la confirmation de l'une ne doit ni
+    // supprimer ni faire disparaître la voisine.
+    it('ne retire que la ligne confirmée', async () => {
+      const user = userEvent.setup();
+      getMatches.mockResolvedValue(
+        matches([
+          aMatch,
+          {
+            ...aMatch,
+            id: 13,
+            counterpart: { ...aMatch.counterpart, name: 'Orbit' },
+          },
+        ]),
+      );
+      renderPage();
+
+      await screen.findByText('Acme Corp');
+      await user.click(endMatchButton('Orbit'));
+      await user.click(confirmButton('Orbit'));
+
+      await waitFor(() => expect(unmatch).toHaveBeenCalledExactlyOnceWith(13));
+      await waitFor(() => expect(screen.queryByText('Orbit')).not.toBeInTheDocument());
+      expect(screen.getByText('Acme Corp')).toBeInTheDocument();
+    });
   });
 });

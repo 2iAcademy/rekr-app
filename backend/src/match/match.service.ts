@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import type { AuthUser } from '../auth/auth-user.interface';
+import { lockAnswer } from '../common/answers/answer-lock';
 import { PrismaService } from '../prisma/prisma.service';
 import { MatchListQueryDto } from './dto/match-list-query.dto';
 
@@ -124,6 +125,102 @@ export class MatchService {
       select: MATCH_LIST_SELECT,
     });
     return matches.map((match) => this.toListItem(match, viewer));
+  }
+
+  /**
+   * Puts an end to a match, and to everything that would re-create it.
+   *
+   * Either party may pull the plug, and the whole answer trail of the pair goes
+   * with the row. Deleting the match alone is not an option: `/likes/sent` and
+   * `/likes/received` hide a pair by the existence of the match, not by the
+   * like, so both screens would show the withdrawn application again the
+   * instant the match disappeared — and the offer would walk straight back
+   * into the feed it was matched out of. Both sides are therefore recorded as
+   * having passed, which is also the truthful reading of what just happened.
+   *
+   * Nothing here is reversible on purpose: re-liking is how the pair starts
+   * over, and that path already exists.
+   */
+  async unmatch(user: AuthUser, id: number): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      // The advisory lock is keyed on (candidate, offer), and this endpoint is
+      // addressed by the match id — so the pair is not known until the row has
+      // been read, and this first read cannot be the one the lock protects.
+      // Hence read, lock, read again: the second read is the one every decision
+      // below rests on, and a row that vanished in between (a concurrent
+      // unmatch, a cascading account or offer deletion) answers 404 rather than
+      // writing a teardown for a match that no longer exists. Locking on the id
+      // instead would leave `like`/`pass`/`unlike` free to run on the pair
+      // under a different key, which is the race this lock exists to close.
+      const pair = await tx.match.findUnique({
+        where: { id },
+        select: { candidateUserId: true, offerId: true },
+      });
+      if (!pair) throw new NotFoundException('Match not found');
+      const { candidateUserId, offerId } = pair;
+
+      await lockAnswer(tx, candidateUserId, offerId);
+
+      const match = await tx.match.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          recruiterUserId: true,
+          offer: { select: { companyId: true } },
+        },
+      });
+      if (!match) throw new NotFoundException('Match not found');
+
+      // Same scope rule as `findMine` and `assertOwnedOffer`: the company, not
+      // whoever concluded the match — a recruiter acts on what their matches
+      // tab shows them, colleague's match or not. And one single answer for
+      // « no such match » and « not yours », because a 403 on someone else's
+      // match confirms the id exists, which is the whole of what an enumeration
+      // needs.
+      if (user.userType === 'candidate') {
+        if (candidateUserId !== user.id)
+          throw new NotFoundException('Match not found');
+      } else {
+        const profile = await tx.recruiterProfile.findUnique({
+          where: { userId: user.id },
+          select: { companyId: true },
+        });
+        if (!profile || profile.companyId !== match.offer.companyId)
+          throw new NotFoundException('Match not found');
+      }
+
+      await tx.match.delete({ where: { id: match.id } });
+      await tx.candidateLikesOffer.deleteMany({
+        where: { candidateUserId, offerId },
+      });
+      // Scoped on the pair and not on one recruiter: `recruiter_likes_candidate`
+      // is keyed on the recruiter too, so a colleague's surviving like would
+      // re-create the match the next time the candidate likes the offer.
+      await tx.recruiterLikesCandidate.deleteMany({
+        where: { candidateUserId, offerId },
+      });
+      await tx.candidatePassesOffer.createMany({
+        data: [{ candidateUserId, offerId }],
+        skipDuplicates: true,
+      });
+      // `recruiterUserId` is nullable — the relation is `onDelete: SetNull`, so
+      // a closed recruiter account leaves the match standing without one. There
+      // is then no recruiter to record a pass for, and the pivot's primary key
+      // could not hold the row anyway. The candidate pass above is what keeps
+      // the pair apart in that case.
+      if (match.recruiterUserId !== null) {
+        await tx.recruiterPassesCandidate.createMany({
+          data: [
+            {
+              recruiterUserId: match.recruiterUserId,
+              candidateUserId,
+              offerId,
+            },
+          ],
+          skipDuplicates: true,
+        });
+      }
+    });
   }
 
   private toListItem(match: MatchRow, viewer: Viewer): MatchListItem {
