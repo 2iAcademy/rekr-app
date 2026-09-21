@@ -92,7 +92,10 @@ describe('MatchService', () => {
     });
     expect(prisma.match.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { offer: { status: 'open', companyId: 8 } },
+        where: {
+          offer: { status: 'open', companyId: 8 },
+          candidate: { isActive: true, candidateProfile: { isNot: null } },
+        },
         skip: 20,
         take: 10,
       }),
@@ -110,6 +113,68 @@ describe('MatchService', () => {
       service.findMine({ id: 3, userType: 'recruiter' }),
     ).resolves.toEqual([]);
     expect(prisma.match.findMany).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Ex aequo are reachable — Prisma stamps `matchedAt` client-side, to the
+   * millisecond — and past a few hundred rows Postgres answers a paginated
+   * `ORDER BY matched_at DESC` with an unstable top-N heapsort: two OFFSETs
+   * disagree on the order of the ties, so a row comes back twice while
+   * another is never served. Only a unique second key rules that out.
+   */
+  it.each([
+    ['candidate' as const, 7],
+    ['recruiter' as const, 3],
+  ])('breaks %s ties on a unique key', async (userType, userId) => {
+    prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 8 });
+    prisma.match.findMany.mockResolvedValue([]);
+
+    await service.findMine({ id: userId, userType });
+
+    expect(prisma.match.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ matchedAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
+  /**
+   * Same rule as `findApplicants` and `/likes/received`: a deactivated account
+   * or a signup that never reached the profile wizard has nothing to show, and
+   * the row would open a screen the candidate is absent from.
+   */
+  it('excludes deactivated and profile-less candidates for a recruiter', async () => {
+    prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 8 });
+    prisma.match.findMany.mockResolvedValue([]);
+
+    await service.findMine({ id: 3, userType: 'recruiter' });
+
+    expect(prisma.match.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          offer: { status: 'open', companyId: 8 },
+          candidate: { isActive: true, candidateProfile: { isNot: null } },
+        },
+      }),
+    );
+  });
+
+  /**
+   * The candidate branch stays as it is: its counterpart is a company, gated
+   * by `offer.status`, and the row's own account is already known active — the
+   * guard refuses a deactivated token. Mirroring the recruiter predicate here
+   * would hide a candidate's own matches while they finish their profile.
+   */
+  it('does not filter a candidate on their own profile', async () => {
+    prisma.match.findMany.mockResolvedValue([]);
+
+    await service.findMine({ id: 7, userType: 'candidate' });
+
+    expect(prisma.match.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { candidateUserId: 7, offer: { status: 'open' } },
+      }),
+    );
   });
 
   it('creates exactly once and retrieves the winning match after a duplicate race', async () => {

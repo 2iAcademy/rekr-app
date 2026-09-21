@@ -99,12 +99,26 @@ export class MatchService {
       // endpoint has always answered 200 for a recruiter without a company,
       // and the screen is out of reach for them anyway.
       if (!profile) return [];
-      where = { offer: { status: 'open', companyId: profile.companyId } };
+      // Same population as `findApplicants` and `/likes/received`, and in the
+      // `where` rather than after the read: filtering a fetched page returns
+      // fewer rows than asked without it being the last one. A deactivated
+      // account must not have its name served, and a signup that never
+      // reached the profile wizard has nothing to show — the row would open a
+      // candidate screen they are absent from.
+      where = {
+        offer: { status: 'open', companyId: profile.companyId },
+        candidate: { isActive: true, candidateProfile: { isNot: null } },
+      };
     }
 
     const matches = await this.prisma.match.findMany({
       where,
-      orderBy: { matchedAt: 'desc' },
+      // `id` breaks the ties `matchedAt` leaves — they are reachable, Prisma
+      // stamps it client-side to the millisecond. Past a few hundred rows
+      // Postgres sorts a paginated read with an unstable top-N heapsort, so
+      // two OFFSETs disagree on the order of the ties and a row is served
+      // twice while another is never served at all.
+      orderBy: [{ matchedAt: 'desc' }, { id: 'desc' }],
       skip: (page - 1) * limit,
       take: limit,
       select: MATCH_LIST_SELECT,

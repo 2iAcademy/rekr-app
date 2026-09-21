@@ -328,4 +328,54 @@ describe('Match (e2e)', () => {
     const matches = res.body as Array<{ id: number }>;
     expect(matches[0]).toMatchObject({ id: visibleMatch.id });
   });
+
+  /**
+   * Same population as `findApplicants` and `/likes/received`, which both
+   * already drop these two. Served here, the row carries the surname of a
+   * deactivated account and opens a candidate screen they are absent from.
+   */
+  it('hides deactivated and profile-less candidates from the recruiter list', async () => {
+    const recruiter = await seedRecruiterWithCompany('Acme');
+    const offer = await prisma.offer.create({
+      data: { title: 'Own', status: 'open', companyId: recruiter.company.id },
+    });
+
+    const visible = await createUser('candidate');
+    await prisma.candidateProfile.create({
+      data: { userId: visible.id, firstName: 'Ada', lastName: 'Lovelace' },
+    });
+    const disabled = await createUser('candidate');
+    await prisma.candidateProfile.create({
+      data: { userId: disabled.id, firstName: 'Zoe', lastName: 'Disabled' },
+    });
+    await prisma.user.update({
+      where: { id: disabled.id },
+      data: { isActive: false },
+    });
+    const profileless = await createUser('candidate');
+
+    const visibleMatch = await prisma.match.create({
+      data: { candidateUserId: visible.id, offerId: offer.id },
+    });
+    for (const candidateUserId of [disabled.id, profileless.id]) {
+      await prisma.match.create({
+        data: { candidateUserId, offerId: offer.id },
+      });
+    }
+
+    const res = await httpRequest(app)
+      .get('/api/matches')
+      .set('Authorization', bearerFor(app, recruiter.user.id, 'recruiter'))
+      .expect(200);
+
+    const body = res.body as Array<{
+      id: number;
+      counterpart: { id: number; name: string };
+    }>;
+    expect(body).toHaveLength(1);
+    expect(body[0]).toMatchObject({
+      id: visibleMatch.id,
+      counterpart: { id: visible.id, name: 'Ada Lovelace' },
+    });
+  });
 });
