@@ -619,6 +619,165 @@ describe('Offer (e2e)', () => {
       });
     });
 
+    describe('exclusive answers', () => {
+      const matchOf = (candidateUserId: number, offerId: number) =>
+        prisma.match.count({ where: { candidateUserId, offerId } });
+
+      it('drops the like when the candidate passes an offer they had liked', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+        await passAsCandidate(candidate.id, offer.id).expect(201);
+
+        await expect(
+          prisma.candidateLikesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.candidatePassesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      it('drops the pass when the candidate likes an offer they had passed', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await passAsCandidate(candidate.id, offer.id).expect(201);
+        const res = await likeAsCandidate(candidate.id, offer.id).expect(201);
+
+        expect(res.body).toMatchObject({ likeCreated: true });
+        await expect(
+          prisma.candidatePassesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.candidateLikesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      /**
+       * A pass on a matched offer is refused rather than accepted with the
+       * match left standing: the match is a mutual commitment the candidate
+       * cannot undo from the offer screen, and a pass that silently keeps it
+       * would leave the two lists telling opposite stories.
+       */
+      it('refuses to pass an offer already matched, and leaves the match alone', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+        await likeBack(user.id, offer.id, candidate.id).expect(201);
+        await expect(matchOf(candidate.id, offer.id)).resolves.toBe(1);
+
+        await passAsCandidate(candidate.id, offer.id).expect(409);
+
+        await expect(matchOf(candidate.id, offer.id)).resolves.toBe(1);
+        await expect(
+          prisma.candidateLikesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(1);
+        await expect(
+          prisma.candidatePassesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(0);
+      });
+    });
+
+    describe('DELETE /offers/:id/like', () => {
+      const unlike = (userId: number, offerId: number) =>
+        httpRequest(app)
+          .delete(`/api/offers/${offerId}/like`)
+          .set('Authorization', asCandidate(userId));
+
+      it('rejects an unauthenticated withdrawal with 401', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+
+        await httpRequest(app)
+          .delete(`/api/offers/${offer.id}/like`)
+          .expect(401);
+      });
+
+      it('forbids a recruiter from withdrawing a like (403)', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+
+        await httpRequest(app)
+          .delete(`/api/offers/${offer.id}/like`)
+          .set('Authorization', bearerFor(app, user.id, 'recruiter'))
+          .expect(403);
+      });
+
+      it('removes the like and stays idempotent', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+        await unlike(candidate.id, offer.id).expect(204);
+        await unlike(candidate.id, offer.id).expect(204);
+
+        await expect(
+          prisma.candidateLikesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('never touches the like of another candidate', async () => {
+        const { company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const camille = await seedCandidateWithProfile('Camille');
+        const alex = await seedCandidateWithProfile('Alex');
+
+        await likeAsCandidate(camille.id, offer.id).expect(201);
+        await likeAsCandidate(alex.id, offer.id).expect(201);
+        await unlike(alex.id, offer.id).expect(204);
+
+        await expect(
+          prisma.candidateLikesOffer.count({
+            where: { candidateUserId: camille.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      // Same rule as the pass: a match is not undone from the offer screen.
+      it('refuses to withdraw a like that has become a match (409)', async () => {
+        const { user, company } = await seedRecruiterWithCompany('Acme');
+        const offer = await seedOffer(company, { status: 'open' });
+        const candidate = await seedCandidateWithProfile('Camille');
+
+        await likeAsCandidate(candidate.id, offer.id).expect(201);
+        await likeBack(user.id, offer.id, candidate.id).expect(201);
+
+        const res = await unlike(candidate.id, offer.id).expect(409);
+
+        expect((res.body as { message: string }).message).toMatch(/match/i);
+        await expect(
+          prisma.candidateLikesOffer.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(1);
+        await expect(
+          prisma.match.count({
+            where: { candidateUserId: candidate.id, offerId: offer.id },
+          }),
+        ).resolves.toBe(1);
+      });
+    });
+
     describe('GET /offers/liked', () => {
       const readLiked = (userId: number) =>
         httpRequest(app)
@@ -1478,6 +1637,16 @@ describe('Offer (e2e)', () => {
       'title',
     ];
 
+    // A candidate reads three keys more than a stranger: their own answer on
+    // the offer, which the detail screen needs before it offers
+    // « Passer / Liker », and whether that answer has turned into a match.
+    const CANDIDATE_DETAIL_KEYS = [
+      ...DETAIL_KEYS,
+      'liked',
+      'passed',
+      'matched',
+    ].sort();
+
     const OWNER_KEYS = [
       'city',
       'company',
@@ -1582,7 +1751,7 @@ describe('Offer (e2e)', () => {
       );
       const body = res.body as OfferDetailBody;
 
-      expect(Object.keys(body).sort()).toEqual(DETAIL_KEYS);
+      expect(Object.keys(body).sort()).toEqual(CANDIDATE_DETAIL_KEYS);
       expect(Object.keys(body.company).sort()).toEqual(COMPANY_KEYS);
       expect(Object.keys(body.tags[0]).sort()).toEqual(TAG_KEYS);
       expect(body).toMatchObject({
@@ -1746,6 +1915,112 @@ describe('Offer (e2e)', () => {
 
       expect(Object.keys(body).sort()).toEqual(DETAIL_KEYS);
       expect(JSON.stringify(res.body)).not.toContain(PROBE_POSTAL_CODE);
+    });
+
+    /**
+     * Reachable since the likes list links to this screen: before it, the deck
+     * was the only way in and it never serves an answered offer.
+     */
+    it('carries the answer the calling candidate already gave', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const liker = await createUser('candidate');
+      const passer = await createUser('candidate');
+      const newcomer = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+      await prisma.candidateLikesOffer.create({
+        data: { candidateUserId: liker.id, offerId: offer.id },
+      });
+      await prisma.candidatePassesOffer.create({
+        data: { candidateUserId: passer.id, offerId: offer.id },
+      });
+
+      const liked = await getDetail(offer.id, liker.id, 'candidate').expect(
+        200,
+      );
+      const passed = await getDetail(offer.id, passer.id, 'candidate').expect(
+        200,
+      );
+      const untouched = await getDetail(
+        offer.id,
+        newcomer.id,
+        'candidate',
+      ).expect(200);
+
+      expect(liked.body).toMatchObject({
+        liked: true,
+        passed: false,
+        matched: false,
+      });
+      expect(passed.body).toMatchObject({
+        liked: false,
+        passed: true,
+        matched: false,
+      });
+      expect(untouched.body).toMatchObject({
+        liked: false,
+        passed: false,
+        matched: false,
+      });
+    });
+
+    /**
+     * A match does not clear the like, so a matched offer would otherwise read
+     * as a plain like — and the screen would offer to withdraw a like the like
+     * endpoint refuses to withdraw (409).
+     */
+    it('tells the matched candidate, and only them, that the offer matched', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const matchedCandidate = await createUser('candidate');
+      const otherCandidate = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+      await prisma.candidateLikesOffer.createMany({
+        data: [
+          { candidateUserId: matchedCandidate.id, offerId: offer.id },
+          { candidateUserId: otherCandidate.id, offerId: offer.id },
+        ],
+      });
+      await prisma.match.create({
+        data: {
+          candidateUserId: matchedCandidate.id,
+          offerId: offer.id,
+          recruiterUserId: user.id,
+        },
+      });
+
+      const mine = await getDetail(
+        offer.id,
+        matchedCandidate.id,
+        'candidate',
+      ).expect(200);
+      const theirs = await getDetail(
+        offer.id,
+        otherCandidate.id,
+        'candidate',
+      ).expect(200);
+
+      expect(mine.body).toMatchObject({ liked: true, matched: true });
+      expect(theirs.body).toMatchObject({ liked: true, matched: false });
+    });
+
+    // Absent, not false: a recruiter has no answer to give on an offer.
+    it('leaves matched out of the payload served to a recruiter', async () => {
+      const { user, company } = await seedShowcaseCompany('Acme');
+      const candidateUser = await createUser('candidate');
+      const offer = await seedDetailOffer(company.id, user.id);
+      await prisma.candidateLikesOffer.create({
+        data: { candidateUserId: candidateUser.id, offerId: offer.id },
+      });
+      await prisma.match.create({
+        data: {
+          candidateUserId: candidateUser.id,
+          offerId: offer.id,
+          recruiterUserId: user.id,
+        },
+      });
+
+      const res = await getDetail(offer.id, user.id, 'recruiter').expect(200);
+
+      expect('matched' in (res.body as Record<string, unknown>)).toBe(false);
     });
 
     it('hides a draft offer from a recruiter without a company behind a 404', async () => {

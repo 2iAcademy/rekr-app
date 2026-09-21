@@ -629,6 +629,51 @@ describe('Offer feed (e2e)', () => {
       expect(idsOf(res)).toEqual([untouched.id]);
     });
 
+    /**
+     * Answering through the routes, not by writing the pivots: an answer now
+     * clears the other one, so the deck must still hide the offer once the
+     * row that hid it has been replaced by the other.
+     */
+    it('hides an offer answered through the routes, whichever answer came last', async () => {
+      const likedThenPassed = await seedOffer();
+      const passedThenLiked = await seedOffer();
+      const untouched = await seedOffer();
+      const token = bearerFor(app, candidate.id, 'candidate');
+      const answer = (offerId: number, verb: 'like' | 'pass') =>
+        httpRequest(app)
+          .post(`/api/offers/${offerId}/${verb}`)
+          .set('Authorization', token)
+          .expect(201);
+
+      await answer(likedThenPassed.id, 'like');
+      await answer(likedThenPassed.id, 'pass');
+      await answer(passedThenLiked.id, 'pass');
+      await answer(passedThenLiked.id, 'like');
+
+      const res = await getFeed().expect(200);
+
+      expect(idsOf(res)).toEqual([untouched.id]);
+    });
+
+    /** Withdrawing a like puts the offer back in the deck: nothing answers it. */
+    it('serves again an offer whose like was withdrawn', async () => {
+      const offer = await seedOffer();
+      const token = bearerFor(app, candidate.id, 'candidate');
+
+      await httpRequest(app)
+        .post(`/api/offers/${offer.id}/like`)
+        .set('Authorization', token)
+        .expect(201);
+      await httpRequest(app)
+        .delete(`/api/offers/${offer.id}/like`)
+        .set('Authorization', token)
+        .expect(204);
+
+      const res = await getFeed().expect(200);
+
+      expect(idsOf(res)).toEqual([offer.id]);
+    });
+
     it('keeps an offer another candidate liked or passed', async () => {
       const offer = await seedOffer();
       const other = await createUser('candidate');

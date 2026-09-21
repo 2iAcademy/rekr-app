@@ -240,4 +240,23 @@ export class OfferDetailDto {
    */
   @ApiPropertyOptional({ type: Number, nullable: true, example: 13 })
   jobFamilyId?: number | null;
+
+  /**
+   * The answer the calling candidate already gave on this offer. Absent, not
+   * false, for a recruiter: they have no answer to give, and `false` would
+   * read as « not liked yet ».
+   */
+  @ApiPropertyOptional({ type: Boolean, example: true })
+  liked?: boolean;
+
+  @ApiPropertyOptional({ type: Boolean, example: false })
+  passed?: boolean;
+
+  /**
+   * Whether that like has already become a match. A match leaves the like
+   * standing, so without this the screen cannot tell the two apart and offers
+   * to withdraw a like the like endpoint refuses to withdraw.
+   */
+  @ApiPropertyOptional({ type: Boolean, example: false })
+  matched?: boolean;
 }

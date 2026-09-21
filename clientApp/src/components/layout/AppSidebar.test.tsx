@@ -53,6 +53,7 @@ describe('AppSidebar', () => {
     expect(screen.getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument();
     expect(navLinks()).toEqual([
       { label: 'Mes offres', href: '/recruteur/offres', current: 'page' },
+      { label: 'Matches', href: '/matches', current: null },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });
@@ -75,6 +76,7 @@ describe('AppSidebar', () => {
 
     expect(navLinks()).toEqual([
       { label: 'Mes offres', href: '/recruteur/offres', current: 'page' },
+      { label: 'Matches', href: '/matches', current: null },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });

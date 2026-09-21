@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
   Patch,
@@ -11,8 +13,10 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiUnauthorizedResponse,
@@ -137,10 +141,35 @@ export class OfferController {
     return this.service.like(user.id, id);
   }
 
+  /**
+   * The candidate takes their like back.
+   *
+   * Idempotent, hence the 204 on a pair that carries no like: the caller asked
+   * for a state, and that state is what they get.
+   */
+  @Delete(':id/like')
+  @Roles('candidate')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: 'Like retiré.' })
+  @ApiConflictResponse({
+    description:
+      'L’offre a déjà donné lieu à un match, le like reste en place.',
+  })
+  unlike(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<void> {
+    return this.service.unlike(user.id, id);
+  }
+
   @Post(':id/pass')
   @Roles('candidate')
   @ApiCreatedResponse({ description: 'Passage enregistré.' })
   @ApiNotFoundResponse({ description: 'Offre inexistante ou non publiée.' })
+  @ApiConflictResponse({
+    description:
+      'L’offre a déjà donné lieu à un match, elle ne peut plus être passée.',
+  })
   pass(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseIntPipe) id: number,

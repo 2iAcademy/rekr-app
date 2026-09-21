@@ -320,6 +320,9 @@ export interface OfferDetailDto {
   status?: OfferStatus;
   /** @nullable */
   jobFamilyId?: number | null;
+  liked?: boolean;
+  passed?: boolean;
+  matched?: boolean;
 }
 
 export interface CreateOfferDto {
@@ -477,14 +480,22 @@ export interface OfferApplicantDto {
   recruiterPassedAt: string | null;
 }
 
-export interface Object {
-  [key: string]: unknown;
-}
-
 export interface SectorDto {
   id: number;
   /** @maxLength 100 */
   label: string;
+}
+
+export interface LikeListItemDto {
+  offerId: number;
+  /**
+   * Null sur /likes/sent, où le candidat est l’appelant.
+   * @nullable
+   */
+  candidateUserId: number | null;
+  likedAt: string;
+  offer: MatchOfferDto;
+  counterpart: MatchCounterpartDto;
 }
 
 export type CandidateProfileControllerReplacePictureBody = {
@@ -573,14 +584,45 @@ export type MatchControllerFindMineParams = {
   /**
    * Numéro de page, à partir de 1.
    * @minimum 1
+   * @maximum 2147483647
    */
-  page?: Object;
+  page?: number;
   /**
    * Nombre maximum de matchs par page.
    * @minimum 1
    * @maximum 100
    */
-  limit?: Object;
+  limit?: number;
+};
+
+export type LikeControllerFindSentParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   * @maximum 2147483647
+   */
+  page?: number;
+  /**
+   * Nombre maximum de likes par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type LikeControllerFindReceivedParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   * @maximum 2147483647
+   */
+  page?: number;
+  /**
+   * Nombre maximum de likes par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
 };
 
 export type appControllerGetHelloResponse200 = {
@@ -1887,6 +1929,51 @@ export const offerControllerLike = async (
   });
 };
 
+export type offerControllerUnlikeResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type offerControllerUnlikeResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerUnlikeResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerUnlikeResponse409 = {
+  data: void;
+  status: 409;
+};
+
+export type offerControllerUnlikeResponseSuccess = offerControllerUnlikeResponse204 & {
+  headers: Headers;
+};
+export type offerControllerUnlikeResponseError = (
+  | offerControllerUnlikeResponse401
+  | offerControllerUnlikeResponse403
+  | offerControllerUnlikeResponse409
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerUnlikeUrl = (id: number) => {
+  return `/api/offers/${id}/like`;
+};
+
+export const offerControllerUnlike = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerUnlikeResponseSuccess> => {
+  return customFetch<offerControllerUnlikeResponseSuccess>(getOfferControllerUnlikeUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type offerControllerPassResponse201 = {
   data: void;
   status: 201;
@@ -1907,11 +1994,19 @@ export type offerControllerPassResponse404 = {
   status: 404;
 };
 
+export type offerControllerPassResponse409 = {
+  data: void;
+  status: 409;
+};
+
 export type offerControllerPassResponseSuccess = offerControllerPassResponse201 & {
   headers: Headers;
 };
 export type offerControllerPassResponseError = (
-  offerControllerPassResponse401 | offerControllerPassResponse403 | offerControllerPassResponse404
+  | offerControllerPassResponse401
+  | offerControllerPassResponse403
+  | offerControllerPassResponse404
+  | offerControllerPassResponse409
 ) & {
   headers: Headers;
 };
@@ -2130,6 +2225,51 @@ export const matchControllerFindMine = async (
   );
 };
 
+export type matchControllerUnmatchResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type matchControllerUnmatchResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type matchControllerUnmatchResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type matchControllerUnmatchResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type matchControllerUnmatchResponseSuccess = matchControllerUnmatchResponse204 & {
+  headers: Headers;
+};
+export type matchControllerUnmatchResponseError = (
+  | matchControllerUnmatchResponse401
+  | matchControllerUnmatchResponse403
+  | matchControllerUnmatchResponse404
+) & {
+  headers: Headers;
+};
+
+export const getMatchControllerUnmatchUrl = (id: number) => {
+  return `/api/matches/${id}`;
+};
+
+export const matchControllerUnmatch = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<matchControllerUnmatchResponseSuccess> => {
+  return customFetch<matchControllerUnmatchResponseSuccess>(getMatchControllerUnmatchUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type sectorControllerFindAllResponse200 = {
   data: SectorDto[];
   status: 200;
@@ -2149,4 +2289,112 @@ export const sectorControllerFindAll = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type likeControllerFindSentResponse200 = {
+  data: LikeListItemDto[];
+  status: 200;
+};
+
+export type likeControllerFindSentResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type likeControllerFindSentResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type likeControllerFindSentResponseSuccess = likeControllerFindSentResponse200 & {
+  headers: Headers;
+};
+export type likeControllerFindSentResponseError = (
+  likeControllerFindSentResponse401 | likeControllerFindSentResponse403
+) & {
+  headers: Headers;
+};
+
+export const getLikeControllerFindSentUrl = (params?: LikeControllerFindSentParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/likes/sent?${stringifiedParams}` : `/api/likes/sent`;
+};
+
+export const likeControllerFindSent = async (
+  params?: LikeControllerFindSentParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<likeControllerFindSentResponseSuccess> => {
+  return customFetch<likeControllerFindSentResponseSuccess>(getLikeControllerFindSentUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type likeControllerFindReceivedResponse200 = {
+  data: LikeListItemDto[];
+  status: 200;
+};
+
+export type likeControllerFindReceivedResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type likeControllerFindReceivedResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type likeControllerFindReceivedResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type likeControllerFindReceivedResponseSuccess = likeControllerFindReceivedResponse200 & {
+  headers: Headers;
+};
+export type likeControllerFindReceivedResponseError = (
+  | likeControllerFindReceivedResponse401
+  | likeControllerFindReceivedResponse403
+  | likeControllerFindReceivedResponse404
+) & {
+  headers: Headers;
+};
+
+export const getLikeControllerFindReceivedUrl = (params?: LikeControllerFindReceivedParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/likes/received?${stringifiedParams}`
+    : `/api/likes/received`;
+};
+
+export const likeControllerFindReceived = async (
+  params?: LikeControllerFindReceivedParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<likeControllerFindReceivedResponseSuccess> => {
+  return customFetch<likeControllerFindReceivedResponseSuccess>(
+    getLikeControllerFindReceivedUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
