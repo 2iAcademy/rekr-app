@@ -100,14 +100,17 @@ describe('CompanyStep', () => {
     expect(screen.getByRole('radio', { name: 'PME' })).not.toBeChecked();
   });
 
-  // Rekr targets small and mid-sized service companies.
-  it('ne propose que les tailles TPE et PME', () => {
+  // Rekr serves companies of every size.
+  it('propose toutes les tailles d’entreprise, de la TPE à la grande entreprise', () => {
     renderStep();
 
     expect(screen.getAllByRole('radio').map((radio) => radio.getAttribute('value'))).toEqual([
       'TPE',
       'PME',
+      'ETI',
+      'GE',
     ]);
+    expect(screen.getByRole('radio', { name: 'Grande entreprise' })).toBeInTheDocument();
   });
 
   it('marque le groupe de tailles quand c’est lui qui manque', () => {

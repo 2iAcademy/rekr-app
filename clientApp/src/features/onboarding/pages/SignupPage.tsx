@@ -1,21 +1,23 @@
 import { useState, type FormEvent } from 'react';
-import { Check, ChevronLeft } from 'lucide-react';
+import { Building2, Check, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/form/PasswordInput';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/useAuth';
 import { OptionCards, type Option } from '@/components/form/OptionCards';
-import type { RoleTheme } from '@/lib/roleTheme';
+import type { UserType } from '@/domain/userType';
 import { SIGNUP_SUCCESS, signupBusiness } from '@/features/auth/authFeedback';
 import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
+import { AuthLayout } from '../components/AuthLayout';
+import { AUTH_LABEL, AUTH_LINK } from '../components/authStyles';
 
-// Typed as `RoleTheme`: the selected value is fed straight to `data-role`, so a
-// value without a matching palette scope must not compile.
+// Typed as `UserType`: the selected value is sent as the account type, so a
+// value the API does not know must not compile.
 const roleOptions = [
-  { value: 'candidate', label: 'Candidat', description: 'Je cherche un poste' },
-  { value: 'recruiter', label: 'Recruteur', description: 'Je recrute' },
-] as const satisfies readonly Option<RoleTheme>[];
+  { value: 'candidate', label: 'Candidat', icon: Search },
+  { value: 'recruiter', label: 'Recruteur', icon: Building2 },
+] as const satisfies readonly Option<UserType>[];
 
 type Role = (typeof roleOptions)[number]['value'];
 
@@ -59,23 +61,24 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
   };
 
   return (
-    <main
-      data-role={role}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background px-6 pt-4 pb-8"
+    <AuthLayout
+      title="Créer un compte"
+      onBack={onBack}
+      footer={
+        <>
+          Déjà un compte ?
+          <button type="button" onClick={onSignIn} className={AUTH_LINK}>
+            Connexion
+          </button>
+        </>
+      }
     >
-      <header className="relative flex h-9 items-center justify-center">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Retour"
-          className="absolute left-0 flex size-9 cursor-pointer items-center justify-center rounded-full bg-card text-ink shadow-sm transition-colors hover:bg-muted"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <h1 className="font-heading text-base font-bold text-ink">Créer un compte</h1>
-      </header>
+      <div className="flex flex-col gap-1.5">
+        <h2 className="text-2xl font-extrabold text-ink">Bienvenue sur Rekr.</h2>
+        <p className="text-sm text-ink-muted">Quelques secondes, et vous pourrez commencer.</p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
+      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
         {/* `Role` is pinned rather than inferred: a bare `setRole` offers
             `SetStateAction<Role>` as an inference candidate, which does not
             satisfy `T extends string`, so `T` collapses to `string`. */}
@@ -89,7 +92,7 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
         />
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="signup-email" className="text-xs text-ink-muted">
+          <label htmlFor="signup-email" className={AUTH_LABEL}>
             Email
           </label>
           <Input
@@ -104,7 +107,7 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="signup-password" className="text-xs text-ink-muted">
+          <label htmlFor="signup-password" className={AUTH_LABEL}>
             Mot de passe
           </label>
           <PasswordInput
@@ -122,7 +125,7 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="signup-confirm-password" className="text-xs text-ink-muted">
+          <label htmlFor="signup-confirm-password" className={AUTH_LABEL}>
             Confirmer le mot de passe
           </label>
           <PasswordInput
@@ -141,7 +144,7 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
           />
         </div>
 
-        <label className="flex cursor-pointer items-center gap-2.5">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3">
           <input
             type="checkbox"
             checked={acceptTerms}
@@ -151,7 +154,7 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
             }}
             className="peer sr-only"
           />
-          <span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-line bg-card text-white transition-colors peer-checked:border-transparent peer-checked:bg-role peer-focus-visible:ring-3 peer-focus-visible:ring-role/30">
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-input bg-card text-white transition-colors peer-checked:border-transparent peer-checked:bg-brand peer-focus-visible:ring-3 peer-focus-visible:ring-brand/30">
             <Check
               className={cn(
                 'size-3.5 transition-opacity',
@@ -159,32 +162,25 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
               )}
             />
           </span>
-          <span className="text-xs leading-snug text-ink-muted">
+          <span className="text-sm leading-snug text-ink-soft">
             J'accepte les CGU et la politique de confidentialité.
           </span>
         </label>
 
         {error && (
-          <p id="signup-error" role="alert" className="text-xs text-destructive">
+          <p
+            id="signup-error"
+            role="alert"
+            className="rounded-xl bg-destructive-tint px-4 py-3 text-sm font-medium text-destructive"
+          >
             {error}
           </p>
         )}
 
-        <Button type="submit" variant="role" size="xl" className="mt-1 w-full">
+        <Button type="submit" variant="brand" size="xl" className="mt-1 w-full">
           Créer mon compte
         </Button>
       </form>
-
-      <p className="mt-6 flex items-center justify-center gap-1.5 text-sm text-ink-muted">
-        Déjà un compte ?
-        <button
-          type="button"
-          onClick={onSignIn}
-          className="cursor-pointer font-medium text-role-strong hover:underline"
-        >
-          Connexion
-        </button>
-      </p>
-    </main>
+    </AuthLayout>
   );
 }

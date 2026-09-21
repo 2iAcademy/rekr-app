@@ -90,15 +90,16 @@ describe('SignupPage', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ role: 'recruiter' }));
   });
 
-  it("expose le rôle sélectionné dans data-role pour l'accent de couleur", async () => {
+  it('présélectionne le profil candidat et bascule sur recruteur au clic', async () => {
     const user = userEvent.setup();
     renderSignup();
 
-    expect(screen.getByRole('main')).toHaveAttribute('data-role', 'candidate');
+    expect(screen.getByRole('radio', { name: /candidat/i })).toBeChecked();
 
     await user.click(screen.getByRole('radio', { name: /recruteur/i }));
 
-    expect(screen.getByRole('main')).toHaveAttribute('data-role', 'recruiter');
+    expect(screen.getByRole('radio', { name: /recruteur/i })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /candidat/i })).not.toBeChecked();
   });
 
   it('affiche chaque mot de passe indépendamment de l’autre', async () => {

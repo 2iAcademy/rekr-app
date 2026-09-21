@@ -10,6 +10,8 @@ import type {
 export const COMPANY_SIZE_OPTIONS = [
   { value: 'TPE', label: 'TPE' },
   { value: 'PME', label: 'PME' },
+  { value: 'ETI', label: 'ETI' },
+  { value: 'GE', label: 'Grande entreprise' },
 ] as const satisfies readonly Option<CompanySize>[];
 
 export const CONTRACT_TYPE_OPTIONS = [

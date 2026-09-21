@@ -1,7 +1,8 @@
-import { Link } from 'react-router';
-import { ArrowLeft } from 'lucide-react';
+import { Link, useLocation } from 'react-router';
+import { ArrowLeft, Users } from 'lucide-react';
 import { notifyFailure } from '@/lib/feedback/notify';
 import { applicantLikeBusiness } from '../applicantFeedback';
+import { offerTitleFrom } from '../offerContext';
 import { matchedCandidate } from '@/features/matches/likeResult';
 import { ApplicantRow } from '../components/ApplicantRow';
 import { CandidateDetailPage } from './CandidateDetailPage';
@@ -34,6 +35,7 @@ export function OfferApplicantsPage({
 }: OfferApplicantsPageProps) {
   const { applicants, status, truncated, pendingId, reload, like, pass, decisionFor } =
     useApplicants(offerId);
+  const offerTitle = offerTitleFrom(useLocation().state);
 
   const answer = (candidateUserId: number): void => {
     void like(candidateUserId)
@@ -70,21 +72,35 @@ export function OfferApplicantsPage({
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 md:mx-0 lg:max-w-4xl xl:max-w-5xl">
-      <Link
-        to={OFFERS_PATH}
-        className="inline-flex items-center gap-2 self-start text-sm font-medium text-ink-muted underline-offset-4 hover:underline"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Vos offres
-      </Link>
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 md:mx-0 lg:max-w-4xl xl:max-w-5xl">
+      <div className="flex flex-col gap-3">
+        <Link
+          to={OFFERS_PATH}
+          className="-ml-1 inline-flex min-h-11 items-center gap-1.5 self-start rounded-lg px-1 text-sm font-semibold text-ink-muted transition-colors outline-none hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Vos offres
+        </Link>
 
-      <h1 className="font-heading text-xl font-bold text-ink md:text-2xl">Candidats intéressés</h1>
+        <div className="flex flex-col gap-1">
+          {offerTitle !== null && (
+            <p className="text-sm font-semibold break-words text-ink-muted">{offerTitle}</p>
+          )}
+          <h1 className="text-2xl font-extrabold text-ink md:text-[1.75rem]">
+            Candidats intéressés
+          </h1>
+        </div>
+      </div>
 
-      {status === 'loading' && <p className="text-sm text-ink-muted">Chargement…</p>}
+      {status === 'loading' && (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-ink-muted">Chargement…</p>
+          <div aria-hidden="true" className="h-40 animate-pulse rounded-2xl bg-surface" />
+        </div>
+      )}
 
       {status === 'missing' && (
-        <p className="text-sm text-ink-muted">
+        <p className="rounded-2xl border border-line bg-card p-5 text-sm text-ink shadow-card">
           Cette offre est introuvable. Elle a peut-être été supprimée.
         </p>
       )}
@@ -92,7 +108,11 @@ export function OfferApplicantsPage({
       {status === 'failed' && (
         <p role="alert" className="text-sm text-destructive">
           Impossible de charger les candidats.{' '}
-          <button type="button" onClick={reload} className="cursor-pointer underline">
+          <button
+            type="button"
+            onClick={reload}
+            className="cursor-pointer font-semibold underline underline-offset-4"
+          >
             Réessayer
           </button>
         </p>
@@ -100,9 +120,13 @@ export function OfferApplicantsPage({
 
       {status === 'ready' && applicants.length === 0 && (
         // Not a failure and not an invitation to act: the offer is published,
-        // there is nothing to do but wait.
-        <div className="rounded-2xl border border-dashed border-line bg-card p-6">
-          <p className="text-sm text-ink-muted">
+        // there is nothing to do but wait — hence no button.
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-card px-6 py-10 text-center shadow-card">
+          <span className="flex size-14 items-center justify-center rounded-full bg-brand-tint text-brand">
+            <Users aria-hidden="true" className="size-6" />
+          </span>
+          <h2 className="mt-1 text-lg font-bold text-ink">Pas encore de candidat</h2>
+          <p className="max-w-sm text-sm text-ink-muted">
             Personne n’a encore manifesté d’intérêt pour cette offre.
           </p>
         </div>
@@ -118,7 +142,10 @@ export function OfferApplicantsPage({
       )}
 
       {status === 'ready' && applicants.length > 0 && (
-        <ul aria-label="Candidats intéressés par cette offre" className="flex flex-col gap-3">
+        <ul
+          aria-label="Candidats intéressés par cette offre"
+          className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card shadow-card"
+        >
           {applicants.map((applicant) => (
             <ApplicantRow
               key={applicant.userId}

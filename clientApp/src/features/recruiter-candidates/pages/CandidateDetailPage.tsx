@@ -1,13 +1,15 @@
-import { useEffect, useRef } from 'react';
-import { Heart, X } from 'lucide-react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { ArrowLeft, Heart, X } from 'lucide-react';
 import type { OfferApplicantDto } from '@/api/generated';
 import { Button } from '@/components/ui/button';
 import { SKILL_CHIP, TAG_CHIP } from '@/components/ui/chip-variants';
+import { SectionTitle } from '@/components/ui/section-title';
 import { CandidateAvatar } from '../components/CandidateAvatar';
 import { ChipList } from '@/components/feed/ChipList';
-import { contractLabel, metaLine } from '@/components/feed/labels';
+import { contractLabel } from '@/components/feed/labels';
 import { availabilityLabel, experienceLabel, remoteLabel } from '../labels';
 import type { ApplicantDecision } from '../useApplicants';
+import { FactList } from '@/components/ui/fact-list';
 
 interface CandidateDetailPageProps {
   candidate: OfferApplicantDto;
@@ -20,7 +22,14 @@ interface CandidateDetailPageProps {
   onPass: () => void;
 }
 
-const SECTION_TITLE = 'text-xs font-semibold tracking-wider text-ink-muted uppercase';
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3 p-5 sm:p-6">
+      <SectionTitle level={2}>{title}</SectionTitle>
+      {children}
+    </section>
+  );
+}
 
 /**
  * A rubric over an empty list would announce « Compétences, list, 0 items », so
@@ -41,10 +50,9 @@ function TagSection({
   }
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className={SECTION_TITLE}>{title}</h2>
+    <Section title={title}>
       <ChipList label={title} items={items} chipClassName={chipClassName} />
-    </section>
+    </Section>
   );
 }
 
@@ -84,7 +92,7 @@ export function CandidateDetailPage({
    * Tab restarts from the top of the document. The list takes the focus back on
    * the way out.
    *
-   * The landmark rather than the heading: the close button sits above the
+   * The landmark rather than the heading: the back button sits above the
    * heading, so focusing the heading would leave the only way out behind a
    * Shift+Tab.
    */
@@ -94,55 +102,63 @@ export function CandidateDetailPage({
 
   const bio = candidate.bio?.trim() ?? '';
   const jobTitle = candidate.desiredJobTitle?.trim() ?? '';
-  const remote = remoteLabel(candidate.remotePolicy);
+  const city = candidate.city?.trim() ?? '';
+
+  // Only what the candidate filled in: a row reading « non renseigné » would
+  // look like a gap in the profile rather than a choice to leave it out.
+  const facts = [
+    { label: 'Expérience', value: experienceLabel(candidate.experienceLevel) },
+    { label: 'Disponibilité', value: availabilityLabel(candidate.availability) },
+    { label: 'Télétravail', value: remoteLabel(candidate.remotePolicy) },
+  ].filter((fact): fact is { label: string; value: string } => fact.value !== null);
 
   // A named `section` rather than a `main`: `AppShell` already owns the page's
-  // `main` landmark and the `data-role` palette that scopes it.
+  // `main` landmark.
   return (
     <section
       ref={screenRef}
       tabIndex={-1}
       aria-label={screenLabel}
-      className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col bg-background outline-none"
+      className="mx-auto flex w-full max-w-2xl flex-col gap-4 outline-none md:mx-0"
     >
-      <header className="absolute top-0 right-0 left-0 z-10 flex h-12 items-center justify-between px-4 pt-3 sm:px-6">
-        <button
+      <div className="flex items-center gap-2">
+        <Button
           type="button"
+          variant="ghost"
           onClick={onBack}
           aria-label="Retour à la liste"
-          className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-card text-ink shadow-sm transition-colors hover:bg-muted"
+          className="-ml-2 size-11 rounded-xl p-0 text-ink hover:bg-surface hover:text-ink"
         >
-          <X aria-hidden="true" className="size-5" />
-        </button>
-        <p className="font-heading text-base font-bold text-ink">Profil</p>
-        {/* Balances the button so the title stays optically centred. */}
-        <span aria-hidden="true" className="size-9" />
-      </header>
-
-      <div className="flex h-44 shrink-0 items-center justify-center bg-role-gradient pt-12 sm:h-52">
-        <CandidateAvatar
-          name={firstName}
-          avatarUrl={candidate.picture}
-          className="size-24 shadow-md"
-        />
+          <ArrowLeft aria-hidden="true" className="size-5" />
+        </Button>
+        <p className="text-base font-bold text-ink">Profil</p>
       </div>
 
-      <div className="relative -mt-5 flex flex-1 flex-col gap-6 rounded-t-3xl bg-background px-5 pt-6 pb-8 sm:px-8">
-        <div className="flex flex-col gap-1">
-          <h1 className="font-heading text-2xl font-bold text-balance break-words text-ink">
-            {firstName}
-          </h1>
-          {jobTitle !== '' && (
-            <p className="text-sm font-medium break-words text-role">{jobTitle}</p>
-          )}
-          <p className="text-sm break-words text-ink-muted">
-            {metaLine([
-              candidate.city,
-              experienceLabel(candidate.experienceLevel),
-              availabilityLabel(candidate.availability),
-            ])}
-          </p>
+      {/* One card for the whole profile — identity, facts, then the sections —
+          split by hairlines rather than stacked as separate objects. */}
+      <div className="divide-y divide-line rounded-2xl border border-line bg-card shadow-card">
+        <div className="flex items-center gap-4 p-5 sm:p-6">
+          <CandidateAvatar
+            name={firstName}
+            avatarUrl={candidate.picture}
+            className="size-16 text-2xl"
+          />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h1 className="text-2xl font-extrabold text-balance break-words text-ink">
+              {firstName}
+            </h1>
+            {jobTitle !== '' && (
+              <p className="text-sm font-semibold break-words text-ink-soft">{jobTitle}</p>
+            )}
+            {city !== '' && <p className="text-sm break-words text-ink-muted">{city}</p>}
+          </div>
         </div>
+
+        {facts.length > 0 && (
+          <div className="px-5 py-2 sm:px-6">
+            <FactList facts={facts} />
+          </div>
+        )}
 
         <TagSection title="Compétences" items={candidate.tags} chipClassName={SKILL_CHIP} />
 
@@ -151,55 +167,51 @@ export function CandidateDetailPage({
           items={candidate.contractTypes.map(contractLabel)}
         />
 
-        {remote !== null && (
-          <section className="flex flex-col gap-1">
-            <h2 className={SECTION_TITLE}>Télétravail</h2>
-            <p className="text-sm leading-relaxed break-words text-ink">{remote}</p>
-          </section>
-        )}
-
         {bio !== '' && (
-          <section className="flex flex-col gap-2">
-            <h2 className={SECTION_TITLE}>À propos</h2>
+          <Section title="À propos">
             {/* Never clamped: reading it in full is the whole reason this screen
-                exists next to the list. */}
-            <p className="text-sm leading-relaxed break-words text-ink-muted">{bio}</p>
-          </section>
+              exists next to the list. */}
+            <p className="text-[0.9375rem] leading-relaxed break-words text-ink-soft">{bio}</p>
+          </Section>
         )}
       </div>
 
-      {decision !== null && (
-        <p
-          role="status"
-          title={`Décision enregistrée le ${decision.at}`}
-          className="px-5 text-center text-sm font-medium text-ink-muted sm:px-8"
-        >
-          {decisionText}
-        </p>
-      )}
-
-      <div className="sticky bottom-0 z-10 flex gap-3 bg-gradient-to-t from-background from-40% via-background/85 to-transparent px-5 pt-8 pb-4 sm:px-8">
-        <Button
-          type="button"
-          variant="outline"
-          size="xl"
-          disabled={isDecided || pending}
-          className="flex-1 rounded-full"
-          onClick={onPass}
-        >
-          Passer
-        </Button>
-        <Button
-          type="button"
-          variant="role"
-          size="xl"
-          disabled={isDecided || pending}
-          className="flex-1 rounded-full"
-          onClick={onLike}
-        >
-          <Heart aria-hidden="true" className="size-5 fill-current" />
-          Liker
-        </Button>
+      {/* Sticks above the phone tab bar; bleeds to the screen edges on phones,
+          stays in the column from `md:`. */}
+      <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 flex flex-col gap-2 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:mx-0 md:flex-row md:items-center md:gap-4 md:rounded-2xl md:border md:px-5 md:shadow-card">
+        {decision !== null && (
+          <p
+            role="status"
+            title={`Décision enregistrée le ${decision.at}`}
+            className="text-center text-sm font-medium text-ink-muted md:text-left"
+          >
+            {decisionText}
+          </p>
+        )}
+        <div className="flex gap-3 md:ml-auto">
+          <Button
+            type="button"
+            variant="outline"
+            size="xl"
+            disabled={isDecided || pending}
+            className="flex-1 md:flex-none"
+            onClick={onPass}
+          >
+            <X aria-hidden="true" />
+            Passer
+          </Button>
+          <Button
+            type="button"
+            variant="brand"
+            size="xl"
+            disabled={isDecided || pending}
+            className="flex-1 md:flex-none"
+            onClick={onLike}
+          >
+            <Heart aria-hidden="true" />
+            {"Ça m'intéresse"}
+          </Button>
+        </div>
       </div>
     </section>
   );

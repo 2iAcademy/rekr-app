@@ -152,7 +152,7 @@ export function CityField({
 
   return (
     <div className="relative flex flex-col gap-1.5">
-      <label htmlFor={fieldId} className="text-xs text-ink-muted">
+      <label htmlFor={fieldId} className="text-sm font-semibold text-ink">
         {label}
       </label>
       <Input
@@ -172,8 +172,8 @@ export function CityField({
         onKeyDown={handleKeyDown}
       />
 
-      <p id={helpId} className="text-xs text-ink-faint">
-        Choisissez votre commune dans la liste : elle renseigne aussi le code postal.
+      <p id={helpId} className="text-xs text-ink-muted">
+        Choisir la commune dans la liste : elle renseigne aussi le code postal.
       </p>
 
       {expanded && cities.length === 0 && (
@@ -185,7 +185,7 @@ export function CityField({
         role="listbox"
         aria-label={label}
         className={cn(
-          'absolute top-full right-0 left-0 z-20 mt-1 max-h-60 overflow-auto rounded-xl border border-line bg-card shadow-lg',
+          'absolute top-full right-0 left-0 z-20 mt-1 max-h-60 overflow-auto rounded-xl border border-line bg-card py-1 shadow-raised',
           expanded && cities.length > 0 ? 'block' : 'hidden',
         )}
       >
@@ -202,8 +202,8 @@ export function CityField({
               choose(city);
             }}
             className={cn(
-              'cursor-pointer px-4 py-2.5 text-sm text-ink',
-              index === activeIndex ? 'bg-brand-tint' : 'hover:bg-muted',
+              'cursor-pointer px-4 py-3 text-sm text-ink',
+              index === activeIndex ? 'bg-brand-tint text-brand-strong' : 'hover:bg-surface',
             )}
           >
             {format({ name: city.name, postalCode: city.postalCode })}

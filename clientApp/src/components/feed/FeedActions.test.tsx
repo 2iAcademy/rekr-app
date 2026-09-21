@@ -7,14 +7,14 @@ const renderActions = (props: Partial<{ onPass: () => void; onLike: () => void }
   render(<FeedActions onPass={vi.fn()} onLike={vi.fn()} {...props} />);
 
 describe('FeedActions', () => {
-  it('rend les deux décisions dans l’ordre passer / liker', () => {
+  it('rend les deux décisions dans l’ordre passer / intéressé', () => {
     renderActions();
 
     const [pass, like] = screen.getAllByRole('button');
 
     expect(screen.getAllByRole('button')).toHaveLength(2);
     expect(pass).toHaveAccessibleName('Passer');
-    expect(like).toHaveAccessibleName('Liker');
+    expect(like).toHaveAccessibleName("Ça m'intéresse");
   });
 
   // The detail action lives on the card itself ("Voir le profil"): a third
@@ -23,16 +23,6 @@ describe('FeedActions', () => {
     renderActions();
 
     expect(screen.queryByRole('button', { name: 'Détail' })).not.toBeInTheDocument();
-  });
-
-  // The lowercase caption sits under the circle: readable for sighted users,
-  // hidden from assistive tech so it does not double the button's own name.
-  it('légende chaque cercle en minuscules sans doubler le nom accessible', () => {
-    renderActions();
-
-    for (const caption of ['passer', 'liker']) {
-      expect(screen.getByText(caption)).toHaveAttribute('aria-hidden', 'true');
-    }
   });
 
   it('remonte le rejet du profil courant', async () => {
@@ -50,7 +40,7 @@ describe('FeedActions', () => {
     const onLike = vi.fn();
     renderActions({ onLike });
 
-    await user.click(screen.getByRole('button', { name: 'Liker' }));
+    await user.click(screen.getByRole('button', { name: "Ça m'intéresse" }));
 
     expect(onLike).toHaveBeenCalledTimes(1);
   });

@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { candidateProfileControllerFindMine, companyControllerFindMine } from '@/api/generated';
+import {
+  authControllerLogout,
+  candidateProfileControllerFindMine,
+  companyControllerFindMine,
+} from '@/api/generated';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { ProfileRoute } from './routes';
 
@@ -149,6 +154,34 @@ describe('ProfileRoute', () => {
 
     expect(findCandidateProfile).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'Mon profil' })).not.toBeInTheDocument();
+  });
+
+  // The phone has no burger menu any more and its tab bar only holds the
+  // destinations: the account page is where a phone user signs out. The tablet
+  // header and the desktop sidebar carry their own, hence `md:hidden` — the
+  // only trace of the breakpoint jsdom, which loads no CSS, can observe.
+  it.each(['candidate', 'recruiter'] as const)(
+    'propose la déconnexion sur téléphone depuis le compte (%s)',
+    async (userType) => {
+      authenticateAs(userType);
+      renderProfile();
+
+      const logout = await screen.findByRole('button', { name: 'Se déconnecter' });
+
+      expect(logout).toHaveTextContent('Se déconnecter');
+      expect(logout.parentElement?.className).toContain('md:hidden');
+    },
+  );
+
+  it('termine la session depuis le bouton de déconnexion du compte', async () => {
+    const user = userEvent.setup();
+    authenticateAs('candidate');
+    renderProfile();
+
+    await user.click(await screen.findByRole('button', { name: 'Se déconnecter' }));
+
+    expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument();
+    expect(authControllerLogout).toHaveBeenCalledTimes(1);
   });
 
   it('ne charge aucun profil tant que la session est anonyme', async () => {

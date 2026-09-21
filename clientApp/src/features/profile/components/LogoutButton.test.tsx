@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -9,7 +10,10 @@ import { LogoutButton } from './LogoutButton';
 
 // The button reads nothing but `logout` from the session, so the context is
 // injected directly rather than booting AuthProvider and its refresh round-trip.
-const renderLogout = (logout: AuthContextValue['logout']) => {
+const renderLogout = (
+  logout: AuthContextValue['logout'],
+  appearance?: ComponentProps<typeof LogoutButton>['appearance'],
+) => {
   render(
     <AuthContext.Provider
       value={{
@@ -28,7 +32,7 @@ const renderLogout = (logout: AuthContextValue['logout']) => {
         markProfileCompleted: vi.fn(),
       }}
     >
-      <LogoutButton />
+      <LogoutButton appearance={appearance} />
       <Toaster />
     </AuthContext.Provider>,
   );
@@ -114,5 +118,26 @@ describe('LogoutButton', () => {
     await user.click(trigger());
 
     expect(logout).toHaveBeenCalledTimes(1);
+  });
+
+  // Three looks for three places — sidebar, tablet header, account page on a
+  // phone — but one control: the same accessible name and the same way out.
+  it.each(['inline', 'icon', 'row'] as const)(
+    'garde le même nom accessible et termine la session en apparence %s',
+    async (appearance) => {
+      const user = userEvent.setup();
+      const logout = vi.fn().mockResolvedValue(undefined);
+      renderLogout(logout, appearance);
+
+      await user.click(trigger());
+
+      expect(logout).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('affiche son libellé en toutes lettres sur la ligne du téléphone', () => {
+    renderLogout(vi.fn(), 'row');
+
+    expect(trigger()).toHaveTextContent('Se déconnecter');
   });
 });

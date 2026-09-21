@@ -136,7 +136,7 @@ describe('navigation vers le feed candidat', () => {
       </AuthProvider>,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Liker' }));
+    await user.click(await screen.findByRole('button', { name: "Ça m'intéresse" }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/match'));
     expect(

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
+import { Heart, HeartHandshake, HeartOff, Inbox, type LucideIcon } from 'lucide-react';
 import { ApiError } from '@/api/customFetch';
 import {
   likeControllerFindReceived,
@@ -11,6 +12,8 @@ import {
   type MatchListItemDto,
   type MatchOfferDto,
 } from '@/api/generated';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { isCandidate, isRecruiter } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
 import type { BusinessMessages } from '@/lib/feedback/failureMessage';
@@ -48,7 +51,8 @@ interface ListRow {
   /** The offer at stake, when the row does not already name it. */
   offer?: string;
   time: string;
-  avatarClass: string;
+  /** The machine-readable date behind `time`. */
+  dateTime: string;
   avatarUrl: string | null;
   isNew?: boolean;
   /**
@@ -59,9 +63,7 @@ interface ListRow {
   matchId?: number;
 }
 
-const avatarClasses = ['bg-brand', 'bg-violet', 'bg-[#e8a712]', 'bg-[#0ea5b5]', 'bg-[#df3c7d]'];
-
-const initial = (name: string) => name.charAt(0).toUpperCase();
+const initial = (name: string) => name.trim().charAt(0).toUpperCase();
 
 /**
  * A recruiter reads their own offers on these rows and has several of them, so
@@ -91,7 +93,7 @@ function matchRow(match: MatchListItemDto): ListRow {
     role: match.counterpart.headline ?? match.offer.title,
     offer: offerLine(match.counterpart, match.offer),
     time: timeSince(match.matchedAt),
-    avatarClass: avatarClasses[match.id % avatarClasses.length],
+    dateTime: match.matchedAt,
     avatarUrl: fileUrl(match.counterpart.avatarUrl),
     isNew: age >= 0 && age < DAY_IN_MS,
     matchId: match.id,
@@ -105,7 +107,7 @@ function sentRow(like: LikeListItemDto): ListRow {
     name: like.counterpart.name,
     role: like.counterpart.headline ?? like.offer.title,
     time: timeSince(like.likedAt),
-    avatarClass: avatarClasses[like.offerId % avatarClasses.length],
+    dateTime: like.likedAt,
     avatarUrl: fileUrl(like.counterpart.avatarUrl),
   };
 }
@@ -120,7 +122,7 @@ function receivedRow(like: LikeListItemDto): ListRow {
     role: like.counterpart.headline ?? like.offer.title,
     offer: offerLine(like.counterpart, like.offer),
     time: timeSince(like.likedAt),
-    avatarClass: avatarClasses[like.counterpart.id % avatarClasses.length],
+    dateTime: like.likedAt,
     avatarUrl: fileUrl(like.counterpart.avatarUrl),
   };
 }
@@ -142,6 +144,15 @@ const loadReceived: LoadPage = (page) =>
  */
 const MORE_FAILURE = 'Impossible de charger la suite.';
 
+/** Where each role goes looking for someone to like. */
+const CANDIDATE_FEED_PATH = '/candidat/offres';
+const RECRUITER_OFFERS_PATH = '/recruteur/offres';
+
+interface EmptyAction {
+  label: string;
+  to: string;
+}
+
 /**
  * Each tab carries its own wording: an empty match list, an empty like list and
  * a silent inbox are not the same silence, and neither is a failure to load one
@@ -153,20 +164,29 @@ interface TabModel {
   slug: string;
   label: string;
   empty: string;
+  emptyHint: string;
+  emptyIcon: LucideIcon;
+  /** Absent when the role has nowhere obvious to be sent. */
+  emptyAction?: EmptyAction;
   failure: string;
   moreFailure: string;
   listLabel: string;
   load: LoadPage;
 }
 
+const BROWSE_OFFERS: EmptyAction = { label: 'Parcourir les offres', to: CANDIDATE_FEED_PATH };
+const SEE_MY_OFFERS: EmptyAction = { label: 'Voir mes offres', to: RECRUITER_OFFERS_PATH };
+
 const MATCHES_TAB: TabModel = {
   value: 'matches',
   slug: 'matches',
-  label: 'Matches',
-  empty: 'Aucun match pour le moment.',
-  failure: 'Impossible de charger tes matches.',
+  label: 'Matchs',
+  empty: 'Aucun match pour le moment',
+  emptyHint: 'Quand l’intérêt est réciproque, le match apparaît ici.',
+  emptyIcon: HeartHandshake,
+  failure: 'Impossible de charger vos matchs.',
   moreFailure: MORE_FAILURE,
-  listLabel: 'Matches',
+  listLabel: 'Matchs',
   load: loadMatches,
 };
 
@@ -174,8 +194,11 @@ const SENT_TAB: TabModel = {
   value: 'sent',
   slug: 'mes-likes',
   label: 'Mes likes',
-  empty: 'Vous n’avez encore liké aucune offre.',
-  failure: 'Impossible de charger tes likes.',
+  empty: 'Aucune offre likée',
+  emptyHint: 'Les offres qui vous intéressent, en attendant la réponse de l’entreprise.',
+  emptyIcon: Heart,
+  emptyAction: BROWSE_OFFERS,
+  failure: 'Impossible de charger vos likes.',
   moreFailure: MORE_FAILURE,
   listLabel: 'Mes likes',
   load: loadSent,
@@ -185,7 +208,10 @@ const RECEIVED_TAB: TabModel = {
   value: 'received',
   slug: 'recus',
   label: 'Reçus',
-  empty: 'Aucun candidat n’a encore liké tes offres.',
+  empty: 'Aucun like reçu pour le moment',
+  emptyHint: 'Les candidats qui s’intéressent à l’une de vos offres attendent ici votre réponse.',
+  emptyIcon: Inbox,
+  emptyAction: SEE_MY_OFFERS,
   failure: 'Impossible de charger les likes reçus.',
   moreFailure: MORE_FAILURE,
   listLabel: 'Reçus',
@@ -201,11 +227,28 @@ const RECEIVED_TAB: TabModel = {
  * candidate list by default — it is the only tab true of both.
  */
 function tabsFor(userType: string | undefined): readonly TabModel[] {
+  const candidate = isCandidate(userType);
+  const recruiter = isRecruiter(userType);
+  const emptyAction = candidate ? BROWSE_OFFERS : recruiter ? SEE_MY_OFFERS : undefined;
+
   return [
-    MATCHES_TAB,
-    ...(isCandidate(userType) ? [SENT_TAB] : []),
-    ...(isRecruiter(userType) ? [RECEIVED_TAB] : []),
+    { ...MATCHES_TAB, emptyAction },
+    ...(candidate ? [SENT_TAB] : []),
+    ...(recruiter ? [RECEIVED_TAB] : []),
   ];
+}
+
+/** One line under the title, saying what the screen holds for this role. */
+function subtitleFor(userType: string | undefined): string {
+  if (isCandidate(userType)) {
+    return 'Les entreprises qui s’intéressent aussi à vous, et les offres que vous avez likées.';
+  }
+
+  if (isRecruiter(userType)) {
+    return 'Les candidats avec qui l’intérêt est réciproque, et ceux qui attendent votre réponse.';
+  }
+
+  return 'Les personnes avec qui l’intérêt est réciproque.';
 }
 
 interface PagedList {
@@ -321,25 +364,21 @@ const UNMATCH_FAILURE: BusinessMessages = {};
 const isAlreadyEnded = (cause: unknown): boolean =>
   cause instanceof ApiError && cause.status === 404;
 
-/**
- * Ending a match cannot be undone, so it is asked twice. The question is raised
- * in the row rather than in a modal: this codebase has no dialog primitive, and
- * a hand-rolled one would have to earn a focus trap, a restore and an escape
- * key for a two-word question. In the row, the confirmation stays next to the
- * name it is about and the focus never leaves the list.
- */
-function UnmatchAction({
-  matchId,
-  name,
-  onEnded,
-}: {
-  matchId: number;
-  name: string;
-  onEnded: () => void;
-}) {
+interface Unmatch {
+  state: UnmatchState;
+  ask: () => void;
+  cancel: () => void;
+  confirm: () => Promise<void>;
+}
+
+function useUnmatch(matchId: number | undefined, name: string, onEnded: () => void): Unmatch {
   const [state, setState] = useState<UnmatchState>('idle');
 
   const confirm = async (): Promise<void> => {
+    if (matchId === undefined) {
+      return;
+    }
+
     setState('pending');
 
     try {
@@ -361,46 +400,91 @@ function UnmatchAction({
     onEnded();
   };
 
-  if (state === 'idle') {
-    return (
-      <button
-        type="button"
-        // The visible label is the same on every row, so the accessible one
-        // names the counterpart: it is the only thing telling two rows apart.
-        aria-label={`Mettre fin au match avec ${name}`}
-        onClick={() => setState('confirming')}
-        className="cursor-pointer self-end px-3 text-[0.55rem] font-semibold text-ink-faint underline transition-colors hover:text-destructive sm:text-xs"
-      >
-        Mettre fin au match
-      </button>
-    );
-  }
+  return {
+    state,
+    ask: () => setState('confirming'),
+    cancel: () => setState('idle'),
+    confirm,
+  };
+}
 
-  const isPending = state === 'pending';
+/**
+ * Ending a match cannot be undone, so it is asked twice. The question is raised
+ * in the row rather than in a modal: this codebase has no dialog primitive, and
+ * a hand-rolled one would have to earn a focus trap, a restore and an escape
+ * key for a two-word question. In the row, the confirmation stays next to the
+ * name it is about and the focus never leaves the list.
+ */
+function UnmatchTrigger({ name, unmatch }: { name: string; unmatch: Unmatch }) {
+  const isOpen = unmatch.state !== 'idle';
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2 px-3 text-[0.55rem] sm:text-xs">
-      <span className="text-ink-muted">Mettre fin au match avec {name} ?</span>
-      <button
+    <button
+      type="button"
+      // The control is the same on every row, so its name carries the
+      // counterpart: it is the only thing telling two rows apart.
+      aria-label={`Mettre fin au match avec ${name}`}
+      aria-expanded={isOpen}
+      title="Mettre fin au match"
+      disabled={unmatch.state === 'pending'}
+      onClick={isOpen ? unmatch.cancel : unmatch.ask}
+      className={cn(
+        'mr-2 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl transition-colors focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none disabled:cursor-default disabled:opacity-50',
+        isOpen
+          ? 'bg-destructive-tint text-destructive'
+          : 'text-ink-faint hover:bg-destructive-tint hover:text-destructive',
+      )}
+    >
+      <HeartOff aria-hidden="true" className="size-5" />
+    </button>
+  );
+}
+
+function UnmatchConfirmation({ name, unmatch }: { name: string; unmatch: Unmatch }) {
+  const isPending = unmatch.state === 'pending';
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2 px-4 pb-3">
+      <span className="mr-auto text-sm text-ink-muted">Mettre fin au match avec {name} ?</span>
+      <Button
         type="button"
-        aria-label={isPending ? undefined : `Confirmer la fin du match avec ${name}`}
-        disabled={isPending}
-        onClick={() => void confirm()}
-        className="cursor-pointer font-semibold text-destructive underline disabled:cursor-default disabled:text-ink-faint disabled:no-underline"
-      >
-        {isPending ? 'Suppression…' : 'Confirmer'}
-      </button>
-      <button
-        type="button"
+        variant="ghost"
+        size="lg"
+        className="h-11 rounded-xl px-4 text-ink-muted hover:bg-surface hover:text-ink"
         // Nothing to cancel once the call is in flight: the server is already
         // deciding, and re-offering the way out would promise a rollback.
         disabled={isPending}
-        onClick={() => setState('idle')}
-        className="cursor-pointer font-semibold text-ink-muted underline disabled:cursor-default disabled:text-ink-faint disabled:no-underline"
+        onClick={unmatch.cancel}
       >
         Annuler
-      </button>
+      </Button>
+      <Button
+        type="button"
+        variant="destructive"
+        size="lg"
+        className="h-11 rounded-xl px-4"
+        aria-label={isPending ? undefined : `Confirmer la fin du match avec ${name}`}
+        disabled={isPending}
+        onClick={() => void unmatch.confirm()}
+      >
+        {isPending ? 'Suppression…' : 'Confirmer'}
+      </Button>
     </div>
+  );
+}
+
+function Avatar({ row }: { row: ListRow }) {
+  return (
+    <span
+      className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-tint text-base font-extrabold text-brand-strong"
+      aria-hidden="true"
+    >
+      {row.avatarUrl ? (
+        <img src={row.avatarUrl} alt="" className="size-full object-cover" />
+      ) : (
+        initial(row.name)
+      )}
+    </span>
   );
 }
 
@@ -413,72 +497,103 @@ function Row({
   from: string;
   onRemove: (key: string) => void;
 }) {
+  const unmatch = useUnmatch(row.matchId, row.name, () => onRemove(row.key));
+
   const body = (
     <>
-      <span
-        className={cn(
-          'flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full font-heading text-sm font-bold text-white shadow-sm sm:size-10',
-          row.avatarClass,
-        )}
-        aria-hidden="true"
-      >
-        {row.avatarUrl ? (
-          <img src={row.avatarUrl} alt="" className="size-full object-cover" />
-        ) : (
-          initial(row.name)
-        )}
-      </span>
+      <Avatar row={row} />
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="truncate text-xs font-bold text-ink sm:text-sm">{row.name}</span>
+        <span className="flex items-center gap-2">
+          <span className="truncate text-sm font-bold text-ink">{row.name}</span>
           {row.isNew && (
-            <span className="rounded-full bg-brand-tint px-1.5 py-0.5 text-[0.5rem] font-bold tracking-wide text-brand uppercase">
-              New
+            <span className="shrink-0 rounded-full bg-brand-tint px-2 py-0.5 text-xs font-semibold text-brand-strong">
+              Nouveau
             </span>
           )}
         </span>
-        <span className="mt-0.5 block truncate text-[0.6rem] text-ink-muted sm:text-xs">
-          {row.role}
-        </span>
+        <span className="mt-0.5 block truncate text-xs text-ink-muted">{row.role}</span>
         {row.offer !== undefined && (
-          <span className="block truncate text-[0.55rem] text-ink-faint sm:text-xs">
-            {row.offer}
-          </span>
+          <span className="mt-0.5 block truncate text-xs text-ink-muted">{row.offer}</span>
         )}
       </span>
-      <time className="shrink-0 text-[0.55rem] text-ink-faint sm:text-xs">{row.time}</time>
+      <time dateTime={row.dateTime} className="tabular shrink-0 text-xs text-ink-muted">
+        {row.time}
+      </time>
     </>
   );
 
-  const shell =
-    'flex w-full items-center gap-3 rounded-2xl bg-card px-3 py-2.5 text-left shadow-[0_8px_22px_-18px_rgba(11,27,23,0.5)] sm:min-h-15 sm:px-4';
+  const shell = 'flex min-h-16 min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left';
 
   return (
     // The action is a sibling of the link, never inside it: a button nested in
     // an anchor is invalid, and a click on the row would then fire both.
-    <li className="flex flex-col gap-1">
-      {row.to === undefined ? (
-        <div className={shell}>{body}</div>
-      ) : (
-        // A real link, not a clickable `div`: the row has to be reachable with
-        // a keyboard and openable in a new tab.
-        <Link
-          to={row.to}
-          // Where the reader came from, so the screen they open can bring them
-          // back to this very tab rather than to the role's home.
-          state={{ from }}
-          className={cn(
-            shell,
-            'transition-shadow hover:shadow-[0_10px_26px_-16px_rgba(11,27,23,0.55)]',
-          )}
-        >
-          {body}
-        </Link>
-      )}
-      {row.matchId !== undefined && (
-        <UnmatchAction matchId={row.matchId} name={row.name} onEnded={() => onRemove(row.key)} />
+    <li>
+      <div className="flex items-center">
+        {row.to === undefined ? (
+          <div className={shell}>{body}</div>
+        ) : (
+          // A real link, not a clickable `div`: the row has to be reachable with
+          // a keyboard and openable in a new tab.
+          <Link
+            to={row.to}
+            // Where the reader came from, so the screen they open can bring them
+            // back to this very tab rather than to the role's home.
+            state={{ from }}
+            className={cn(
+              shell,
+              'transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none focus-visible:ring-inset',
+            )}
+          >
+            {body}
+          </Link>
+        )}
+        {row.matchId !== undefined && <UnmatchTrigger name={row.name} unmatch={unmatch} />}
+      </div>
+      {row.matchId !== undefined && unmatch.state !== 'idle' && (
+        <UnmatchConfirmation name={row.name} unmatch={unmatch} />
       )}
     </li>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div
+      aria-hidden="true"
+      className="divide-y divide-line rounded-2xl border border-line bg-card shadow-card"
+    >
+      {[0, 1, 2].map((row) => (
+        <div key={row} className="flex min-h-16 items-center gap-3 px-4 py-3">
+          <div className="size-11 shrink-0 animate-pulse rounded-full bg-surface" />
+          <div className="flex flex-1 flex-col gap-2">
+            <div className="h-3.5 w-2/5 animate-pulse rounded-xl bg-surface" />
+            <div className="h-3 w-3/5 animate-pulse rounded-xl bg-surface" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyTab({ tab }: { tab: TabModel }) {
+  const Icon = tab.emptyIcon;
+
+  return (
+    <div className="flex flex-col items-center px-6 py-12 text-center">
+      <span className="flex size-14 items-center justify-center rounded-full bg-brand-tint text-brand">
+        <Icon aria-hidden="true" className="size-6" />
+      </span>
+      <h2 className="mt-4 text-lg font-bold text-ink">{tab.empty}</h2>
+      <p className="mt-2 max-w-xs text-sm leading-relaxed text-ink-muted">{tab.emptyHint}</p>
+      {tab.emptyAction && (
+        <Link
+          to={tab.emptyAction.to}
+          className={cn(buttonVariants({ variant: 'brand', size: 'xl' }), 'mt-6 w-full max-w-xs')}
+        >
+          {tab.emptyAction.label}
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -526,68 +641,91 @@ export function MatchesPage() {
 
   return (
     <div className="mx-auto max-w-3xl md:mx-0 lg:max-w-4xl xl:max-w-5xl">
-      <h1 className="mt-5 font-heading text-xl font-bold text-ink md:mt-0 md:text-2xl">
+      {/* The title names the open tab: a recruiter reading « Reçus » is not
+          reading their matches. */}
+      <h1 className="mt-5 text-2xl font-extrabold text-ink md:mt-0 md:text-[1.75rem]">
         {tab.listLabel}
       </h1>
-      <div className="mt-3 border-b border-line">
-        <div role="tablist" aria-label="Filtrer les matches" className="flex gap-6 sm:gap-10">
-          {tabs.map((item) => {
-            const isActive = item.value === tab.value;
-            return (
-              <button
-                key={item.value}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => open(item)}
-                className={cn(
-                  '-mb-px cursor-pointer border-b-2 px-0.5 pb-2 text-[0.65rem] transition-colors sm:text-xs',
-                  isActive
-                    ? 'border-brand font-semibold text-brand-strong'
-                    : 'border-transparent text-ink-muted hover:text-ink',
-                )}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <ul
-        className="mt-4 flex flex-col gap-2.5 sm:mt-5 sm:gap-3"
-        aria-label={`${tab.listLabel} liste`}
+      <p className="mt-1 text-sm text-ink-muted">{subtitleFor(user?.userType)}</p>
+
+      <div
+        role="tablist"
+        aria-label="Filtrer les matchs"
+        className="mt-5 inline-flex rounded-xl bg-surface p-1"
       >
+        {tabs.map((item) => {
+          const isActive = item.value === tab.value;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => open(item)}
+              className={cn(
+                'h-10 cursor-pointer rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none',
+                isActive ? 'bg-card text-ink shadow-card' : 'text-ink-muted hover:text-ink',
+              )}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4">
         {list.state === 'loading' && (
-          <li className="px-3 py-4 text-sm text-ink-muted">Chargement…</li>
+          <>
+            <p role="status" className="sr-only">
+              Chargement…
+            </p>
+            <ListSkeleton />
+          </>
         )}
         {list.state === 'failed' && (
-          <li className="px-3 py-4 text-sm text-ink-muted">{tab.failure}</li>
+          <p
+            role="alert"
+            className="rounded-2xl border border-line bg-card px-4 py-6 text-center text-sm text-destructive shadow-card"
+          >
+            {tab.failure}
+          </p>
         )}
-        {list.state === 'ready' && list.rows.length === 0 && (
-          <li className="px-3 py-4 text-sm text-ink-muted">{tab.empty}</li>
+        {list.state === 'ready' && list.rows.length === 0 && <EmptyTab tab={tab} />}
+        {list.state === 'ready' && list.rows.length > 0 && (
+          <ul
+            aria-label={`${tab.listLabel} liste`}
+            className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card shadow-card"
+          >
+            {list.rows.map((row) => (
+              <Row key={row.key} row={row} from={from} onRemove={list.remove} />
+            ))}
+          </ul>
         )}
-        {list.state === 'ready' &&
-          list.rows.map((row) => (
-            <Row key={row.key} row={row} from={from} onRemove={list.remove} />
-          ))}
-      </ul>
+      </div>
+
       {list.state === 'ready' && list.more === 'failed' && (
-        <p role="alert" className="mt-4 text-sm text-destructive">
+        <p role="alert" className="mt-4 text-center text-sm text-destructive">
           {tab.moreFailure}{' '}
-          <button type="button" onClick={list.loadMore} className="cursor-pointer underline">
+          <button
+            type="button"
+            onClick={list.loadMore}
+            className="cursor-pointer font-semibold text-brand-strong underline underline-offset-2 focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
+          >
             Réessayer
           </button>
         </p>
       )}
       {list.state === 'ready' && list.hasMore && list.more !== 'failed' && (
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="lg"
           onClick={list.loadMore}
           disabled={list.more === 'loading'}
-          className="mt-4 w-full cursor-pointer rounded-2xl border border-line px-4 py-2.5 text-xs font-semibold text-ink-muted transition-colors hover:text-ink disabled:cursor-default disabled:text-ink-faint sm:text-sm"
+          className="mt-4 h-11 w-full rounded-xl"
         >
           {list.more === 'loading' ? 'Chargement…' : 'Voir plus'}
-        </button>
+        </Button>
       )}
     </div>
   );

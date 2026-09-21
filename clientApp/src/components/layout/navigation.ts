@@ -29,8 +29,8 @@ export function navigationItems(isRecruiter: boolean): NavigationItem[] {
   return [
     ...(isRecruiter
       ? [{ label: 'Mes offres', to: '/recruteur/offres' }]
-      : [{ label: 'Feed', to: '/candidat/offres' }]),
-    { label: 'Matches', to: '/matches' },
+      : [{ label: 'Offres', to: '/candidat/offres' }]),
+    { label: 'Matchs', to: '/matches' },
     { label: 'Profil', to: '/profil' },
   ];
 }

@@ -89,6 +89,16 @@ describe('CandidateFeedPage', () => {
     expect(screen.queryByText(/offres correspondent/)).not.toBeInTheDocument();
   });
 
+  it('situe la carte courante dans le deck', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText('Offre 1 sur 2')).toBeVisible();
+
+    await user.click(button('Passer'));
+    expect(screen.getByText('Offre 2 sur 2')).toBeVisible();
+  });
+
   it('avance dans le deck après un passage ou un like', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -96,8 +106,8 @@ describe('CandidateFeedPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Passer' }));
     expect(heading('Data Analyst')).toBeVisible();
 
-    await user.click(button('Liker'));
-    expect(heading('Tu as tout vu')).toBeVisible();
+    await user.click(button("Ça m'intéresse"));
+    expect(heading('Vous avez tout vu')).toBeVisible();
     expect(screen.getByText('1 offre likée')).toBeVisible();
   });
 
@@ -109,7 +119,7 @@ describe('CandidateFeedPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Passer' }));
     expect(like).not.toHaveBeenCalled();
 
-    await user.click(button('Liker'));
+    await user.click(button("Ça m'intéresse"));
 
     await waitFor(() => expect(like).toHaveBeenCalledWith(anotherOffer.id));
     expect(like).toHaveBeenCalledTimes(1);
@@ -125,7 +135,7 @@ describe('CandidateFeedPage', () => {
     like.mockRejectedValue(new Error('réseau'));
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Liker' }));
+    await user.click(await screen.findByRole('button', { name: "Ça m'intéresse" }));
 
     expect(heading('Data Analyst')).toBeVisible();
   });
@@ -150,7 +160,7 @@ describe('CandidateFeedPage', () => {
     expect(heading('Data Analyst')).toBeVisible();
 
     await user.keyboard('{ArrowLeft}');
-    expect(heading('Tu as tout vu')).toBeVisible();
+    expect(heading('Vous avez tout vu')).toBeVisible();
   });
 
   it('propose de réessayer quand le chargement échoue', async () => {
@@ -171,7 +181,7 @@ describe('CandidateFeedPage', () => {
   it('n’annonce nulle part la fin du deck pendant le chargement', () => {
     renderPage();
 
-    expect(screen.queryByText(/tu as tout vu/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/vous avez tout vu/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/aucune offre ne correspond/i)).not.toBeInTheDocument();
   });
 
@@ -183,11 +193,11 @@ describe('CandidateFeedPage', () => {
 
     await screen.findByRole('alert');
 
-    expect(screen.queryByText(/tu as tout vu/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/vous avez tout vu/i)).not.toBeInTheDocument();
   });
 
   /**
-   * « Tu as tout vu » est faux quand le deck arrive vide : le candidat n'a rien
+   * « Vous avez tout vu » est faux quand le deck arrive vide : le candidat n'a rien
    * vu, ses critères n'ont rien laissé passer. Le message doit le renvoyer à
    * son profil, pas le féliciter.
    */
@@ -196,7 +206,7 @@ describe('CandidateFeedPage', () => {
     renderPage();
 
     expect(
-      await screen.findByRole('heading', { name: 'Aucune offre ne correspond à tes critères' }),
+      await screen.findByRole('heading', { name: 'Aucune offre ne correspond à vos critères' }),
     ).toBeInTheDocument();
   });
 
@@ -207,7 +217,7 @@ describe('CandidateFeedPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Passer' }));
 
-    expect(screen.getByRole('heading', { name: 'Tu as tout vu' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Vous avez tout vu' })).toBeInTheDocument();
   });
 
   it('reports a newly created company match to the route', async () => {
@@ -235,7 +245,7 @@ describe('CandidateFeedPage', () => {
     } as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
 
     renderPage(undefined, onMatch);
-    await user.click(await screen.findByRole('button', { name: 'Liker' }));
+    await user.click(await screen.findByRole('button', { name: "Ça m'intéresse" }));
 
     await waitFor(() =>
       expect(onMatch).toHaveBeenCalledWith({

@@ -18,7 +18,7 @@ const thousands = (amount: number): number => Math.round(amount / 1000);
 
 export const offerSalaryLabel = (min: number | null, max: number | null): string => {
   if (min !== null && max !== null) {
-    return `${thousands(min)} - ${thousands(max)} k€`;
+    return `${thousands(min)}–${thousands(max)} k€`;
   }
 
   if (min !== null) {

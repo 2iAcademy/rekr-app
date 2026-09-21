@@ -8,11 +8,12 @@ import { notifySuccess } from '@/lib/feedback/notify';
 
 interface LogoutButtonProps {
   /**
-   * How the chrome around it needs it to look. `inline` is the full-width entry
-   * of the sidebar and the mobile menu; `icon` is the tablet header, where the
-   * bar is already crowded and only the icon fits.
+   * How the screen around it needs it to look. `inline` is the entry of the
+   * sidebar; `icon` is the tablet header, where the bar is already crowded and
+   * only the icon fits; `row` is the full-width row closing the account page on
+   * a phone, where neither chrome carries it.
    */
-  appearance?: 'inline' | 'icon';
+  appearance?: 'inline' | 'icon' | 'row';
   className?: string;
 }
 
@@ -51,6 +52,24 @@ export function LogoutButton({ appearance = 'inline', className }: LogoutButtonP
         className={cn('text-ink-muted hover:text-destructive', className)}
       >
         <LogOut aria-hidden="true" className="size-5" />
+      </Button>
+    );
+  }
+
+  if (appearance === 'row') {
+    return (
+      <Button
+        variant="outline"
+        size="xl"
+        disabled={leaving}
+        onClick={end}
+        className={cn(
+          'w-full justify-start gap-3 px-4 text-ink hover:border-destructive/30 hover:bg-destructive-tint hover:text-destructive',
+          className,
+        )}
+      >
+        <LogOut aria-hidden="true" className="size-5 shrink-0" />
+        {LABEL}
       </Button>
     );
   }

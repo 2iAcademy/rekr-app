@@ -1,23 +1,29 @@
-import { Heart, X } from 'lucide-react';
-import { AvatarBanner } from '@/components/ui/avatar-banner';
-import { Button } from '@/components/ui/button';
-import { chipVariants } from '@/components/ui/chip-variants';
-import { SectionTitle } from '@/components/ui/section-title';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, Check, Heart, HeartHandshake, X } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useParams } from 'react-router';
 import {
   offerControllerFindOneById,
   offerControllerLike,
   offerControllerPass,
   offerControllerUnlike,
 } from '@/api/generated';
+import type { OfferDetailDto, TagCategory } from '@/api/generated';
 import { ApiError } from '@/api/customFetch';
-import { notifyFailure } from '@/lib/feedback/notify';
-import type { BusinessMessages } from '@/lib/feedback/failureMessage';
+import { ChipList } from '@/components/feed/ChipList';
+import { contractLabel, metaLine, offerSalaryLabel } from '@/components/feed/labels';
+import { AvatarBanner } from '@/components/ui/avatar-banner';
+import { Button } from '@/components/ui/button';
+import { SKILL_CHIP } from '@/components/ui/chip-variants';
+import { MarkdownText } from '@/components/ui/markdown-text';
+import { SectionTitle } from '@/components/ui/section-title';
+import { EXPERIENCE_LEVEL_OPTIONS, REMOTE_POLICY_OPTIONS } from '@/domain/options';
 import { likeFailureBusiness } from '@/features/candidate-feed/likeFeedback';
 import { matchedCompany } from '@/features/matches/likeResult';
-import type { OfferDetailDto, TagCategory } from '@/api/generated';
+import type { BusinessMessages } from '@/lib/feedback/failureMessage';
+import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
 import { fileUrl } from '@/lib/fileUrl';
-import { useParams } from 'react-router';
+import { cn } from '@/lib/utils';
+import { FactList } from '@/components/ui/fact-list';
 
 const UNLIKE_CONFLICT = 'Ce like ne peut plus être retiré.';
 
@@ -53,6 +59,66 @@ interface OfferDetailPageProps {
   onMatch?: (matchedProfile: MatchedProfile) => void;
 }
 
+/** Same wording as the feed card: an empty field is said, not left blank. */
+const NOT_SPECIFIED = 'Non précisé';
+
+const labelOf = <T extends string>(
+  options: readonly { value: T; label: string }[],
+  value: T | null,
+): string =>
+  value === null
+    ? NOT_SPECIFIED
+    : (options.find((option) => option.value === value)?.label ?? NOT_SPECIFIED);
+
+function TopBar({ onBack }: { onBack?: () => void }) {
+  return (
+    <header className="sticky top-0 z-10 flex h-14 items-center gap-1 bg-background px-2">
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Fermer"
+        className="flex size-11 cursor-pointer items-center justify-center rounded-xl text-ink transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
+      >
+        <ArrowLeft aria-hidden="true" className="size-5" />
+      </button>
+      <h1 className="text-base font-bold text-ink">Détail</h1>
+    </header>
+  );
+}
+
+function SectionCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3 p-5">
+      <SectionTitle>{title}</SectionTitle>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * A decision already taken, shown where the buttons would be: the same size as
+ * them, so the bar does not jump, but not a control — there is nothing to press.
+ */
+function SettledDecision({ tone, children }: { tone: 'match' | 'neutral'; children: ReactNode }) {
+  return (
+    <p
+      className={cn(
+        'flex min-h-12 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-center text-[0.9375rem] font-bold',
+        tone === 'match'
+          ? 'border-transparent bg-brand-tint text-brand-strong'
+          : 'border-line bg-card text-ink',
+      )}
+    >
+      {tone === 'match' ? (
+        <HeartHandshake aria-hidden="true" className="size-5 shrink-0" />
+      ) : (
+        <Check aria-hidden="true" className="size-5 shrink-0 text-success" />
+      )}
+      {children}
+    </p>
+  );
+}
+
 export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProps) {
   const { id } = useParams();
   const [offer, setOffer] = useState<OfferDetailDto | null>(null);
@@ -81,16 +147,32 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
 
   if (isLoading) {
     return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg items-center justify-center bg-background">
-        <p className="text-sm text-ink-muted">Chargement…</p>
+      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background">
+        <TopBar onBack={onBack} />
+        <div className="flex flex-col gap-3 px-4 pb-6">
+          <p role="status" className="sr-only">
+            Chargement…
+          </p>
+          <div aria-hidden="true" className="flex flex-col gap-3">
+            <div className="h-36 animate-pulse rounded-2xl bg-surface" />
+            <div className="h-44 animate-pulse rounded-2xl bg-surface" />
+            <div className="h-28 animate-pulse rounded-2xl bg-surface" />
+          </div>
+        </div>
       </main>
     );
   }
 
   if (error || !offer) {
     return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col items-center justify-center gap-4 bg-background">
-        <p className="text-sm text-ink-muted">{error ?? 'Offre introuvable.'}</p>
+      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background">
+        <TopBar onBack={onBack} />
+        <div className="flex flex-1 flex-col items-center justify-center px-6 pb-16 text-center">
+          <p role="alert" className="text-[0.9375rem] font-bold text-ink">
+            {error ?? 'Offre introuvable.'}
+          </p>
+          <p className="mt-1 text-sm text-ink-muted">Elle a peut-être été retirée entre-temps.</p>
+        </div>
       </main>
     );
   }
@@ -111,7 +193,14 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
     try {
       const response = await offerControllerLike(offer.id);
       const counterpart = matchedCompany(response.data);
-      if (counterpart) onMatch?.({ name: counterpart.name, avatarUrl: counterpart.avatarUrl });
+      if (counterpart) {
+        onMatch?.({ name: counterpart.name, avatarUrl: counterpart.avatarUrl });
+        return;
+      }
+      // No match yet: the interest is recorded, so the screen says so and moves
+      // to the liked state the server now holds (a like replaces a pass).
+      setOffer((current) => (current ? { ...current, liked: true, passed: false } : current));
+      notifySuccess(`Intérêt envoyé à ${offer.company.name}.`);
     } catch (cause) {
       notifyFailure(cause, likeFailureBusiness);
     } finally {
@@ -130,7 +219,7 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
     }
   };
 
-  const { company, tags, salaryMin, salaryMax, remotePolicy, city } = offer;
+  const { company, tags, city } = offer;
   // The three keys are served to the candidate alone: on a recruiter's read they
   // are absent, which is not the same answer as `false` and must not read as one.
   // A match does not erase the like, so `matched` is read first: taken the other
@@ -143,144 +232,121 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
     tags.filter((tag) => categories.includes(tag.category)).map((tag) => tag.label);
   const stack = labelsOf('skill', 'tech');
   const benefits = labelsOf('benefit');
-  const toK = (value: number | null) => (value != null ? Math.round(value / 1000) : '?');
-  const salary =
-    salaryMin != null || salaryMax != null
-      ? `${toK(salaryMin)} - ${toK(salaryMax)} k€`
-      : 'Non communiqué';
+  const contract = offer.contractType === null ? null : contractLabel(offer.contractType);
+  const facts = [
+    { label: 'Contrat', value: contract ?? NOT_SPECIFIED },
+    { label: 'Télétravail', value: labelOf(REMOTE_POLICY_OPTIONS, offer.remotePolicy) },
+    { label: 'Expérience', value: labelOf(EXPERIENCE_LEVEL_OPTIONS, offer.minExperienceLevel) },
+    { label: 'Salaire', value: offerSalaryLabel(offer.salaryMin, offer.salaryMax) },
+  ];
 
   return (
-    <main
-      data-role="candidat"
-      className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background"
-    >
-      <header className="absolute top-0 left-0 right-0 z-10 flex h-12 items-center justify-between px-4 pt-3">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Fermer"
-          className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-card text-ink shadow-sm transition-colors hover:bg-muted"
-        >
-          <X className="size-5" />
-        </button>
-        <h1 className="font-heading text-base font-bold text-ink">Détail</h1>
-        <div className="size-9" aria-hidden="true" />
-      </header>
+    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background">
+      <TopBar onBack={onBack} />
 
-      <AvatarBanner size="lg" name={company.name} imageUrl={companyLogoUrl} />
-
-      <section className="relative -mt-4 flex flex-1 flex-col rounded-t-3xl bg-background px-6 pt-6 pb-32">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-heading text-2xl font-bold text-ink">{offer.title}</h2>
-          <p className="text-sm text-ink-muted">
-            {company.name}
-            {company.size ? ` · ${company.size}` : ''}
-            {city ? ` · ${city}` : ''}
-          </p>
-        </div>
-
-        <div className="mt-6 flex flex-col gap-3">
-          <SectionTitle>Stack technique</SectionTitle>
-          <div className="flex flex-wrap gap-2">
-            {stack.map((tech) => (
-              <span key={tech} className={chipVariants({ size: 'sm' })}>
-                {tech}
-              </span>
-            ))}
-            {remotePolicy && (
-              <span className={chipVariants({ size: 'sm' })}>
-                {remotePolicy === 'FULL_REMOTE'
-                  ? 'Remote'
-                  : remotePolicy === 'HYBRID'
-                    ? 'Hybride'
-                    : 'Présentiel'}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-6 flex flex-col gap-1">
-          <SectionTitle>Salaire</SectionTitle>
-          <p className="text-base font-bold text-ink">{salary}</p>
-        </div>
-
-        {benefits.length > 0 && (
-          <div className="mt-6 flex flex-col gap-3">
-            <SectionTitle>Avantages</SectionTitle>
-            <div className="flex flex-wrap gap-2">
-              {benefits.map((benefit) => (
-                <span key={benefit} className={chipVariants({ size: 'sm' })}>
-                  {benefit}
-                </span>
-              ))}
+      <div className="flex flex-1 flex-col px-4 pb-6">
+        {/* One card for the whole offer — who, what, the facts, then the
+            sections — split by hairlines rather than stacked as separate
+            objects. */}
+        <div className="divide-y divide-line rounded-2xl border border-line bg-card shadow-card">
+          <section className="p-5">
+            <div className="flex items-center gap-3">
+              <AvatarBanner name={company.name} imageUrl={companyLogoUrl} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-ink">{company.name}</p>
+                <p className="truncate text-xs text-ink-muted">{metaLine([company.size, city])}</p>
+              </div>
             </div>
-          </div>
-        )}
+            <h2 className="mt-4 text-xl leading-tight font-extrabold break-words text-ink sm:text-2xl">
+              {offer.title}
+            </h2>
+          </section>
 
-        {offer.description && (
-          <div className="mt-6 flex flex-col gap-2">
-            <SectionTitle>À propos du poste</SectionTitle>
-            <p className="text-sm leading-relaxed text-ink-muted">{offer.description}</p>
-          </div>
-        )}
+          <section aria-label="En bref" className="px-5 py-2">
+            <FactList facts={facts} />
+          </section>
 
-        {company.description && (
-          <div className="mt-6 flex flex-col gap-2">
-            <SectionTitle>À propos de l'entreprise</SectionTitle>
-            <p className="text-sm leading-relaxed text-ink-muted">{company.description}</p>
-          </div>
-        )}
-      </section>
+          {stack.length > 0 && (
+            <SectionCard title="Compétences">
+              <ChipList label="Compétences" items={stack} chipClassName={SKILL_CHIP} />
+            </SectionCard>
+          )}
 
-      <div className="sticky bottom-0 flex flex-col gap-3 bg-background/80 px-6 py-4 backdrop-blur-md">
-        {(matched || liked || passed) && (
-          <p className="text-center text-sm text-ink-muted">
-            {matched
-              ? 'Cette offre a donné lieu à un match'
-              : liked
-                ? 'Tu as liké cette offre'
-                : 'Tu as passé cette offre'}
-          </p>
-        )}
-        {matched ? null : liked ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="xl"
-            className="w-full rounded-full"
-            onClick={() => void unlike()}
-            disabled={isUnliking}
-          >
-            Retirer mon like
-          </Button>
-        ) : (
-          <div className="flex gap-3">
-            {/* Passing again is a no-op; liking after a pass is a change of
-                mind the reader is entitled to. */}
-            {!passed && (
-              <Button
-                type="button"
-                variant="outline"
-                size="xl"
-                className="flex-1 rounded-full"
-                onClick={() => void pass()}
-                disabled={isPassing}
-              >
-                Passer
-              </Button>
-            )}
+          {benefits.length > 0 && (
+            <SectionCard title="Avantages">
+              <ChipList label="Avantages" items={benefits} chipClassName={SKILL_CHIP} />
+            </SectionCard>
+          )}
+
+          {offer.description && (
+            <SectionCard title="À propos du poste">
+              <MarkdownText source={offer.description} />
+            </SectionCard>
+          )}
+
+          {company.description && (
+            <SectionCard title="À propos de l'entreprise">
+              <MarkdownText source={company.description} />
+            </SectionCard>
+          )}
+        </div>
+      </div>
+
+      <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-line bg-card px-4 py-3">
+        {matched ? (
+          <SettledDecision tone="match">Cette offre a donné lieu à un match</SettledDecision>
+        ) : liked ? (
+          <>
+            <SettledDecision tone="neutral">Vous avez liké cette offre</SettledDecision>
             <Button
               type="button"
-              variant="role"
+              variant="ghost"
               size="xl"
-              className="flex-1 rounded-full"
-              onClick={() => void like()}
-              disabled={isLiking}
+              className="w-full text-ink-muted hover:bg-surface hover:text-ink"
+              onClick={() => void unlike()}
+              disabled={isUnliking}
             >
-              <Heart className="size-5" />
-              Liker
+              Retirer mon like
             </Button>
-          </div>
+          </>
+        ) : (
+          <>
+            {passed && (
+              <p className="text-center text-sm text-ink-muted">Vous avez passé cette offre</p>
+            )}
+            <div
+              role="group"
+              aria-label="Décision sur l'offre"
+              className={cn('grid gap-3', passed ? 'grid-cols-1' : 'grid-cols-2')}
+            >
+              {/* Passing again is a no-op; liking after a pass is a change of
+                  mind the reader is entitled to. */}
+              {!passed && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xl"
+                  className="w-full"
+                  onClick={() => void pass()}
+                  disabled={isPassing}
+                >
+                  <X aria-hidden="true" />
+                  Passer
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="brand"
+                size="xl"
+                className="w-full"
+                onClick={() => void like()}
+                disabled={isLiking}
+              >
+                <Heart aria-hidden="true" />
+                Ça m&apos;intéresse
+              </Button>
+            </div>
+          </>
         )}
       </div>
     </main>

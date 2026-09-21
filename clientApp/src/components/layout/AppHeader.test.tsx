@@ -1,85 +1,44 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { describe, expect, it } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { installDialogDouble } from '@/test/dialog';
 import { AppHeader } from './AppHeader';
 
-// The recruiter's own list: it is the longest one the chromes are handed, so a
-// spec built on it also answers for the candidate's.
+// Longer than either role's real list, so a spec built on it also answers for
+// both of them: the header renders whatever it is handed.
 const items = [
-  { label: 'Feed', to: '/candidat/offres' },
-  { label: 'Matches', to: '/matches' },
+  { label: 'Offres', to: '/candidat/offres' },
+  { label: 'Matchs', to: '/matches' },
   { label: 'Mes offres', to: '/recruteur/offres' },
   { label: 'Profil', to: '/profil' },
 ];
 
 const user = { name: 'sacha', role: 'Recruteur' };
 
-installDialogDouble();
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-/**
- * jsdom implements no `matchMedia` at all, and the project has no double for it.
- * This one exposes the only thing the header uses — a `change` subscription and
- * the current `matches` — plus a handle to cross the breakpoint on demand.
- */
-const stubMatchMedia = () => {
-  const listeners = new Set<() => void>();
-  let matches = false;
-
-  vi.stubGlobal('matchMedia', (media: string) => ({
-    media,
-    get matches() {
-      return matches;
-    },
-    addEventListener: (_type: string, listener: () => void) => {
-      listeners.add(listener);
-    },
-    removeEventListener: (_type: string, listener: () => void) => {
-      listeners.delete(listener);
-    },
-  }));
-
-  return {
-    crossTo: (next: boolean) => {
-      matches = next;
-
-      act(() => {
-        for (const listener of [...listeners]) {
-          listener();
-        }
-      });
-    },
-    listenerCount: () => listeners.size,
-  };
-};
-
 /**
  * A splat route keeps the header mounted whatever the location, so the same
  * render covers both the active-item assertions and the navigation triggered
- * from the mobile menu.
+ * from the header's own links.
  */
-const renderHeader = (initialPath = '/matches') => {
+const renderHeader = (initialPath = '/matches', logoutIcon?: ReactNode) => {
   const router = createMemoryRouter(
-    [{ path: '*', element: <AppHeader items={items} user={user} profileTo="/profil" /> }],
+    [
+      {
+        path: '*',
+        element: (
+          <AppHeader items={items} user={user} profileTo="/profil" logoutIcon={logoutIcon} />
+        ),
+      },
+    ],
     { initialEntries: [initialPath] },
   );
 
-  return render(<RouterProvider router={router} />);
+  return { ...render(<RouterProvider router={router} />), router };
 };
 
 const inlineNavigation = () =>
   screen.getByRole('navigation', { name: 'Navigation de la barre supérieure' });
-
-const openMenu = async (actor: ReturnType<typeof userEvent.setup>) => {
-  await actor.click(screen.getByRole('button', { name: 'Ouvrir le menu' }));
-
-  return screen.getByRole('dialog', { name: 'Menu de navigation' });
-};
 
 describe('AppHeader', () => {
   it('rend les items de navigation en ligne avec leurs destinations', () => {
@@ -88,8 +47,8 @@ describe('AppHeader', () => {
     const links = within(inlineNavigation()).getAllByRole('link');
 
     expect(links.map((link) => link.textContent)).toEqual([
-      'Feed',
-      'Matches',
+      'Offres',
+      'Matchs',
       'Mes offres',
       'Profil',
     ]);
@@ -106,8 +65,30 @@ describe('AppHeader', () => {
 
     const navigation = within(inlineNavigation());
 
-    expect(navigation.getByRole('link', { name: 'Feed' })).toHaveAttribute('aria-current', 'page');
-    expect(navigation.getByRole('link', { name: 'Matches' })).not.toHaveAttribute('aria-current');
+    expect(navigation.getByRole('link', { name: 'Offres' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(navigation.getByRole('link', { name: 'Matchs' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('navigue au clic sur un item en ligne', async () => {
+    const actor = userEvent.setup();
+    const { router } = renderHeader('/candidat/offres');
+
+    await actor.click(within(inlineNavigation()).getByRole('link', { name: 'Matchs' }));
+
+    expect(router.state.location.pathname).toBe('/matches');
+    expect(within(inlineNavigation()).getByRole('link', { name: 'Matchs' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('ramène à l’accueil depuis le logo', () => {
+    renderHeader();
+
+    expect(screen.getByRole('link', { name: 'Accueil' })).toHaveAttribute('href', '/');
   });
 
   it('pointe le lien profil sur la destination fournie et affiche l’initiale du nom', () => {
@@ -134,155 +115,43 @@ describe('AppHeader', () => {
     ]);
   });
 
-  it('n’affiche le menu mobile qu’après un clic sur le burger', async () => {
-    const actor = userEvent.setup();
+  // On a phone the destinations live in the bottom tab bar: the header must not
+  // bring back a second way to the same screens.
+  it('ne porte plus de menu burger', () => {
     renderHeader();
 
-    const burger = screen.getByRole('button', { name: 'Ouvrir le menu' });
-
-    expect(burger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
-    await openMenu(actor);
-
-    expect(burger).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('dialog', { name: 'Menu de navigation' })).toBeInTheDocument();
-  });
-
-  it('ferme le menu mobile au clic sur le bouton de fermeture', async () => {
-    const actor = userEvent.setup();
-    renderHeader();
-    await openMenu(actor);
-
-    await actor.click(screen.getByRole('button', { name: 'Fermer le menu' }));
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ouvrir le menu' })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
-  });
-
-  // Closing the panel unmounts the element that held the focus. Without an
-  // explicit hand-back the focus drops to the body, and keyboard navigation
-  // restarts from the top of the page.
-  it('rend le focus au burger à la fermeture du menu', async () => {
-    const actor = userEvent.setup();
-    renderHeader();
-    await openMenu(actor);
-
-    await actor.click(screen.getByRole('button', { name: 'Fermer le menu' }));
-
-    expect(screen.getByRole('button', { name: 'Ouvrir le menu' })).toHaveFocus();
-  });
-
-  // A click on the `::backdrop` is dispatched on the dialog element itself.
-  it('ferme le menu mobile au clic sur le fond', async () => {
-    const actor = userEvent.setup();
-    renderHeader();
-    const panel = await openMenu(actor);
-
-    await actor.click(panel);
-
+    expect(screen.queryByRole('button', { name: /menu/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  // Escape on a modal dialog reaches the page as `cancel`, an event jsdom never
-  // raises: dispatching it by hand tests the wiring, the key itself is the
-  // browser's job.
-  it('ferme le menu mobile quand le navigateur annule le dialogue', async () => {
-    const actor = userEvent.setup();
-    renderHeader();
-    const panel = await openMenu(actor);
+  it('rend la déconnexion qu’on lui confie', () => {
+    renderHeader('/matches', <button type="button">Se déconnecter</button>);
 
-    act(() => {
-      panel.dispatchEvent(new Event('cancel', { cancelable: true }));
-    });
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('banner')).getByRole('button', { name: 'Se déconnecter' }),
+    ).toBeInTheDocument();
   });
 
-  it('ferme le menu mobile et navigue au clic sur un item', async () => {
-    const actor = userEvent.setup();
-    renderHeader();
-    const panel = await openMenu(actor);
-
-    await actor.click(within(panel).getByRole('link', { name: 'Matches' }));
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(within(inlineNavigation()).getByRole('link', { name: 'Matches' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-  });
-
-  // Hiding the panel in CSS would leave it open: rotating a phone to landscape
-  // would strand the focus on an invisible close button, and coming back under
-  // the breakpoint would re-display a menu nobody asked for.
-  it('ferme le menu ouvert quand la navigation en ligne prend le relais', async () => {
-    const actor = userEvent.setup();
-    const mediaQuery = stubMatchMedia();
-    renderHeader();
-    await openMenu(actor);
-
-    mediaQuery.crossTo(true);
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ouvrir le menu' })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
-  });
-
-  // The media query fires in both directions: coming back under the breakpoint
-  // must leave the menu exactly as the user left it.
-  it('laisse le menu ouvert en repassant sous le point de rupture', async () => {
-    const actor = userEvent.setup();
-    const mediaQuery = stubMatchMedia();
-    renderHeader();
-    await openMenu(actor);
-
-    mediaQuery.crossTo(false);
-
-    expect(screen.getByRole('dialog', { name: 'Menu de navigation' })).toBeInTheDocument();
-  });
-
-  it('retire l’écouteur de requête média au démontage', () => {
-    const mediaQuery = stubMatchMedia();
-    const { unmount } = renderHeader();
-
-    expect(mediaQuery.listenerCount()).toBe(1);
-
-    unmount();
-
-    expect(mediaQuery.listenerCount()).toBe(0);
-  });
-
-  // Every other test in this file already runs without `matchMedia`; this one
-  // says out loud that its absence is tolerated rather than incidental.
-  it('reste utilisable en l’absence de matchMedia', async () => {
-    const actor = userEvent.setup();
+  it('ne rend aucune déconnexion quand on ne lui en confie pas', () => {
     renderHeader();
 
-    expect(window.matchMedia).toBeUndefined();
-    await openMenu(actor);
-
-    expect(screen.getByRole('dialog', { name: 'Menu de navigation' })).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   // jsdom loads no CSS, so the responsive utilities are the only observable
-  // trace of the ticket's layout rule: header on mobile and tablet, sidebar
-  // from 1440px, and no burger once the items sit inline.
-  it('réserve le header au mobile et à la tablette, et le burger au mobile', () => {
+  // trace of the layout rule: header on phone and tablet, sidebar from 1440px,
+  // and the destinations inline only from tablet width, the tab bar serving
+  // them below.
+  it('réserve le header au mobile et à la tablette, et la navigation en ligne à la tablette', () => {
     renderHeader();
 
     expect(screen.getByRole('banner').className).toContain('desktop:hidden');
-    expect(screen.getByRole('button', { name: 'Ouvrir le menu' }).className).toContain('md:hidden');
+    expect(inlineNavigation().className).toContain('hidden');
     expect(inlineNavigation().className).toContain('md:flex');
   });
 
-  // Same reason: "no horizontal scroll" is a ticket requirement that only the
-  // width utilities can carry in a DOM without layout.
+  // Same reason: "no horizontal scroll" is a requirement that only the width
+  // utilities can carry in a DOM without layout.
   it('contraint le header à la largeur disponible', () => {
     renderHeader();
 
@@ -290,19 +159,25 @@ describe('AppHeader', () => {
     expect(inlineNavigation().className).toContain('min-w-0');
   });
 
-  // The 44px touch target is a ticket requirement that jsdom cannot observe:
-  // the utility classes are the only trace of the constraint.
+  // The 44px touch target is a requirement that jsdom cannot observe: the
+  // utility classes are the only trace of the constraint.
   it('donne à chaque élément cliquable du header une zone tactile de 44px', () => {
     renderHeader();
 
     const clickables = [
-      screen.getByRole('button', { name: 'Ouvrir le menu' }),
+      screen.getByRole('link', { name: 'Accueil' }),
       screen.getByRole('link', { name: 'Mon profil' }),
       ...within(inlineNavigation()).getAllByRole('link'),
     ];
 
     for (const element of clickables) {
       expect(element.className).toContain('min-h-11');
+    }
+
+    for (const element of [
+      screen.getByRole('link', { name: 'Mon profil' }),
+      ...within(inlineNavigation()).getAllByRole('link'),
+    ]) {
       expect(element.className).toContain('min-w-11');
     }
   });

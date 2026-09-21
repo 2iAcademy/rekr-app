@@ -30,6 +30,11 @@ const renderPage = ({ decision = null, pending, ...overrides }: Overrides = {}) 
   return { onBack, onLike, onPass };
 };
 
+const factsOf = (): [string | null, string | null][] =>
+  screen
+    .getAllByRole('term')
+    .map((term) => [term.textContent, term.nextElementSibling?.textContent ?? null]);
+
 const itemsOf = (list: HTMLElement): (string | null)[] =>
   within(list)
     .getAllByRole('listitem')
@@ -56,16 +61,36 @@ describe('CandidateDetailPage', () => {
     expect(screen.getByText('Développeuse back-end')).toBeInTheDocument();
   });
 
-  it('assemble ville, expérience et disponibilité sur une seule ligne', () => {
+  it('situe le candidat sous son prénom', () => {
     renderPage();
 
-    expect(screen.getByText('Lyon · Confirmé · Immédiate')).toBeInTheDocument();
+    expect(screen.getByText('Lyon')).toBeInTheDocument();
   });
 
-  it('écarte de cette ligne les informations non renseignées', () => {
+  it('présente expérience, disponibilité et télétravail en lignes libellé / valeur', () => {
+    renderPage();
+
+    expect(factsOf()).toEqual([
+      ['Expérience', 'Confirmé'],
+      ['Disponibilité', 'Immédiate'],
+      ['Télétravail', 'Hybride'],
+    ]);
+  });
+
+  it('écarte les informations non renseignées', () => {
     renderPage({ city: null, experienceLevel: null });
 
-    expect(screen.getByText('Immédiate')).toBeInTheDocument();
+    expect(screen.queryByText('Lyon')).not.toBeInTheDocument();
+    expect(factsOf()).toEqual([
+      ['Disponibilité', 'Immédiate'],
+      ['Télétravail', 'Hybride'],
+    ]);
+  });
+
+  it('n’affiche aucune ligne de faits quand rien n’est renseigné', () => {
+    renderPage({ experienceLevel: null, availability: null, remotePolicy: null });
+
+    expect(screen.queryByRole('term')).not.toBeInTheDocument();
   });
 
   it('liste les compétences', () => {
@@ -135,23 +160,43 @@ describe('CandidateDetailPage', () => {
     const user = userEvent.setup();
     const { onLike } = renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Liker' }));
+    await user.click(screen.getByRole('button', { name: "Ça m'intéresse" }));
 
     expect(onLike).toHaveBeenCalledTimes(1);
+  });
+
+  it('remonte le passage', async () => {
+    const user = userEvent.setup();
+    const { onPass } = renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Passer' }));
+
+    expect(onPass).toHaveBeenCalledTimes(1);
   });
 
   it('affiche la décision sauvegardée et désactive les deux actions', () => {
     renderPage({ decision: { kind: 'liked', at: '2026-09-16T09:30:00.000Z' } });
 
-    expect(screen.getByRole('status')).toHaveTextContent('Intérêt déjà enregistré');
-    expect(screen.getByRole('button', { name: 'Liker' })).toBeDisabled();
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Intérêt déjà enregistré');
+    expect(status).toHaveAttribute('title', 'Décision enregistrée le 2026-09-16T09:30:00.000Z');
+    expect(screen.getByRole('button', { name: "Ça m'intéresse" })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Passer' })).toBeDisabled();
+  });
+
+  it('affiche un passage sauvegardé et désactive les deux actions', () => {
+    renderPage({ decision: { kind: 'passed', at: '2026-09-16T09:30:00.000Z' } });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Candidat déjà passé');
+    expect(screen.getByRole('button', { name: "Ça m'intéresse" })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Passer' })).toBeDisabled();
   });
 
   it('désactive le like pendant l’envoi', () => {
     renderPage({ pending: true });
 
-    expect(screen.getByRole('button', { name: 'Liker' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: "Ça m'intéresse" })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Passer' })).toBeDisabled();
   });
 
   // Ni CV, ni LinkedIn, ni prétention salariale : la projection vitrine ne les

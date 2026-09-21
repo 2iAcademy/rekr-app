@@ -6,7 +6,7 @@ import { offerSalaryLabel } from './labels';
 // without a test of its own.
 describe('offerSalaryLabel', () => {
   it('affiche la fourchette en milliers d’euros', () => {
-    expect(offerSalaryLabel(45000, 55000)).toBe('45 - 55 k€');
+    expect(offerSalaryLabel(45000, 55000)).toBe('45–55 k€');
   });
 
   it('borne d’un seul côté quand une seule valeur est connue', () => {
@@ -15,7 +15,7 @@ describe('offerSalaryLabel', () => {
   });
 
   it('arrondit au millier le plus proche', () => {
-    expect(offerSalaryLabel(41500, 47400)).toBe('42 - 47 k€');
+    expect(offerSalaryLabel(41500, 47400)).toBe('42–47 k€');
   });
 
   it('annonce l’absence de salaire plutôt qu’une fourchette vide', () => {

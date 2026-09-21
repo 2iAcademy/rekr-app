@@ -1,12 +1,18 @@
 import { useId, useRef, useState, type ChangeEvent } from 'react';
-import { Paperclip, Trash2 } from 'lucide-react';
+import { FileText, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   acceptAttribute,
   constraintHint,
   validateFile,
   type FileConstraint,
 } from './fileConstraints';
+
+// Text actions under the file name: two outlined buttons next to a thumbnail
+// left no room for the name itself on a phone.
+const FILE_ACTION =
+  '-my-1 inline-flex min-h-11 cursor-pointer items-center rounded-md text-sm font-semibold text-brand-strong underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50';
 
 interface FileFieldProps {
   label: string;
@@ -95,49 +101,85 @@ export function FileField({
     .filter(Boolean)
     .join(' ');
 
+  const openPicker = (): void => inputRef.current?.click();
+
+  const hint = (
+    <p id={hintId} className="text-xs text-ink-muted">
+      {constraintHint(constraint)}
+    </p>
+  );
+
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={fieldId} className="text-xs text-ink-muted">
+      <label htmlFor={fieldId} className="text-sm font-semibold text-ink">
         {label}
       </label>
 
-      <div className="flex items-center gap-3">
-        {preview === null ? (
+      {filled ? (
+        <>
+          <div className="flex items-center gap-3 rounded-2xl border border-line bg-card p-3">
+            {preview === null ? (
+              <span
+                aria-hidden="true"
+                className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-surface text-ink-soft"
+              >
+                <FileText className="size-5" />
+              </span>
+            ) : (
+              <img
+                src={preview}
+                alt={label}
+                className="size-14 shrink-0 rounded-xl border border-line object-cover"
+              />
+            )}
+
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-ink">{presentLabel}</p>
+              <div className="flex gap-4">
+                <button type="button" disabled={busy} onClick={openPicker} className={FILE_ACTION}>
+                  Remplacer
+                </button>
+
+                {onRemove !== undefined && (
+                  <button
+                    // Explicit, because this field can sit inside a form: a
+                    // `button` with no type submits it, so removing a photo
+                    // would have saved the whole profile.
+                    type="button"
+                    aria-label={`Supprimer ${label}`}
+                    disabled={busy}
+                    onClick={onRemove}
+                    className={cn(FILE_ACTION, 'text-destructive')}
+                  >
+                    Supprimer
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          {hint}
+        </>
+      ) : (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-input bg-card px-4 py-6 text-center">
           <span
             aria-hidden="true"
-            className="flex size-16 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-ink-faint"
+            className="flex size-11 items-center justify-center rounded-full bg-surface text-ink-soft"
           >
-            <Paperclip className="size-5" />
+            <Upload className="size-5" />
           </span>
-        ) : (
-          <img
-            src={preview}
-            alt={label}
-            className="size-16 shrink-0 rounded-xl border border-line object-cover"
-          />
-        )}
-
-        <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">
-          {filled ? presentLabel : emptyLabel}
-        </p>
-
-        {filled && onRemove !== undefined && (
+          <p className="text-sm font-semibold text-ink">{emptyLabel}</p>
+          {hint}
           <Button
-            // Explicit, because this field can sit inside a form: a `button`
-            // with no type submits it, so removing a photo would have saved the
-            // whole profile.
             type="button"
-            variant="destructive"
-            size="sm"
-            aria-label={`Supprimer ${label}`}
+            variant="outline"
             disabled={busy}
-            onClick={onRemove}
+            onClick={openPicker}
+            className="mt-1 h-11 rounded-xl px-4"
           >
-            <Trash2 />
-            Supprimer
+            Choisir un fichier
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       <input
         ref={inputRef}
@@ -152,22 +194,6 @@ export function FileField({
         className="sr-only"
       />
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => inputRef.current?.click()}
-        >
-          {filled ? 'Remplacer' : 'Choisir un fichier'}
-        </Button>
-
-        <p id={hintId} className="text-xs text-ink-faint">
-          {constraintHint(constraint)}
-        </p>
-      </div>
-
       {rejection !== null && (
         <p id={errorId} role="alert" className="text-xs text-destructive">
           {rejection}
@@ -175,7 +201,7 @@ export function FileField({
       )}
 
       {busy && (
-        <p role="status" className="text-xs text-role">
+        <p role="status" className="text-xs text-ink-muted">
           {busyLabel}
         </p>
       )}

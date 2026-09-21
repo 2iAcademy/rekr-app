@@ -7,7 +7,7 @@
  * here is ever interpolated into an attribute, and there is no
  * `dangerouslySetInnerHTML` anywhere.
  */
-interface Span {
+export interface Span {
   text: string;
   bold?: true;
   italic?: true;
@@ -201,4 +201,59 @@ export const htmlToMarkdown = (html: string): string => {
   }
 
   return lines.join('\n');
+};
+
+/**
+ * Markdown to one line of plain text, for previews that clamp the description:
+ * marks are dropped, bullets and line breaks become a middle dot.
+ */
+export const markdownToPlainText = (source: string): string =>
+  source
+    .split('\n')
+    .map((line) => line.trim())
+    .map((line) => (line === '-' || line.startsWith(BULLET) ? line.slice(1).trim() : line))
+    .filter((line) => line !== '')
+    .map((line) =>
+      parseSpans(line)
+        .map((span) => span.text)
+        .join(''),
+    )
+    // A line that already ends a sentence needs no separator of its own.
+    .reduce(
+      (text, line) => (text === '' ? line : `${text}${/[.!?:;]$/.test(text) ? ' ' : ' · '}${line}`),
+      '',
+    );
+
+export type MarkdownBlock =
+  { kind: 'paragraph'; spans: Span[] } | { kind: 'list'; items: Span[][] };
+
+/**
+ * Markdown to blocks a component can render as elements, for read-only
+ * display: one paragraph per non-empty line, consecutive bullets grouped into
+ * one list. No HTML string is built, so nothing needs escaping.
+ */
+export const markdownBlocks = (source: string): MarkdownBlock[] => {
+  const blocks: MarkdownBlock[] = [];
+
+  for (const raw of source.split('\n')) {
+    const line = raw.trimEnd();
+
+    if (line.startsWith(BULLET)) {
+      const last = blocks[blocks.length - 1];
+      const item = parseSpans(line.slice(BULLET.length));
+
+      if (last?.kind === 'list') {
+        last.items.push(item);
+      } else {
+        blocks.push({ kind: 'list', items: [item] });
+      }
+      continue;
+    }
+
+    if (line.trim() !== '') {
+      blocks.push({ kind: 'paragraph', spans: parseSpans(line) });
+    }
+  }
+
+  return blocks;
 };
