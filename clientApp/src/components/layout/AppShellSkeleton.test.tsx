@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AppHeader } from './AppHeader';
 import { AppShellSkeleton } from './AppShellSkeleton';
-import { AppSidebar } from './AppSidebar';
 
 const renderSkeleton = () => render(<AppShellSkeleton />);
 
@@ -21,7 +20,6 @@ const realChromeClasses = () => {
         path: '*',
         element: (
           <>
-            <AppSidebar items={items} user={user} profileTo="/profil" />
             <AppHeader items={items} user={user} profileTo="/profil" />
           </>
         ),
@@ -30,9 +28,9 @@ const realChromeClasses = () => {
     { initialEntries: ['/'] },
   );
   const view = render(<RouterProvider router={router} />);
+  // The header's height lives on its inner row, the one that lays it out.
   const classes = {
-    sidebar: screen.getByRole('complementary').className.split(' '),
-    header: screen.getByRole('banner').className.split(' '),
+    header: (screen.getByRole('banner').firstElementChild?.className ?? '').split(' '),
   };
 
   view.unmount();
@@ -63,26 +61,19 @@ describe('AppShellSkeleton', () => {
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
   });
 
-  // Same width, same height and same breakpoints as the real chromes, otherwise
-  // the content jumps the moment the session lands.
-  it('reprend la géométrie du shell et ses points de rupture', () => {
+  // Same height as the real header, shown at every width like it, otherwise the
+  // content jumps the moment the session lands.
+  it('reprend la hauteur de l’en-tête, à toutes les largeurs', () => {
     const real = realChromeClasses();
     const { container } = renderSkeleton();
     const root = container.firstElementChild;
-    const [sidebar, headerColumn] = [...(root?.children ?? [])].slice(1);
-    const header = headerColumn.firstElementChild;
+    const header = root?.children[1];
 
     expect(root?.className).toContain('overflow-x-clip');
-
-    const sidebarWidth = token(real.sidebar, /^w-/);
-    expect(sidebarWidth).toBeDefined();
-    expect(sidebar.className.split(' ')).toContain(sidebarWidth);
-    expect(sidebar.className).toContain('hidden');
-    expect(sidebar.className).toContain('desktop:block');
 
     const headerHeight = token(real.header, /^h-/);
     expect(headerHeight).toBeDefined();
     expect(header?.className.split(' ')).toContain(headerHeight);
-    expect(header?.className).toContain('desktop:hidden');
+    expect(header?.className).not.toMatch(/(^|\s)(hidden|\w+:hidden)(\s|$)/);
   });
 });

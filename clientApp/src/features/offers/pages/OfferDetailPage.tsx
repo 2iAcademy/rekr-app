@@ -292,7 +292,7 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-line bg-card px-4 py-3">
+      <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-line bg-card px-4 py-3 md:bottom-4 md:mx-4 md:mb-4 md:rounded-2xl md:border md:px-5 md:shadow-float md:float-bar">
         {matched ? (
           <SettledDecision tone="match">Cette offre a donné lieu à un match</SettledDecision>
         ) : liked ? (

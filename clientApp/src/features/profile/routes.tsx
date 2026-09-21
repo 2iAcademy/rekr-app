@@ -14,7 +14,7 @@ export function ProfileRoute() {
               `userTypeLabel`: an unrecognised session lands on the narrower half. */}
           {isRecruiter(user.userType) ? <RecruiterAccountSection /> : <CandidateAccountSection />}
           {/* Phone only: the tab bar has room for the destinations alone, while
-              the tablet header and the desktop sidebar carry their own. */}
+              the header carries its own from tablet width up. */}
           <div className="mt-6 md:hidden">
             <LogoutButton appearance="row" />
           </div>

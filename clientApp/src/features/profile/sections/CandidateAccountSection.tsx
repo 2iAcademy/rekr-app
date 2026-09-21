@@ -485,7 +485,7 @@ export function CandidateAccountSection() {
             tall enough that a button at the very bottom means scrolling past
             everything to commit. It sits on the phone tab bar through
             `--tabbar-h`, and rests in the flow once the form ends. */}
-        <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 mt-6 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6">
+        <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 mt-6 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:bottom-4 md:mx-0 md:rounded-2xl md:border md:px-5 md:shadow-float md:float-bar">
           <Button
             type="submit"
             variant="brand"

@@ -58,8 +58,6 @@ const renderWith = (value: AuthContextValue) => {
 
 const renderShell = (userType: UserType) => renderWith(session(userType));
 
-const sidebar = () => screen.getByRole('complementary');
-
 const tabBar = () => screen.getByRole('navigation', { name: 'Onglets de navigation' });
 
 // A layout route mounts before its child gets a say, so the guards carried by
@@ -117,19 +115,11 @@ describe('AppShell', () => {
    * Elle attendait au bas de la fiche de compte, après un formulaire qu'il
    * fallait dérouler en entier pour la trouver.
    *
-   * Trois paliers, trois porteurs : la barre latérale au-dessus de 1440,
-   * l'écran « Mon compte » en dessous de 768 (la barre d'onglets n'a de place
-   * que pour les destinations), et l'en-tête entre les deux — c'est la seule
-   * largeur que ni l'une ni l'autre ne sert.
+   * Deux porteurs : l'en-tête à partir de 768, l'écran « Mon compte » en
+   * dessous (la barre d'onglets n'a de place que pour les destinations).
    */
   describe('déconnexion', () => {
-    it('la propose depuis la barre latérale, à côté du bloc profil', () => {
-      renderShell('candidate');
-
-      expect(within(sidebar()).getByRole('button', { name: 'Se déconnecter' })).toBeInTheDocument();
-    });
-
-    it('la propose dans l’en-tête, pour la largeur que les deux autres ne servent pas', () => {
+    it('la propose dans l’en-tête', () => {
       renderShell('candidate');
 
       expect(
@@ -138,8 +128,9 @@ describe('AppShell', () => {
     });
 
     // jsdom loads no CSS: the utilities are the only trace of the breakpoint
-    // that keeps the header's control off the phone and off the desktop.
-    it('réserve celle de l’en-tête à la tablette', () => {
+    // that keeps the header's control off the phone, where the account page
+    // carries it.
+    it('réserve celle de l’en-tête aux écrans à partir de la tablette', () => {
       renderShell('candidate');
 
       const inHeader = within(screen.getByRole('banner')).getByRole('button', {
@@ -148,7 +139,7 @@ describe('AppShell', () => {
 
       expect(inHeader.className).toContain('hidden');
       expect(inHeader.className).toContain('md:flex');
-      expect(inHeader.className).toContain('desktop:hidden');
+      expect(inHeader.className).not.toContain('desktop:hidden');
     });
 
     it('ne l’ajoute pas à la barre d’onglets', () => {
@@ -166,17 +157,24 @@ describe('AppShell', () => {
       const logout = vi.fn().mockResolvedValue(undefined);
       const { router } = renderWith({ ...session('candidate'), logout });
 
-      await user.click(within(sidebar()).getByRole('button', { name: 'Se déconnecter' }));
+      await user.click(
+        within(screen.getByRole('banner')).getByRole('button', { name: 'Se déconnecter' }),
+      );
 
       await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
       expect(router.state.location.pathname).toBe('/');
     });
   });
 
-  it('monte les trois chromes du shell', () => {
+  // The header serves every width from tablet up: the sidebar it replaced is
+  // gone, and the phone keeps its tab bar.
+  it('monte l’en-tête et la barre d’onglets, sans barre latérale', () => {
     renderShell('recruiter');
 
-    expect(screen.getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Navigation principale' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('navigation', { name: 'Navigation de la barre supérieure' }),
     ).toBeInTheDocument();
@@ -198,23 +196,23 @@ describe('AppShell', () => {
     expect(screen.queryAllByRole('link', { name: 'Offres' })).toEqual([]);
   });
 
-  it('ouvre les matchs au recruteur dans les trois chromes', () => {
+  it('ouvre les matchs au recruteur dans les deux chromes', () => {
     renderShell('recruiter');
 
     const matchLinks = screen.getAllByRole('link', { name: 'Matchs' });
 
-    expect(matchLinks).toHaveLength(3);
+    expect(matchLinks).toHaveLength(2);
     for (const link of matchLinks) {
       expect(link).toHaveAttribute('href', '/matches');
     }
   });
 
-  it('envoie le candidat sur son feed d’offres dans les trois chromes', () => {
+  it('envoie le candidat sur son feed d’offres dans les deux chromes', () => {
     renderShell('candidate');
 
     const feedLinks = screen.getAllByRole('link', { name: 'Offres' });
 
-    expect(feedLinks).toHaveLength(3);
+    expect(feedLinks).toHaveLength(2);
     for (const link of feedLinks) {
       expect(link).toHaveAttribute('href', '/candidat/offres');
     }
@@ -224,12 +222,12 @@ describe('AppShell', () => {
   // candidate would only bounce them back to the home page. The shell is the
   // one place that knows the role, hence the case here rather than in the
   // chromes, which render whatever list they are handed.
-  it('ouvre la gestion des offres au recruteur dans les trois chromes', () => {
+  it('ouvre la gestion des offres au recruteur dans les deux chromes', () => {
     renderShell('recruiter');
 
     const offerLinks = screen.getAllByRole('link', { name: 'Mes offres' });
 
-    expect(offerLinks).toHaveLength(3);
+    expect(offerLinks).toHaveLength(2);
     for (const link of offerLinks) {
       expect(link).toHaveAttribute('href', '/recruteur/offres');
     }
@@ -241,32 +239,13 @@ describe('AppShell', () => {
     expect(screen.queryByRole('link', { name: 'Mes offres' })).not.toBeInTheDocument();
   });
 
-  it('pointe le bloc profil de la barre latérale et de l’en-tête sur l’écran profil', () => {
+  it('pointe l’avatar de l’en-tête sur l’écran profil, avec l’initiale du nom dérivé de l’email', () => {
     renderShell('recruiter');
 
-    const profileLinks = screen.getAllByRole('link', { name: 'Mon profil' });
+    const profile = screen.getByRole('link', { name: 'Mon profil' });
 
-    expect(profileLinks).toHaveLength(2);
-    for (const link of profileLinks) {
-      expect(link).toHaveAttribute('href', '/profil');
-    }
-  });
-
-  it('dérive le nom affiché de l’email et affiche le libellé du rôle', () => {
-    renderShell('recruiter');
-
-    const profile = within(sidebar()).getByRole('link', { name: 'Mon profil' });
-
-    expect(profile).toHaveTextContent('sacha');
-    expect(profile).toHaveTextContent('Recruteur');
-  });
-
-  it('affiche le libellé candidat pour un candidat', () => {
-    renderShell('candidate');
-
-    expect(within(sidebar()).getByRole('link', { name: 'Mon profil' })).toHaveTextContent(
-      'Candidat',
-    );
+    expect(profile).toHaveAttribute('href', '/profil');
+    expect(profile).toHaveTextContent(/^S$/);
   });
 
   // The palette is gone: one accent for both roles, so nothing in the shell may

@@ -378,7 +378,7 @@ export function RecruiterAccountSection() {
           Left inside the form, the bar landed between the two and `sticky` kept
           it there: it only sticks when it would otherwise leave the viewport.
           `form` is what still ties the button to the fields it saves. */}
-      <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 mt-6 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6">
+      <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 mt-6 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:bottom-4 md:mx-0 md:rounded-2xl md:border md:px-5 md:shadow-float md:float-bar">
         <Button
           type="submit"
           form={formId}

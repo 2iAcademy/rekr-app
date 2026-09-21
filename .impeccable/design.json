@@ -436,10 +436,10 @@
       "css": ".ds-tabbar{display:flex;width:360px;height:64px;background:#fff;border-top:1px solid var(--line,#e5e7eb);font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;}.ds-tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:0.6875rem;font-weight:600;color:var(--ink-faint,#656d7b);text-decoration:none;transition:color .15s;}.ds-tab::before{content:'';position:absolute;top:0;width:32px;height:2px;border-radius:9999px;background:transparent;}.ds-tab:hover{color:var(--ink,#111827);}.ds-tab-on{color:var(--brand-strong,#4a31b8);}.ds-tab-on::before{background:var(--brand,#5b3fd6);}.ds-tab:focus-visible{outline:2px solid var(--brand,#5b3fd6);outline-offset:-2px;}"
     },
     {
-      "name": "Header / Sidebar Nav Item",
+      "name": "Header Nav Item",
       "kind": "nav",
       "refersTo": "nav-item-active",
-      "description": "Tablet header and desktop sidebar destinations: violet wash when active, quiet-surface hover when idle.",
+      "description": "Header destinations from tablet width up: violet wash when active, quiet-surface hover when idle.",
       "html": "<ul class=\"ds-navlist\"><li><a class=\"ds-nav ds-nav-on\" href=\"#\">Mes offres</a></li><li><a class=\"ds-nav\" href=\"#\">Matchs</a></li><li><a class=\"ds-nav\" href=\"#\">Profil</a></li></ul>",
       "css": ".ds-navlist{display:flex;gap:4px;margin:0;padding:0;list-style:none;font-family:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;font-size:0.875rem;}.ds-nav{display:flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;font-weight:600;color:var(--ink-muted,#525a68);text-decoration:none;transition:background-color .15s,color .15s;}.ds-nav:hover{background:var(--surface,#f3f4f6);color:var(--ink,#111827);}.ds-nav-on{background:var(--brand-tint,#eeeafd);color:var(--brand-strong,#4a31b8);}.ds-nav:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(91 63 214 / 0.3);}"
     },
@@ -469,7 +469,7 @@
       "Each detail screen is ONE card, its sections split by hairlines rather than stacked cards.",
       "One accent, ink violet, shared by both audiences; semantic colours only for status.",
       "Manrope everywhere, 800 for headings with tight tracking (-0.02em).",
-      "Bottom tab bar on phones, inline header nav on tablet, sidebar from 1440px.",
+      "Bottom tab bar on phones, the header with inline nav from tablet width up, at every larger width too.",
       "One motion moment: the match screen's avatars settling together."
     ],
     "rules": [
@@ -510,7 +510,7 @@
       },
       {
         "name": "The Two Heights Rule",
-        "body": "Surfaces are either on the ground (header, tab bar, sidebar: flat, divided by hairlines) or on a card (shadow-card). Raised is reserved for things that arrive: a toast, the match.",
+        "body": "Surfaces are either on the ground (header, tab bar: flat, divided by hairlines) or on a card (shadow-card). Raised is reserved for things that arrive: a toast, the match.",
         "section": "elevation"
       },
       {

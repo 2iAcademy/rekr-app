@@ -139,13 +139,12 @@ describe('AppHeader', () => {
   });
 
   // jsdom loads no CSS, so the responsive utilities are the only observable
-  // trace of the layout rule: header on phone and tablet, sidebar from 1440px,
-  // and the destinations inline only from tablet width, the tab bar serving
-  // them below.
-  it('réserve le header au mobile et à la tablette, et la navigation en ligne à la tablette', () => {
+  // trace of the layout rule: the header at every width, and the destinations
+  // inline only from tablet width, the tab bar serving them below.
+  it('montre le header à toutes les largeurs, et la navigation en ligne dès la tablette', () => {
     renderHeader();
 
-    expect(screen.getByRole('banner').className).toContain('desktop:hidden');
+    expect(screen.getByRole('banner').className).not.toMatch(/(^|\s)(hidden|\w+:hidden)(\s|$)/);
     expect(inlineNavigation().className).toContain('hidden');
     expect(inlineNavigation().className).toContain('md:flex');
   });

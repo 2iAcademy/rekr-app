@@ -178,7 +178,7 @@ export function CandidateDetailPage({
 
       {/* Sticks above the phone tab bar; bleeds to the screen edges on phones,
           stays in the column from `md:`. */}
-      <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 flex flex-col gap-2 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:mx-0 md:flex-row md:items-center md:gap-4 md:rounded-2xl md:border md:px-5 md:shadow-card">
+      <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 flex flex-col gap-2 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:bottom-4 md:mx-0 md:flex-row md:items-center md:gap-4 md:rounded-2xl md:border md:px-5 md:shadow-float md:float-bar">
         {decision !== null && (
           <p
             role="status"

@@ -183,7 +183,7 @@ export function OfferForm({
           bleeds to the screen edges on phones, stays in the column from `md:`.
           The error sits in it for the same reason: it has to be read where the
           button was pressed. */}
-      <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 flex flex-col gap-2 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:mx-0 md:flex-row md:items-center md:justify-end md:gap-4 md:rounded-2xl md:border md:shadow-card md:px-5">
+      <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 flex flex-col gap-2 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:bottom-4 md:mx-0 md:flex-row md:items-center md:justify-end md:gap-4 md:rounded-2xl md:border md:shadow-float md:float-bar md:px-5">
         {error !== null && (
           // The id is the one every field above points at through `markIfInvalid`;
           // it comes from the shared helper so the two cannot drift apart.

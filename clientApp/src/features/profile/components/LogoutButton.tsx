@@ -8,10 +8,10 @@ import { notifySuccess } from '@/lib/feedback/notify';
 
 interface LogoutButtonProps {
   /**
-   * How the screen around it needs it to look. `inline` is the entry of the
-   * sidebar; `icon` is the tablet header, where the bar is already crowded and
-   * only the icon fits; `row` is the full-width row closing the account page on
-   * a phone, where neither chrome carries it.
+   * How the screen around it needs it to look. `inline` is a compact entry in a
+   * list; `icon` is the header, where the bar is already crowded and only the
+   * icon fits; `row` is the full-width row closing the account page on a phone,
+   * where the header does not carry it.
    */
   appearance?: 'inline' | 'icon' | 'row';
   className?: string;
