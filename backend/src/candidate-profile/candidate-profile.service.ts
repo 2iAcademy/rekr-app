@@ -7,6 +7,7 @@ import { Prisma, TagCategory } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
 import { resolveTagIds } from '../common/tags/tag-sync';
 import { JobFamilyService } from '../job-family/job-family.service';
+import { primaryJobFamilyOf } from '../search/ranking/offer-ranking';
 import { PrismaService } from '../prisma/prisma.service';
 import { CandidateProfileResponseDto } from './dto/candidate-profile-response.dto';
 import { CreateCandidateProfileDto } from './dto/create-candidate-profile.dto';
@@ -109,6 +110,12 @@ export class CandidateProfileService {
               orderBy: { tag: { label: 'asc' } },
               select: { tag: { select: { label: true, category: true } } },
             },
+            // Primary first: the rank is the candidate's preference, and the
+            // form reads the first trade as the one they ranked highest.
+            candidateJobFamilies: {
+              orderBy: [{ rank: 'asc' }, { jobFamilyId: 'asc' }],
+              select: { jobFamilyId: true, rank: true },
+            },
           },
         },
       },
@@ -130,6 +137,8 @@ export class CandidateProfileService {
       longitude: longitude?.toString() ?? null,
       skills: labelsOf('skill'),
       languages: labelsOf('language'),
+      jobFamilyIds: user.candidateJobFamilies.map((link) => link.jobFamilyId),
+      primaryJobFamilyId: primaryJobFamilyOf(user.candidateJobFamilies),
     };
   }
 
@@ -156,6 +165,9 @@ export class CandidateProfileService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // Two saves of one account wait for each other: a patch carrying only the
+      // trades takes no row lock, and both wipe-and-rewrites kept their union.
+      await tx.$queryRaw`SELECT 1 FROM candidate_profile WHERE fk_user = ${userId} FOR UPDATE`;
       const existing = await tx.candidateProfile.findUnique({
         where: { userId },
       });
@@ -217,6 +229,9 @@ export class CandidateProfileService {
    * are written nowhere else, so the payload is the whole truth. An empty list
    * clears the filter rather than leaving the previous trades in place, which
    * is what lets someone widen their search back to everything.
+   *
+   * The position in the list is persisted as the rank, 0 being the primary:
+   * the array is the only place the candidate's preference is expressed.
    */
   private async syncJobFamilies(
     tx: Prisma.TransactionClient,
@@ -231,9 +246,10 @@ export class CandidateProfileService {
     }
 
     await tx.candidateJobFamily.createMany({
-      data: jobFamilyIds.map((jobFamilyId) => ({
+      data: jobFamilyIds.map((jobFamilyId, rank) => ({
         candidateUserId: userId,
         jobFamilyId,
+        rank,
       })),
       skipDuplicates: true,
     });

@@ -7,7 +7,12 @@ import { emptyCandidateOnboarding } from '../state';
 
 vi.mock('@/api/generated', () => ({
   jobFamilyControllerFindAll: vi.fn(() =>
-    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+    Promise.resolve({
+      data: [
+        { id: 13, label: 'Informatique' },
+        { id: 4, label: 'Commerce' },
+      ],
+    }),
   ),
 }));
 
@@ -22,6 +27,18 @@ describe('ProjectStep', () => {
     expect(screen.getByRole('group', { name: 'Type(s) de contrat' })).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: 'Niveau d’expérience' })).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: 'Disponibilité' })).toBeInTheDocument();
+  });
+
+  // The first trade ticked is only a default: the question stays on screen so
+  // the primary reads as a decision rather than as a click order.
+  it('demande quel métier compte le plus dès que deux sont cochés', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderStep({ state: { ...emptyCandidateOnboarding, jobFamilyIds: ['13', '4'] }, onChange });
+
+    await user.click(await screen.findByRole('radio', { name: 'Commerce' }));
+
+    expect(onChange).toHaveBeenCalledWith({ jobFamilyIds: ['4', '13'] });
   });
 
   it('permet de retenir plusieurs types de contrat', async () => {

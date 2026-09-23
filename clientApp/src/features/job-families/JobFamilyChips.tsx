@@ -1,12 +1,20 @@
 import { useId } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Star } from 'lucide-react';
+import { OptionCards } from '@/components/form/OptionCards';
 import { cn } from '@/lib/utils';
 import { MAX_JOB_FAMILIES } from '@/lib/bounds';
 import { jobFamilyIcon } from './jobFamilyIcons';
+import { choosePrimaryJobFamily, toggleJobFamily } from './jobFamilySelection';
 import { useJobFamilies } from './useJobFamilies';
 
 interface JobFamilyChipsProps {
+  /** Ordered: the first trade is the primary one. */
   values: string[];
+  /**
+   * False while the order of `values` is not a choice the candidate made — an
+   * account older than the rank. Nothing is starred or preselected then.
+   */
+  primaryChosen?: boolean;
   onChange: (values: string[]) => void;
   'aria-invalid'?: boolean;
   'aria-describedby'?: string;
@@ -25,27 +33,27 @@ interface JobFamilyChipsProps {
  * whereas twenty trades of similar length and colour give the eye nothing to
  * land on — the icon is what turns reading the list into scanning it.
  */
-export function JobFamilyChips({ values, onChange, ...aria }: JobFamilyChipsProps) {
+export function JobFamilyChips({
+  values,
+  onChange,
+  primaryChosen = true,
+  ...aria
+}: JobFamilyChipsProps) {
   const legendId = useId();
+  const primaryName = useId();
   const { jobFamilies, status, reload } = useJobFamilies();
 
   const full = values.length >= MAX_JOB_FAMILIES;
+  const reference = jobFamilies.map(({ id }) => String(id));
+  const labelOf = (id: string): string =>
+    jobFamilies.find((family) => String(family.id) === id)?.label ?? id;
 
-  // Rebuilt from the reference list rather than appended to, so the selection
-  // always reads in the order shown on screen.
   const toggle = (id: string): void => {
-    const next = values.includes(id) ? values.filter((kept) => kept !== id) : [...values, id];
+    const next = toggleJobFamily(values, id, reference);
 
-    // Refused on the way in rather than by disabling the untaken pills: a
-    // disabled pill reads as « unavailable » when it means « deselect one
-    // first ».
-    if (next.length > MAX_JOB_FAMILIES) {
-      return;
+    if (next !== values) {
+      onChange(next);
     }
-
-    onChange(
-      jobFamilies.map(({ id: known }) => String(known)).filter((known) => next.includes(known)),
-    );
   };
 
   if (status === 'failed') {
@@ -91,7 +99,12 @@ export function JobFamilyChips({ values, onChange, ...aria }: JobFamilyChipsProp
           jobFamilies.map((family) => {
             const id = String(family.id);
             const selected = values.includes(id);
-            const Icon = selected ? Check : jobFamilyIcon(family.label);
+            // Marked only when there is something to rank it above.
+            const primary = primaryChosen && values[0] === id && values.length > 1;
+            // The mark replaces the check rather than adding a badge: a wider
+            // pill pushed every pill after it along the line, and a tap aimed
+            // at one trade landed on the next.
+            const Icon = primary ? Star : selected ? Check : jobFamilyIcon(family.label);
 
             return (
               <label
@@ -119,14 +132,48 @@ export function JobFamilyChips({ values, onChange, ...aria }: JobFamilyChipsProp
                 />
                 <Icon
                   aria-hidden="true"
-                  className={cn('size-4 shrink-0', selected ? 'text-white' : 'text-role')}
+                  className={cn(
+                    'size-4 shrink-0',
+                    selected ? 'text-white' : 'text-role',
+                    primary && 'fill-current',
+                  )}
                 />
                 {family.label}
+                {primary && (
+                  <>
+                    {' '}
+                    <span className="sr-only">(principal)</span>
+                  </>
+                )}
               </label>
             );
           })
         )}
       </div>
+
+      {/* Asked only once there is something to rank: with a single trade the
+          primary is not a choice. The first trade ticked is the default, but
+          the question stays on screen so it reads as a decision, not as an
+          accident of which pill was clicked first. */}
+      {status === 'ready' && values.length > 1 && (
+        <div className="flex flex-col gap-1.5">
+          <OptionCards
+            legend="Lequel compte le plus ?"
+            name={primaryName}
+            // In the order of the chips, not of the selection: sorted by
+            // preference, the option just clicked jumped to the left.
+            options={reference
+              .filter((id) => values.includes(id))
+              .map((id) => ({ value: id, label: labelOf(id) }))}
+            value={primaryChosen ? values[0] : ''}
+            onChange={(id) => onChange(choosePrimaryJobFamily(values, id, reference))}
+            columns={values.length === 2 ? 2 : 3}
+          />
+          <p className="text-xs text-ink-muted">
+            Ses offres passent un peu plus haut ; les autres restent dans votre feed.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

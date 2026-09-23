@@ -4,6 +4,7 @@ import {
   allowedContractTypes,
   allowedRemotePolicies,
   buildOfferRankingQuery,
+  primaryJobFamilyOf,
   type CandidateRankingProfile,
 } from './offer-ranking';
 import type {
@@ -27,6 +28,7 @@ const profileOf = (
   overrides: Partial<CandidateRankingProfile> = {},
 ): CandidateRankingProfile => ({
   jobFamilyIds: [],
+  primaryJobFamilyId: null,
   skills: [],
   contractTypes: [],
   experienceLevel: null,
@@ -122,13 +124,23 @@ describe('the matrices themselves', () => {
 });
 
 describe('what filters', () => {
-  it('keeps the trade a hard filter and nothing else about it', () => {
+  it('keeps the trade a hard filter, scored only when a primary is named', () => {
     const { filter, functions } = buildOfferRankingQuery(
       profileOf({ jobFamilyIds: [13, 4] }),
     );
 
     expect(filter).toContainEqual({ terms: { jobFamilyId: [13, 4] } });
     expect(JSON.stringify(functions)).not.toContain('jobFamilyId');
+  });
+
+  // The primary orders, it never narrows: the secondary trades stay in the
+  // filter so ranking one of them first cannot empty the deck of the others.
+  it('keeps every trade in the filter once a primary is named', () => {
+    const { filter } = buildOfferRankingQuery(
+      profileOf({ jobFamilyIds: [13, 4, 7], primaryJobFamilyId: 13 }),
+    );
+
+    expect(filter).toContainEqual({ terms: { jobFamilyId: [13, 4, 7] } });
   });
 
   it('leaves the deck unfiltered for a candidate who named no trade', () => {
@@ -337,6 +349,47 @@ describe('what orders', () => {
     expect(JSON.stringify(functions)).not.toContain('location');
   });
 
+  it('gives the primary trade the job family weight', () => {
+    const weight = weightFor(
+      profileOf({ jobFamilyIds: [13, 4], primaryJobFamilyId: 13 }),
+      (filter) => filter.includes('"jobFamilyId":13'),
+    );
+
+    expect(weight).toBeGreaterThan(0);
+    expect(weight).toBe(CRITERION_WEIGHTS.jobFamily);
+  });
+
+  it('scores nothing for the secondary trades', () => {
+    expect(
+      weightFor(
+        profileOf({ jobFamilyIds: [13, 4], primaryJobFamilyId: 13 }),
+        (filter) => filter.includes('"jobFamilyId":4'),
+      ),
+    ).toBeUndefined();
+  });
+
+  /**
+   * A tie-breaker, not a block sort: an offer of a secondary trade matching
+   * every skill must still outrank one of the primary trade matching none.
+   * Raising the weight past the skills one turns the primary into a second
+   * filter the candidate never asked for.
+   */
+  it('weighs the primary trade below the skills', () => {
+    expect(CRITERION_WEIGHTS.jobFamily).toBeGreaterThan(0);
+    expect(CRITERION_WEIGHTS.jobFamily).toBeLessThan(CRITERION_WEIGHTS.skills);
+  });
+
+  // A primary outside the filter would score offers the deck never shows.
+  it('ignores a primary that is not one of the filtered trades', () => {
+    expect(
+      JSON.stringify(
+        buildOfferRankingQuery(
+          profileOf({ jobFamilyIds: [4], primaryJobFamilyId: 13 }),
+        ).functions,
+      ),
+    ).not.toContain('jobFamilyId');
+  });
+
   // A three-month-old post is often already filled, and it used to only break
   // ties rather than cost anything.
   it('always scores freshness', () => {
@@ -381,5 +434,41 @@ describe('the scale', () => {
         }),
       ),
     ).toBeGreaterThan(0);
+  });
+});
+
+describe('which trade is primary', () => {
+  it('is the one ranked first', () => {
+    expect(
+      primaryJobFamilyOf([
+        { jobFamilyId: 4, rank: 1 },
+        { jobFamilyId: 13, rank: 0 },
+        { jobFamilyId: 7, rank: 2 },
+      ]),
+    ).toBe(13);
+  });
+
+  // One trade has nothing to be preferred over: scoring it would add the same
+  // points to every offer of the deck.
+  it('is nobody when the candidate named a single trade', () => {
+    expect(primaryJobFamilyOf([{ jobFamilyId: 13, rank: 0 }])).toBeNull();
+  });
+
+  it('is nobody when the candidate named no trade', () => {
+    expect(primaryJobFamilyOf([])).toBeNull();
+  });
+
+  /**
+   * The accounts written before the rank existed all read rank 0: the
+   * migration had no intention to recover. Electing one of them would boost a
+   * trade the candidate never preferred.
+   */
+  it('is nobody when the trades were never ranked', () => {
+    expect(
+      primaryJobFamilyOf([
+        { jobFamilyId: 4, rank: 0 },
+        { jobFamilyId: 13, rank: 0 },
+      ]),
+    ).toBeNull();
   });
 });

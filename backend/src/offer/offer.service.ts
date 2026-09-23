@@ -15,6 +15,7 @@ import { MatchService } from '../match/match.service';
 import { OfferSearchService } from '../search/offer-search.service';
 import {
   CONTRACT_TYPE_COUNT,
+  primaryJobFamilyOf,
   REMOTE_POLICY_COUNT,
   allowedContractTypes,
   allowedRemotePolicies,
@@ -352,7 +353,8 @@ export class OfferService {
       }),
       this.prisma.candidateJobFamily.findMany({
         where: { candidateUserId: user.id },
-        select: { jobFamilyId: true },
+        select: { jobFamilyId: true, rank: true },
+        orderBy: [{ rank: 'asc' }, { jobFamilyId: 'asc' }],
       }),
     ]);
 
@@ -428,6 +430,7 @@ export class OfferService {
     const rankedIds = await this.search?.rankOfferIds(
       {
         jobFamilyIds: wantedFamilyIds,
+        primaryJobFamilyId: primaryJobFamilyOf(wantedFamilies),
         skills: profile?.user.candidateTags.map((link) => link.tag.label) ?? [],
         contractTypes: wantedContracts,
         experienceLevel: profile?.experienceLevel ?? null,

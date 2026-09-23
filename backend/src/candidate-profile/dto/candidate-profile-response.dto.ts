@@ -151,6 +151,23 @@ export class CandidateProfileResponseDto {
   @ApiProperty({ type: [String], example: ['Anglais', 'Espagnol'] })
   languages!: string[];
 
+  /**
+   * The trades the candidate is looking for, primary first: the order is the
+   * rank they gave, not the reference list's. Empty for an account that named
+   * none, whose feed then spans every trade.
+   */
+  @ApiProperty({ type: [Number], example: [13, 4] })
+  jobFamilyIds!: number[];
+
+  /**
+   * The trade the feed ranks above the others, or `null` when there is none:
+   * a single trade, no trade, or trades written before the rank existed. The
+   * form reads the null as « no choice made yet » rather than electing the
+   * first entry of `jobFamilyIds`.
+   */
+  @ApiProperty({ type: Number, nullable: true, example: 13 })
+  primaryJobFamilyId!: number | null;
+
   @ApiProperty({
     type: String,
     format: 'date-time',
