@@ -14,6 +14,7 @@ const filled: RecruiterOnboardingState = {
   siteUrl: 'https://rekr.fr',
   description: 'On construit le matching qui respecte les candidats.',
   benefits: ['Mutuelle', 'Tickets resto'],
+  offerJobFamilyId: '13',
   offerTitle: 'Développeur Front React',
   offerCity: 'Lyon',
   offerPostalCode: '69003',
@@ -83,6 +84,7 @@ describe('buildOfferPayload', () => {
   it('mappe la première offre et la publie', () => {
     expect(buildOfferPayload(filled)).toEqual({
       title: 'Développeur Front React',
+      jobFamilyId: 13,
       description: 'Construire les écrans du swipe.',
       city: 'Lyon',
       postalCode: '69003',
@@ -111,13 +113,17 @@ describe('buildOfferPayload', () => {
   });
 
   it('omet les champs optionnels laissés vides', () => {
+    // The trade is named even here: it is not one of the optional fields this
+    // test is about, and the wizard refuses to leave the offer step without it.
     const payload = buildOfferPayload({
       ...emptyRecruiterOnboarding,
       offerTitle: 'Développeur Front React',
+      offerJobFamilyId: '13',
     });
 
     expect(payload).toEqual({
       title: 'Développeur Front React',
+      jobFamilyId: 13,
       status: 'open',
     });
   });

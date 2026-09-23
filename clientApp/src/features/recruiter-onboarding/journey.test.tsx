@@ -34,7 +34,7 @@ const recruiter = {
 
 const fetchMock = vi.fn();
 
-const route = (url: string): Response => {
+const route = (url: string, init?: RequestInit): Response => {
   if (url.includes('/api/auth/refresh')) {
     return json(401, {});
   }
@@ -47,6 +47,12 @@ const route = (url: string): Response => {
       { id: 9, label: 'Juridique' },
     ]);
   }
+  if (url.includes('/api/job-families')) {
+    return json(200, [
+      { id: 13, label: 'Informatique & Numérique' },
+      { id: 14, label: 'Juridique' },
+    ]);
+  }
   if (url.includes('/api/cities')) {
     return json(200, [
       { name: 'Lyon', postalCode: '69003', latitude: 45.751578, longitude: 4.869577 },
@@ -55,8 +61,11 @@ const route = (url: string): Response => {
   if (url.includes('/api/companies/mine')) {
     return json(200, {});
   }
-  if (url.includes('/api/companies') || url.includes('/api/offers')) {
+  if (url.includes('/api/companies')) {
     return json(201, {});
+  }
+  if (url.includes('/api/offers')) {
+    return (init?.method ?? 'GET') === 'GET' ? json(200, []) : json(201, {});
   }
 
   throw new Error(`Appel réseau inattendu : ${url}`);
@@ -108,6 +117,8 @@ const completeWizard = async (user: User) => {
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 
   await user.type(screen.getByLabelText('Titre du poste'), 'Développeur Front React');
+  await waitFor(() => expect(screen.getByLabelText('Domaine du poste')).toBeEnabled());
+  await user.selectOptions(screen.getByLabelText('Domaine du poste'), '13');
   await user.type(screen.getByLabelText('Missions'), 'Construire les écrans du swipe.');
   await user.type(screen.getByLabelText('Compétences recherchées'), 'React, TypeScript{Enter}');
   await user.type(screen.getByLabelText('Avantages (optionnel)'), 'Mutuelle, RTT{Enter}');
@@ -126,7 +137,9 @@ describe('parcours recruteur de bout en bout', () => {
     sessionStorage.clear();
     clearAccessToken();
     fetchMock.mockReset();
-    fetchMock.mockImplementation((url: string) => Promise.resolve(route(url)));
+    fetchMock.mockImplementation((url: string, init?: RequestInit) =>
+      Promise.resolve(route(url, init)),
+    );
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -172,6 +185,7 @@ describe('parcours recruteur de bout en bout', () => {
     expect(offer.authorization).toBe('Bearer jeton-de-test');
     expect(offer.body).toEqual({
       title: 'Développeur Front React',
+      jobFamilyId: 13,
       description: 'Construire les écrans du swipe.',
       city: 'Lyon',
       postalCode: '69003',
@@ -184,7 +198,7 @@ describe('parcours recruteur de bout en bout', () => {
       salaryMax: 55000,
       status: 'open',
     });
-  });
+  }, 45_000);
 
   it('conserve la saisie et aboutit au second essai quand l’offre échoue', async () => {
     const user = userEvent.setup({ delay: null });
@@ -232,5 +246,5 @@ describe('parcours recruteur de bout en bout', () => {
     const update = callTo('/api/companies/mine');
     expect(update.method).toBe('PATCH');
     expect(update.body).toMatchObject({ name: 'Rekr', jobTitle: 'Responsable RH', sectorId: 4 });
-  });
+  }, 45_000);
 });

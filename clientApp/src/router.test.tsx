@@ -9,6 +9,11 @@ import { AuthProvider } from '@/features/auth/AuthProvider';
 import { routes } from '@/router';
 
 vi.mock('@/api/generated', () => ({
+  likeControllerFindSent: vi.fn(() => Promise.resolve({ data: [] })),
+  likeControllerFindReceived: vi.fn(() => Promise.resolve({ data: [] })),
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   authControllerLogin: vi.fn(),
   authControllerLogout: vi.fn(),
   authControllerSignup: vi.fn(),
@@ -19,6 +24,7 @@ vi.mock('@/api/generated', () => ({
   companyControllerCreate: vi.fn(),
   companyControllerUpdateMine: vi.fn(),
   offerControllerCreate: vi.fn(),
+  matchControllerFindMine: vi.fn(() => Promise.resolve({ data: [] })),
   offerControllerFindMine: vi.fn(),
   offerControllerFindOneById: vi.fn(),
   offerControllerUpdate: vi.fn(),
@@ -67,7 +73,7 @@ const shellChildren = shellRoutes.flatMap((route) => route.children ?? []);
 // completeness case below turns a child missing from this table into a failure,
 // so declaring a route is not enough to slip past the guard-rail.
 const ALLOWED_USER_TYPES: Record<string, readonly UserType[]> = {
-  '/matches': ['candidate'],
+  '/matches': USER_TYPES,
   '/profil': USER_TYPES,
   '/candidat/offres': ['candidate'],
   '/recruteur/offres/:id/candidats': ['recruiter'],

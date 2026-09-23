@@ -12,6 +12,9 @@ import {
 import { RecruiterOnboardingPage } from './RecruiterOnboardingPage';
 
 vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   companyControllerCreate: vi.fn(),
   companyControllerUpdateMine: vi.fn(),
   offerControllerCreate: vi.fn(),
@@ -68,6 +71,8 @@ const fillCulture = async (user: User) => {
 
 const fillOffer = async (user: User) => {
   await user.type(screen.getByLabelText('Titre du poste'), 'Développeur Front React');
+  await waitFor(() => expect(screen.getByLabelText('Domaine du poste')).toBeEnabled());
+  await user.selectOptions(screen.getByLabelText('Domaine du poste'), '13');
   await user.type(screen.getByLabelText('Missions'), 'Construire le swipe.');
   await user.type(screen.getByLabelText('Compétences recherchées'), 'React{Enter}');
   await submit(user);
@@ -299,6 +304,7 @@ describe('RecruiterOnboardingPage', () => {
     });
     expect(createOffer).toHaveBeenCalledWith({
       title: 'Développeur Front React',
+      jobFamilyId: 13,
       description: 'Construire le swipe.',
       city: 'Lyon',
       postalCode: '69003',
@@ -471,6 +477,8 @@ describe('RecruiterOnboardingPage', () => {
     await fillCompany(user);
     await fillCulture(user);
     await user.type(screen.getByLabelText('Titre du poste'), 'Développeur Front React');
+    await waitFor(() => expect(screen.getByLabelText('Domaine du poste')).toBeEnabled());
+    await user.selectOptions(screen.getByLabelText('Domaine du poste'), '13');
     await user.type(screen.getByLabelText('Missions'), 'Construire le swipe.');
     await user.type(screen.getByLabelText('Compétences recherchées'), 'React');
     await submit(user);
@@ -487,6 +495,8 @@ describe('RecruiterOnboardingPage', () => {
     await fillCulture(user);
     await user.clear(screen.getByRole('combobox', { name: 'Ville du poste' }));
     await user.type(screen.getByLabelText('Titre du poste'), 'Développeur Front React');
+    await waitFor(() => expect(screen.getByLabelText('Domaine du poste')).toBeEnabled());
+    await user.selectOptions(screen.getByLabelText('Domaine du poste'), '13');
     await user.type(screen.getByLabelText('Missions'), 'Construire le swipe.');
     await user.type(screen.getByLabelText('Compétences recherchées'), 'React{Enter}');
     await submit(user);

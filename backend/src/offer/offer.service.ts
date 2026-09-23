@@ -1,9 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { Prisma, TagCategory } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
+import { lockAnswer } from '../common/answers/answer-lock';
 import { resolveTagIds } from '../common/tags/tag-sync';
 import type { AuthUser } from '../auth/auth-user.interface';
+import { JobFamilyService } from '../job-family/job-family.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MatchService } from '../match/match.service';
+import { OfferSearchService } from '../search/offer-search.service';
+import {
+  CONTRACT_TYPE_COUNT,
+  REMOTE_POLICY_COUNT,
+  allowedContractTypes,
+  allowedRemotePolicies,
+} from '../search/ranking/offer-ranking';
+import { LikeResultDto } from '../match/dto/like-result.dto';
 import { CreateOfferDto } from './dto/create-offer.dto';
 import { OfferFeedItemDto } from './dto/offer-feed-item.dto';
 import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
@@ -121,6 +137,10 @@ const OWNER_DETAIL_OFFER_COLUMNS = {
   ...DETAIL_OFFER_COLUMNS,
   postalCode: true,
   status: true,
+  // Read by the edit form to preselect the trade. Absent from the candidate
+  // projection: the family decides which feed the offer reaches, it is not
+  // something the card has to show.
+  jobFamilyId: true,
 } as const;
 
 /** The columns of an applicant a recruiter may read, and no others. */
@@ -172,14 +192,18 @@ export class OfferService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cities: CityService,
+    private readonly matches: MatchService,
+    private readonly jobFamilies: JobFamilyService,
+    @Optional() private readonly search?: OfferSearchService,
   ) {}
 
   async create(userId: number, dto: CreateOfferDto) {
     const { skills, benefits, ...offerData } = dto;
 
+    await this.jobFamilies.assertKnown([dto.jobFamilyId]);
     const coordinates = await this.cities.assertKnown(dto);
 
-    return this.prisma.$transaction(async (tx) => {
+    const offer = await this.prisma.$transaction(async (tx) => {
       const profile = await tx.recruiterProfile.findUnique({
         where: { userId },
       });
@@ -200,17 +224,23 @@ export class OfferService {
 
       return offer;
     });
+    await this.search?.syncOffer(offer.id);
+    return offer;
   }
 
   async update(userId: number, offerId: number, dto: UpdateOfferDto) {
     const { skills, benefits, ...offerData } = dto;
     let coordinates: Coordinates | null = null;
 
+    if (dto.jobFamilyId !== undefined) {
+      await this.jobFamilies.assertKnown([dto.jobFamilyId]);
+    }
+
     if (dto.city !== undefined || dto.postalCode !== undefined) {
       coordinates = await this.verifyPatchedLocation(userId, offerId, dto);
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({ where: { id: offerId } });
       const profile = await tx.recruiterProfile.findUnique({
         where: { userId },
@@ -232,6 +262,8 @@ export class OfferService {
 
       return updated;
     });
+    await this.search?.syncOffer(updated.id);
+    return updated;
   }
 
   /**
@@ -295,84 +327,269 @@ export class OfferService {
   ): Promise<OfferFeedItemDto[]> {
     const { limit } = query;
 
-    const profile = await this.prisma.candidateProfile.findUnique({
-      where: { userId: user.id },
-      select: { contractTypes: true, remotePolicy: true },
-    });
+    const [profile, wantedFamilies] = await Promise.all([
+      this.prisma.candidateProfile.findUnique({
+        where: { userId: user.id },
+        select: {
+          contractTypes: true,
+          experienceLevel: true,
+          remotePolicy: true,
+          salaryMin: true,
+          salaryMax: true,
+          latitude: true,
+          longitude: true,
+          mobilityRadiusKm: true,
+          mobilityNationwide: true,
+          user: {
+            select: {
+              candidateTags: {
+                where: { tag: { category: { in: ['skill', 'tech'] } } },
+                select: { tag: { select: { label: true } } },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.candidateJobFamily.findMany({
+        where: { candidateUserId: user.id },
+        select: { jobFamilyId: true },
+      }),
+    ]);
 
     const wantedContracts = profile?.contractTypes ?? [];
     const wantedRemote = profile?.remotePolicy ?? null;
-
-    // Collected in an `AND` rather than spread as two `OR` keys: a second `OR`
-    // at the same level would overwrite the first, silently dropping one of the
-    // two preferences. `null` cannot ride in an `in` either, hence the pairs.
+    const wantedFamilyIds = wantedFamilies.map((link) => link.jobFamilyId);
+    // The contract is no longer a filter: a permanent-contract filter amputates
+    // half the stock of a temping agency and hides the best offer of the
+    // catalogue for an administrative reason. It is ranked instead, by
+    // `CONTRACT_AFFINITY`.
+    //
+    // One exception survives as a filter, and the matrix is what names it:
+    // apprenticeships and internships are a status, not a preference, so
+    // neither side of that line is served the other. Applied here rather than
+    // in the Elasticsearch query alone because the ranked page is topped up
+    // straight from PostgreSQL — an unindexed internship would otherwise walk
+    // into the deck of someone looking for a permanent contract.
+    const allowedContracts = allowedContractTypes(wantedContracts);
+    const allowedRemote = allowedRemotePolicies(wantedRemote);
     const preferences: Prisma.OfferWhereInput[] = [
-      ...(wantedContracts.length > 0
+      ...(allowedContracts.length < CONTRACT_TYPE_COUNT
         ? [
             {
               OR: [
-                { contractType: { in: wantedContracts } },
+                { contractType: { in: allowedContracts } },
                 { contractType: { equals: null } },
               ],
             },
           ]
         : []),
-      ...(wantedRemote
+      // Remote work still filters, but on what the candidate can hold rather
+      // than on a literal match: someone who asked for hybrid was offering to
+      // come in, not requiring it, so a fully remote post suits them too. The
+      // inability only points one way, which is why `REMOTE_AFFINITY` is not
+      // symmetric where `CONTRACT_AFFINITY` is.
+      ...(allowedRemote.length < REMOTE_POLICY_COUNT
         ? [
             {
               OR: [
-                { remotePolicy: { equals: wantedRemote } },
+                { remotePolicy: { in: allowedRemote } },
                 { remotePolicy: { equals: null } },
               ],
             },
           ]
         : []),
     ];
+    const eligibleWhere: Prisma.OfferWhereInput = {
+      status: 'open',
+      ...(preferences.length > 0 ? { AND: preferences } : {}),
+      // The trade excludes rather than scores: nobody changes career because an
+      // unrelated post pays well, so a family that does not match has no rank
+      // low enough to be worth showing. Applied here rather than on the query
+      // below so the Elasticsearch path and its PostgreSQL top-up share it.
+      //
+      // A candidate who named no family is left unfiltered, which keeps the
+      // accounts created before this column from facing an empty deck. Once
+      // they name one, an offer carrying no family stops matching: its trade is
+      // unknown, and an unknown trade is not a wildcard.
+      ...(wantedFamilyIds.length > 0
+        ? { jobFamilyId: { in: wantedFamilyIds } }
+        : {}),
+      candidateLikes: { none: { candidateUserId: user.id } },
+      candidatePasses: { none: { candidateUserId: user.id } },
+    };
+    const fallbackOrder: Prisma.OfferOrderByWithRelationInput[] = [
+      { createdAt: 'desc' },
+      { id: 'desc' },
+    ];
 
-    const offers = await this.prisma.offer.findMany({
-      where: {
-        status: 'open',
-        ...(preferences.length > 0 ? { AND: preferences } : {}),
-        candidateLikes: { none: { candidateUserId: user.id } },
-        candidatePasses: { none: { candidateUserId: user.id } },
+    // Elasticsearch ranks only ids. This PostgreSQL query is the final gate for
+    // status and prior decisions, so a delayed index can never serve an offer a
+    // candidate has already answered or one that is no longer published.
+    const rankedIds = await this.search?.rankOfferIds(
+      {
+        jobFamilyIds: wantedFamilyIds,
+        skills: profile?.user.candidateTags.map((link) => link.tag.label) ?? [],
+        contractTypes: wantedContracts,
+        experienceLevel: profile?.experienceLevel ?? null,
+        remotePolicy: wantedRemote,
+        salaryMin: profile?.salaryMin ?? null,
+        salaryMax: profile?.salaryMax ?? null,
+        latitude:
+          profile?.latitude === null || profile?.latitude === undefined
+            ? null
+            : Number(profile.latitude),
+        longitude:
+          profile?.longitude === null || profile?.longitude === undefined
+            ? null
+            : Number(profile.longitude),
+        mobilityRadiusKm: profile?.mobilityRadiusKm ?? null,
+        mobilityNationwide: profile?.mobilityNationwide ?? null,
       },
-      // `createdAt` alone is not unique, so it cannot order the deck on its
-      // own: two offers written in the same instant would swap places from one
-      // read to the next. The id break is what makes the order stable.
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: limit,
+      limit,
+    );
+
+    if (rankedIds === null || rankedIds === undefined) {
+      const offers = await this.prisma.offer.findMany({
+        where: eligibleWhere,
+        orderBy: fallbackOrder,
+        take: limit,
+        select: SHOWCASE_OFFER_COLUMNS,
+      });
+      return offers.map(toShowcaseOffer);
+    }
+
+    const rankedRows = await this.prisma.offer.findMany({
+      where: { ...eligibleWhere, id: { in: rankedIds } },
       select: SHOWCASE_OFFER_COLUMNS,
     });
+    const rowsById = new Map(rankedRows.map((offer) => [offer.id, offer]));
+    const rankedOffers = rankedIds.flatMap((id) => {
+      const offer = rowsById.get(id);
+      return offer ? [offer] : [];
+    });
 
-    return offers.map(toShowcaseOffer);
+    // Indexing is asynchronous. Fill a short ranked page from PostgreSQL so a
+    // just-published or newly repaired offer is not hidden while its document
+    // catches up.
+    const remaining = limit - rankedOffers.length;
+    if (remaining > 0) {
+      const fallback = await this.prisma.offer.findMany({
+        where: { ...eligibleWhere, id: { notIn: rankedIds } },
+        orderBy: fallbackOrder,
+        take: remaining,
+        select: SHOWCASE_OFFER_COLUMNS,
+      });
+      rankedOffers.push(...fallback);
+    }
+
+    return rankedOffers.slice(0, limit).map(toShowcaseOffer);
   }
-
   /**
    * Writes down that a candidate is interested in an offer.
    *
    * Idempotent: liking twice is what a double tap produces, not an error worth
-   * showing. No `Match` is derived from a reciprocal pair — that rule belongs
-   * to #134, and settling it here would decide a product question this code
-   * does not carry.
+   * showing. The reciprocal recruiter decision is checked in the same
+   * transaction, which is what makes creating a Match race-safe.
    */
-  async like(candidateUserId: number, offerId: number): Promise<void> {
-    // Only a published offer can be liked, and a candidate cannot see any
-    // other — same 404 as the detail route, for the same reason: a 403 on an
-    // unpublished offer would confirm that the id exists.
-    const offer = await this.prisma.offer.findFirst({
-      where: { id: offerId, status: 'open' },
-      select: { id: true },
+  async like(candidateUserId: number, offerId: number): Promise<LikeResultDto> {
+    return this.prisma.$transaction(async (tx) => {
+      await lockAnswer(tx, candidateUserId, offerId);
+      const offer = await tx.offer.findFirst({
+        where: { id: offerId, status: 'open' },
+        select: { id: true, companyId: true },
+      });
+      if (!offer) throw new NotFoundException('Offer not found');
+      // The two answers are exclusive, so the one being given clears the
+      // other: a candidate may change their mind, but the pair must never
+      // carry a like and a pass at once.
+      await tx.candidatePassesOffer.deleteMany({
+        where: { candidateUserId, offerId },
+      });
+      const like = await tx.candidateLikesOffer.createMany({
+        data: [{ candidateUserId, offerId }],
+        skipDuplicates: true,
+      });
+      const reciprocal = await tx.recruiterLikesCandidate.findFirst({
+        where: {
+          candidateUserId,
+          offerId,
+          recruiter: { recruiterProfile: { companyId: offer.companyId } },
+        },
+        orderBy: [{ likedAt: 'asc' }, { recruiterUserId: 'asc' }],
+        select: { recruiterUserId: true },
+      });
+      if (!reciprocal)
+        return { likeCreated: like.count === 1, matchCreated: false };
+      const result = await this.matches.tryCreateReciprocalMatch(
+        tx,
+        candidateUserId,
+        offerId,
+        reciprocal.recruiterUserId,
+        'candidate',
+      );
+      return { likeCreated: like.count === 1, ...result };
     });
-    if (!offer) {
-      throw new NotFoundException('Offer not found');
-    }
-
-    await this.prisma.candidateLikesOffer.createMany({
-      data: [{ candidateUserId, offerId }],
-      skipDuplicates: true,
+  }
+  /** Records a candidate's decision not to pursue an open offer. */
+  async pass(candidateUserId: number, offerId: number): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await lockAnswer(tx, candidateUserId, offerId);
+      const offer = await tx.offer.findFirst({
+        where: { id: offerId, status: 'open' },
+        select: { id: true },
+      });
+      if (!offer) throw new NotFoundException('Offer not found');
+      await this.assertNotMatched(tx, candidateUserId, offerId);
+      await tx.candidateLikesOffer.deleteMany({
+        where: { candidateUserId, offerId },
+      });
+      await tx.candidatePassesOffer.createMany({
+        data: [{ candidateUserId, offerId }],
+        skipDuplicates: true,
+      });
     });
   }
 
+  /**
+   * Takes back a candidate's like on an offer.
+   *
+   * Idempotent, and deliberately blind to the offer itself: a pair carrying no
+   * like answers like one that did, and an offer that has left `open` since
+   * the like was written must still be releasable — the candidate is undoing
+   * their own row, not reading the post.
+   */
+  async unlike(candidateUserId: number, offerId: number): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await lockAnswer(tx, candidateUserId, offerId);
+      await this.assertNotMatched(tx, candidateUserId, offerId);
+      await tx.candidateLikesOffer.deleteMany({
+        where: { candidateUserId, offerId },
+      });
+    });
+  }
+
+  /**
+   * A match is a mutual commitment, and neither half of it is undone from the
+   * offer screen: refusing here is what keeps the likes list and the matches
+   * list from telling opposite stories about the same pair. Accepting the
+   * write and leaving the match standing would do exactly that.
+   */
+  private async assertNotMatched(
+    tx: Prisma.TransactionClient,
+    candidateUserId: number,
+    offerId: number,
+  ): Promise<void> {
+    const match = await tx.match.findUnique({
+      where: { candidateUserId_offerId: { candidateUserId, offerId } },
+      select: { id: true },
+    });
+
+    if (match) {
+      throw new ConflictException(
+        'Cette offre a déjà donné lieu à un match : il ne peut pas être défait ici.',
+      );
+    }
+  }
   /** The offers the calling candidate has liked, newest interest first. */
   async findLiked(
     candidateUserId: number,
@@ -436,6 +653,16 @@ export class OfferService {
               orderBy: { tag: { label: 'asc' } },
               select: { tag: { select: { label: true } } },
             },
+            likesReceived: {
+              where: { recruiterUserId, offerId },
+              select: { likedAt: true },
+              take: 1,
+            },
+            passesReceived: {
+              where: { recruiterUserId, offerId },
+              select: { passedAt: true },
+              take: 1,
+            },
           },
         },
       },
@@ -448,6 +675,8 @@ export class OfferService {
             {
               ...user.candidateProfile,
               tags: user.candidateTags.map((link) => link.tag.label),
+              recruiterLikedAt: user.likesReceived[0]?.likedAt ?? null,
+              recruiterPassedAt: user.passesReceived[0]?.passedAt ?? null,
             },
           ]
         : [],
@@ -459,42 +688,77 @@ export class OfferService {
    *
    * Scoped through the offer: the recruiter answers someone who applied to a
    * post of theirs, so both the offer and the application are verified before
-   * anything is written. Idempotent, and no `Match` is derived — see `like`.
-   *
-   * The row itself carries no offer: `RecruiterLikesCandidate` is keyed on the
-   * pair alone, and giving it an `offerId` is #134's business, not this one's.
+   * anything is written. The recruiter decision is scoped to that offer and
+   * can create the reciprocal Match in the same transaction.
    */
   async likeApplicant(
     recruiterUserId: number,
     offerId: number,
     candidateUserId: number,
-  ): Promise<void> {
-    await this.assertOwnedOffer(recruiterUserId, offerId);
-
-    // One answer for « no such application » and « not on this offer »: a
-    // recruiter may only answer someone who came to them.
-    const application = await this.prisma.candidateLikesOffer.findUnique({
-      where: {
-        candidateUserId_offerId: { candidateUserId, offerId },
-      },
-      select: { candidateUserId: true },
-    });
-    if (!application) {
-      throw new NotFoundException('Applicant not found');
-    }
-
-    await this.prisma.recruiterLikesCandidate.createMany({
-      data: [{ recruiterUserId, candidateUserId }],
-      skipDuplicates: true,
+  ): Promise<LikeResultDto> {
+    return this.prisma.$transaction(async (tx) => {
+      await lockAnswer(tx, candidateUserId, offerId);
+      const [offer, profile] = await Promise.all([
+        tx.offer.findFirst({
+          where: { id: offerId, status: 'open' },
+          select: { companyId: true },
+        }),
+        tx.recruiterProfile.findUnique({
+          where: { userId: recruiterUserId },
+          select: { companyId: true },
+        }),
+      ]);
+      if (!offer || !profile || offer.companyId !== profile.companyId)
+        throw new NotFoundException('Offer not found');
+      const application = await tx.candidateLikesOffer.findUnique({
+        where: { candidateUserId_offerId: { candidateUserId, offerId } },
+        select: { candidateUserId: true },
+      });
+      if (!application) throw new NotFoundException('Applicant not found');
+      const like = await tx.recruiterLikesCandidate.createMany({
+        data: [{ recruiterUserId, candidateUserId, offerId }],
+        skipDuplicates: true,
+      });
+      const result = await this.matches.tryCreateReciprocalMatch(
+        tx,
+        candidateUserId,
+        offerId,
+        recruiterUserId,
+        'recruiter',
+      );
+      return { likeCreated: like.count === 1, ...result };
     });
   }
-
-  /**
-   * Resolves the offer a recruiter names, or answers 404.
-   *
-   * 404 rather than 403 on an offer of another company, as everywhere else
-   * here: telling a stranger « not yours » already tells them the id exists.
-   */
+  /** Records a recruiter's decision not to pursue an applicant. */
+  async passApplicant(
+    recruiterUserId: number,
+    offerId: number,
+    candidateUserId: number,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const [offer, profile] = await Promise.all([
+        tx.offer.findUnique({
+          where: { id: offerId },
+          select: { companyId: true },
+        }),
+        tx.recruiterProfile.findUnique({
+          where: { userId: recruiterUserId },
+          select: { companyId: true },
+        }),
+      ]);
+      if (!offer || !profile || offer.companyId !== profile.companyId)
+        throw new NotFoundException('Offer not found');
+      const application = await tx.candidateLikesOffer.findUnique({
+        where: { candidateUserId_offerId: { candidateUserId, offerId } },
+        select: { candidateUserId: true },
+      });
+      if (!application) throw new NotFoundException('Applicant not found');
+      await tx.recruiterPassesCandidate.createMany({
+        data: [{ recruiterUserId, candidateUserId, offerId }],
+        skipDuplicates: true,
+      });
+    });
+  }
   private async assertOwnedOffer(
     recruiterUserId: number,
     offerId: number,
@@ -560,7 +824,52 @@ export class OfferService {
       throw new NotFoundException('Offer not found');
     }
 
-    return toDetailOffer(offer);
+    // Read for the candidate only, and absent — not false — for anyone else:
+    // a recruiter has no answer to give on an offer, and the same convention
+    // already governs `postalCode` and `status`.
+    const answer =
+      user.userType === 'candidate'
+        ? await this.readCandidateAnswer(user.id, id)
+        : {};
+
+    return { ...toDetailOffer(offer), ...answer };
+  }
+
+  /**
+   * What the calling candidate has already answered on an offer.
+   *
+   * The deck never shows an offer that carries one — `findFeed` excludes both
+   * — but the likes list links straight to the detail screen, so the screen
+   * has to know before it offers « Passer / Liker » again.
+   *
+   * A match does not clear the like, so it is read alongside: the two states
+   * are otherwise indistinguishable on the wire.
+   */
+  private async readCandidateAnswer(
+    candidateUserId: number,
+    offerId: number,
+  ): Promise<{ liked: boolean; passed: boolean; matched: boolean }> {
+    const key = { candidateUserId_offerId: { candidateUserId, offerId } };
+    const [liked, passed, matched] = await Promise.all([
+      this.prisma.candidateLikesOffer.findUnique({
+        where: key,
+        select: { offerId: true },
+      }),
+      this.prisma.candidatePassesOffer.findUnique({
+        where: key,
+        select: { offerId: true },
+      }),
+      this.prisma.match.findUnique({
+        where: key,
+        select: { offerId: true },
+      }),
+    ]);
+
+    return {
+      liked: liked !== null,
+      passed: passed !== null,
+      matched: matched !== null,
+    };
   }
 
   /**

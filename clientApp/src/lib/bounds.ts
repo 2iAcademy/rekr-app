@@ -8,6 +8,9 @@ export const MAX_TAGS = 50;
 export const MAX_TAG_LABEL_LENGTH = 100;
 export const MAX_FREE_TEXT_LENGTH = 5000;
 
+/** Mirrors `MAX_JOB_FAMILIES` in `backend/src/common/tags/tag-bounds.ts`. */
+export const MAX_JOB_FAMILIES = 3;
+
 /**
  * Salaries are `@Max(MAX_INT4)` server-side (2_147_483_647). Capping the input
  * at 9 digits keeps every reachable value under that ceiling, so a typo cannot

@@ -5,6 +5,12 @@ import { WIZARD_ERROR_ID } from '@/components/wizard/wizardError';
 import { ProjectStep } from './ProjectStep';
 import { emptyCandidateOnboarding } from '../state';
 
+vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
+}));
+
 const renderStep = (props: Partial<Parameters<typeof ProjectStep>[0]> = {}) =>
   render(<ProjectStep state={emptyCandidateOnboarding} onChange={vi.fn()} {...props} />);
 

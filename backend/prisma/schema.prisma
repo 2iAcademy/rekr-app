@@ -111,20 +111,21 @@ model User {
   /// nothing to compare against, so nothing is refused.
   passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
 
-  candidateProfile    CandidateProfile?
-  createdOffers       Offer[]
-  likedOffers         CandidateLikesOffer[]
-  likesGiven          RecruiterLikesCandidate[]  @relation("RecruiterLikes")
-  likesReceived       RecruiterLikesCandidate[]  @relation("CandidateLikedByRecruiter")
-  passedOffers        CandidatePassesOffer[]
-  passesGiven         RecruiterPassesCandidate[] @relation("RecruiterPasses")
-  passesReceived      RecruiterPassesCandidate[] @relation("CandidatePassedByRecruiter")
-  recruiterProfile    RecruiterProfile?
-  candidateTags       CandidateTag[]
-  matchesAsCandidate  Match[]                    @relation("MatchCandidate")
-  matchesAsRecruiter  Match[]                    @relation("MatchRecruiter")
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
+  candidateProfile     CandidateProfile?
+  createdOffers        Offer[]
+  likedOffers          CandidateLikesOffer[]
+  likesGiven           RecruiterLikesCandidate[]  @relation("RecruiterLikes")
+  likesReceived        RecruiterLikesCandidate[]  @relation("CandidateLikedByRecruiter")
+  passedOffers         CandidatePassesOffer[]
+  passesGiven          RecruiterPassesCandidate[] @relation("RecruiterPasses")
+  passesReceived       RecruiterPassesCandidate[] @relation("CandidatePassedByRecruiter")
+  recruiterProfile     RecruiterProfile?
+  candidateTags        CandidateTag[]
+  candidateJobFamilies CandidateJobFamily[]
+  matchesAsCandidate   Match[]                    @relation("MatchCandidate")
+  matchesAsRecruiter   Match[]                    @relation("MatchRecruiter")
+  refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
 
   @@map("user")
 }
@@ -242,6 +243,35 @@ model Company {
   @@map("company")
 }
 
+/// The trade an offer belongs to, and the trades a candidate is looking for.
+///
+/// Deliberately coarse — around twenty entries — because its only job is to
+/// keep a bakery out of a developer's feed. Distinct from `Sector`, which
+/// describes the company rather than the post: a bakery also hires accountants.
+model JobFamily {
+  id    Int    @id @default(autoincrement())
+  label String @unique @db.VarChar(100)
+
+  offers     Offer[]
+  candidates CandidateJobFamily[]
+
+  @@map("job_family")
+}
+
+/// Keyed on the user rather than on `CandidateProfile`, like `CandidateTag`:
+/// the profile carries the description, the account carries what it looks for.
+model CandidateJobFamily {
+  candidateUserId Int @map("fk_user_candidate")
+  jobFamilyId     Int @map("fk_job_family")
+
+  user      User      @relation(fields: [candidateUserId], references: [id], onDelete: Cascade)
+  jobFamily JobFamily @relation(fields: [jobFamilyId], references: [id], onDelete: Cascade)
+
+  @@id([candidateUserId, jobFamilyId])
+  @@index([jobFamilyId])
+  @@map("candidate_job_family")
+}
+
 model Sector {
   id    Int    @id @default(autoincrement())
   label String @unique @db.VarChar(100)
@@ -262,6 +292,9 @@ model Offer {
   latitude           Decimal?         @db.Decimal(10, 7)
   longitude          Decimal?         @db.Decimal(10, 7)
   contractType       ContractType?    @map("contract_type")
+  // Nullable only to carry the offers written before job families existed.
+  // New offers are required to name one, which the DTO enforces.
+  jobFamilyId        Int?             @map("fk_job_family")
   minExperienceLevel ExperienceLevel? @map("min_experience_level")
   remotePolicy       RemotePolicy?    @map("remote_policy")
   salaryMin          Int?             @map("salary_min")
@@ -270,15 +303,19 @@ model Offer {
   createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user            User?                  @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user            User?                      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  company         Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobFamily       JobFamily?                 @relation(fields: [jobFamilyId], references: [id], onDelete: Restrict)
   offerTags       OfferTag[]
   candidateLikes  CandidateLikesOffer[]
   candidatePasses CandidatePassesOffer[]
+  recruiterLikes  RecruiterLikesCandidate[]
+  recruiterPasses RecruiterPassesCandidate[]
   matches         Match[]
 
   @@index([companyId])
   @@index([status, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([jobFamilyId, status])
   @@map("offer")
 }
 
@@ -359,24 +396,30 @@ model CandidatePassesOffer {
 model RecruiterLikesCandidate {
   recruiterUserId Int      @map("fk_user_recruiter")
   candidateUserId Int      @map("fk_user_candidate")
+  offerId         Int      @map("fk_offer")
   likedAt         DateTime @default(now()) @map("liked_at") @db.Timestamptz(6)
 
-  recruiter User @relation("RecruiterLikes", fields: [recruiterUserId], references: [id], onDelete: Cascade)
-  candidate User @relation("CandidateLikedByRecruiter", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  recruiter User  @relation("RecruiterLikes", fields: [recruiterUserId], references: [id], onDelete: Cascade)
+  candidate User  @relation("CandidateLikedByRecruiter", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  offer     Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
 
-  @@id([recruiterUserId, candidateUserId])
+  @@id([recruiterUserId, candidateUserId, offerId])
+  @@index([candidateUserId, offerId])
   @@map("recruiter_likes_candidate")
 }
 
 model RecruiterPassesCandidate {
   recruiterUserId Int      @map("fk_user_recruiter")
   candidateUserId Int      @map("fk_user_candidate")
+  offerId         Int      @map("fk_offer")
   passedAt        DateTime @default(now()) @map("passed_at") @db.Timestamptz(6)
 
-  recruiter User @relation("RecruiterPasses", fields: [recruiterUserId], references: [id], onDelete: Cascade)
-  candidate User @relation("CandidatePassedByRecruiter", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  recruiter User  @relation("RecruiterPasses", fields: [recruiterUserId], references: [id], onDelete: Cascade)
+  candidate User  @relation("CandidatePassedByRecruiter", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  offer     Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
 
-  @@id([recruiterUserId, candidateUserId])
+  @@id([recruiterUserId, candidateUserId, offerId])
+  @@index([candidateUserId, offerId])
   @@map("recruiter_passes_candidate")
 }
 

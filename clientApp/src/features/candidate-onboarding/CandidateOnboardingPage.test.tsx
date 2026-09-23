@@ -10,6 +10,9 @@ import {
 import { CandidateOnboardingPage } from './CandidateOnboardingPage';
 
 vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   candidateProfileControllerCreate: vi.fn(),
   candidateProfileControllerUpdate: vi.fn(),
   cityControllerSearch: vi.fn(),
@@ -44,6 +47,10 @@ const fillIdentity = async (user: User) => {
 
 const fillProject = async (user: User) => {
   await user.type(screen.getByLabelText('Poste recherché'), 'Développeuse Front React');
+  await waitFor(() =>
+    expect(screen.getByRole('checkbox', { name: 'Informatique' })).toBeInTheDocument(),
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'Informatique' }));
   await user.click(screen.getByRole('checkbox', { name: 'CDI' }));
   await user.click(screen.getByRole('radio', { name: 'Confirmé' }));
   await user.click(screen.getByRole('radio', { name: 'Immédiate' }));
@@ -157,6 +164,7 @@ describe('CandidateOnboardingPage', () => {
       postalCode: '69001',
       desiredJobTitle: 'Développeuse Front React',
       contractTypes: ['CDI'],
+      jobFamilyIds: [13],
       experienceLevel: 'CONFIRME',
       availability: 'IMMEDIATE',
       remotePolicy: 'HYBRID',

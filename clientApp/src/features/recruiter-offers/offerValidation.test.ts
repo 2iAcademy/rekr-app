@@ -5,6 +5,7 @@ import { firstOfferError } from './offerValidation';
 const valid: OfferFormValue = {
   ...emptyOfferForm,
   title: 'Développeuse Front',
+  jobFamilyId: '13',
   description: 'Vous construirez le design system.',
   city: 'Lyon',
   postalCode: '69003',

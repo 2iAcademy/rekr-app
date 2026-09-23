@@ -2,6 +2,7 @@ import { MessageCircle } from 'lucide-react';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { fileUrl } from '@/lib/fileUrl';
 
 interface MatchPerson {
   name: string;
@@ -17,6 +18,10 @@ interface MatchPageProps {
 
 function Avatar({ person, className }: { person: MatchPerson; className?: string }) {
   const initial = person.name.trim().charAt(0).toUpperCase();
+  const avatarUrl =
+    person.avatarUrl?.startsWith('/') || person.avatarUrl?.startsWith('http')
+      ? person.avatarUrl
+      : fileUrl(person.avatarUrl);
 
   return (
     <div
@@ -25,8 +30,8 @@ function Avatar({ person, className }: { person: MatchPerson; className?: string
         className,
       )}
     >
-      {person.avatarUrl ? (
-        <img src={person.avatarUrl} alt={person.name} className="size-full object-cover" />
+      {avatarUrl ? (
+        <img src={avatarUrl} alt={person.name} className="size-full object-cover" />
       ) : (
         <span aria-hidden>{initial}</span>
       )}
@@ -65,7 +70,7 @@ export function MatchPage({
             C&apos;est un match !
           </h1>
           <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-white/85">
-            {`${matchedProfile.name} est aussi intéressé. Lance la conversation.`}
+            Vous avez tous les deux manifesté votre intérêt. Lancez la conversation.
           </p>
         </div>
 

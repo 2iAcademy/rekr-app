@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { authControllerSignup } from '@/api/generated';
@@ -7,6 +7,9 @@ import { AuthProvider } from '@/features/auth/AuthProvider';
 import { routes } from '@/router';
 
 vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   authControllerSignup: vi.fn(),
   authControllerLogin: vi.fn(),
   authControllerLogout: vi.fn(),
@@ -49,6 +52,7 @@ function renderAt(path: string) {
       <RouterProvider router={router} />
     </AuthProvider>,
   );
+  return router;
 }
 
 describe('navigation création de profil candidat', () => {
@@ -100,10 +104,13 @@ describe('navigation création de profil candidat', () => {
    */
   it('renvoie un recruteur connecté vers ses offres', async () => {
     authenticateAs('recruiter');
-    renderAt('/candidat/onboarding');
+    const router = renderAt('/candidat/onboarding');
 
+    await waitFor(() => expect(router.state.location.pathname).toBe('/recruteur/offres'), {
+      timeout: 5000,
+    });
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Vos offres' }),
+      await screen.findByRole('heading', { level: 1, name: 'Vos offres' }, { timeout: 5000 }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Étape 1 sur 4')).not.toBeInTheDocument();
   });
