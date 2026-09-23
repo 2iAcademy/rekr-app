@@ -59,11 +59,7 @@ const LIST_ITEM_COLUMNS = {
   },
 } as const;
 
-/**
- * The showcase projection of an offer, shared by the candidate feed and the
- * list of offers a candidate liked: two reads of the same thing by the same
- * role, so they answer the same shape.
- */
+/** The showcase projection of an offer, as the candidate feed serves it. */
 const SHOWCASE_OFFER_COLUMNS = {
   id: true,
   title: true,
@@ -590,27 +586,6 @@ export class OfferService {
       );
     }
   }
-  /** The offers the calling candidate has liked, newest interest first. */
-  async findLiked(
-    candidateUserId: number,
-    { page, limit }: OfferApplicantsQueryDto,
-  ): Promise<OfferFeedItemDto[]> {
-    const likes = await this.prisma.candidateLikesOffer.findMany({
-      // Published only, exactly as the match list reads: a like is not a
-      // standing right to read the offer. Unpublished, the post is being
-      // reworked, and `GET /offers/:id` answers 404 on it — this list must not
-      // be the way around that.
-      where: { candidateUserId, offer: { status: 'open' } },
-      // `offerId` breaks the ties `likedAt` leaves: two likes written in the
-      // same instant would otherwise swap places between two reads.
-      orderBy: [{ likedAt: 'desc' }, { offerId: 'desc' }],
-      skip: (page - 1) * limit,
-      take: limit,
-      select: { offer: { select: SHOWCASE_OFFER_COLUMNS } },
-    });
-
-    return likes.map(({ offer }) => toShowcaseOffer(offer));
-  }
 
   /**
    * The candidates who liked one of the recruiter's offers.
@@ -690,6 +665,11 @@ export class OfferService {
    * post of theirs, so both the offer and the application are verified before
    * anything is written. The recruiter decision is scoped to that offer and
    * can create the reciprocal Match in the same transaction.
+   *
+   * Every status is accepted, as `findApplicants` serves every status: a
+   * candidate the recruiter can read has to be one they can answer. A match
+   * concluded on a post that is not `open` stays out of both match lists until
+   * the post is published again, like everything else about it.
    */
   async likeApplicant(
     recruiterUserId: number,
@@ -699,8 +679,8 @@ export class OfferService {
     return this.prisma.$transaction(async (tx) => {
       await lockAnswer(tx, candidateUserId, offerId);
       const [offer, profile] = await Promise.all([
-        tx.offer.findFirst({
-          where: { id: offerId, status: 'open' },
+        tx.offer.findUnique({
+          where: { id: offerId },
           select: { companyId: true },
         }),
         tx.recruiterProfile.findUnique({
@@ -710,8 +690,14 @@ export class OfferService {
       ]);
       if (!offer || !profile || offer.companyId !== profile.companyId)
         throw new NotFoundException('Offer not found');
-      const application = await tx.candidateLikesOffer.findUnique({
-        where: { candidateUserId_offerId: { candidateUserId, offerId } },
+      // The population `findApplicants` serves, and no wider: a deactivated
+      // account is off the list, and the match would hand out its name.
+      const application = await tx.candidateLikesOffer.findFirst({
+        where: {
+          candidateUserId,
+          offerId,
+          user: { isActive: true, candidateProfile: { isNot: null } },
+        },
         select: { candidateUserId: true },
       });
       if (!application) throw new NotFoundException('Applicant not found');
