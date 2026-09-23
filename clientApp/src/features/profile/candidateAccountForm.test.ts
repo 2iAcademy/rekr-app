@@ -36,6 +36,8 @@ const profile = (
   cvUrl: 'candidates/42/cv/def.pdf',
   skills: ['React', 'TypeScript'],
   languages: ['Anglais'],
+  jobFamilyIds: [13, 4],
+  primaryJobFamilyId: 13,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-02T00:00:00.000Z',
   ...overrides,
@@ -56,6 +58,8 @@ describe('toCandidateAccountForm', () => {
       city: 'Lyon',
       postalCode: '69003',
       desiredJobTitle: 'Développeuse Front React',
+      jobFamilyIds: ['13', '4'],
+      primaryJobFamilyChosen: true,
       contractTypes: ['CDI', 'FREELANCE'],
       experienceLevel: 'SENIOR',
       availability: 'WITHIN_DELAY',
@@ -93,6 +97,8 @@ describe('toCandidateAccountForm', () => {
         linkedinUrl: null,
         skills: [],
         languages: [],
+        jobFamilyIds: [],
+        primaryJobFamilyId: null,
       }),
     );
 
@@ -134,6 +140,52 @@ describe('toCandidateAccountForm', () => {
 });
 
 describe('buildCandidateAccountPayload', () => {
+  // The order is the preference: the API reads the first trade as the primary.
+  it('envoie les métiers en nombres, principal en tête', () => {
+    const payload = buildCandidateAccountPayload(form({ jobFamilyIds: ['4', '13'] }));
+
+    expect(payload.jobFamilyIds).toEqual([4, 13]);
+  });
+
+  /**
+   * Sent even when empty, unlike the onboarding wizard: this is a PATCH, and an
+   * omitted list leaves the previous trades in place. Emptying the chips is how
+   * a candidate reopens their feed to every trade.
+   */
+  /**
+   * An account written before the rank has several trades and no primary. The
+   * form still holds them in some order, and sending that order back would
+   * elect its first entry — so an untouched list stays out of the body.
+   */
+  it('lit l’absence de principal sur un compte antérieur au rang', () => {
+    expect(
+      toCandidateAccountForm(profile({ jobFamilyIds: [13, 4], primaryJobFamilyId: null }))
+        .primaryJobFamilyChosen,
+    ).toBe(false);
+  });
+
+  // One trade has nothing to be ranked above: there is no choice to wait for.
+  it('considère le principal choisi quand il n’y a qu’un métier', () => {
+    expect(
+      toCandidateAccountForm(profile({ jobFamilyIds: [13], primaryJobFamilyId: null }))
+        .primaryJobFamilyChosen,
+    ).toBe(true);
+  });
+
+  it('n’envoie pas les métiers tant que le principal n’a pas été choisi', () => {
+    const payload = buildCandidateAccountPayload(
+      form({ jobFamilyIds: ['13', '4'], primaryJobFamilyChosen: false }),
+    );
+
+    expect(payload).not.toHaveProperty('jobFamilyIds');
+  });
+
+  it('envoie une liste de métiers vide pour rouvrir le feed à tous les métiers', () => {
+    const payload = buildCandidateAccountPayload(form({ jobFamilyIds: [] }));
+
+    expect(payload.jobFamilyIds).toEqual([]);
+  });
+
   it('renvoie toujours les compétences et les langues ensemble', () => {
     const payload = buildCandidateAccountPayload(form({ skills: ['React'], languages: [] }));
 

@@ -26,6 +26,13 @@ const filled: CandidateOnboardingState = {
 };
 
 describe('buildCandidateProfilePayload', () => {
+  // The API reads the order as the preference: the first trade is the primary.
+  it('garde l’ordre des métiers, principal en tête', () => {
+    expect(
+      buildCandidateProfilePayload({ ...filled, jobFamilyIds: ['13', '4'] }).jobFamilyIds,
+    ).toEqual([13, 4]);
+  });
+
   it('mappe le profil vers les champs attendus par l’API', () => {
     expect(buildCandidateProfilePayload(filled)).toEqual({
       firstName: 'Ada',

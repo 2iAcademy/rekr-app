@@ -63,6 +63,7 @@ export const candidateSummaries = (form: CandidateAccountForm): CandidateSummari
   ]),
 
   project: metaLine([
+    count('domaine', 'domaines', form.jobFamilyIds),
     form.desiredJobTitle.trim() || null,
     form.contractTypes.length === 0 ? null : form.contractTypes.map(contractLabel).join(', '),
     labelOf(EXPERIENCE_LEVEL_OPTIONS, form.experienceLevel),

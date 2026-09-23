@@ -479,6 +479,49 @@ describe('Offer feed (e2e)', () => {
       expect(titlesOf(res)).toEqual([]);
     });
 
+    /**
+     * The whole loop the account screen offers: the trades picked at sign-up
+     * are corrected from the profile, and the deck follows — including back
+     * to every trade, which is where the accounts older than the field live.
+     */
+    it('follows the trades the candidate edits from their profile', async () => {
+      const asCandidate = bearerFor(app, candidate.id, 'candidate');
+      await seedOffer({ title: 'Dev', jobFamilyId: wanted });
+      await seedOffer({ title: 'Boulanger', jobFamilyId: unwanted });
+      await httpRequest(app)
+        .post('/api/candidate-profiles')
+        .set('Authorization', asCandidate)
+        .send({
+          jobFamilyIds: [wanted],
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+        })
+        .expect(201);
+      const editTrades = (jobFamilyIds: number[]) =>
+        httpRequest(app)
+          .patch('/api/candidate-profiles/me')
+          .set('Authorization', asCandidate)
+          .send({ jobFamilyIds })
+          .expect(200);
+
+      expect(titlesOf(await getFeed().expect(200))).toEqual(['Dev']);
+
+      await editTrades([unwanted]);
+      expect(titlesOf(await getFeed().expect(200))).toEqual(['Boulanger']);
+
+      await editTrades([unwanted, wanted]);
+      expect(titlesOf(await getFeed().expect(200)).sort()).toEqual([
+        'Boulanger',
+        'Dev',
+      ]);
+
+      await editTrades([]);
+      expect(titlesOf(await getFeed().expect(200)).sort()).toEqual([
+        'Boulanger',
+        'Dev',
+      ]);
+    });
+
     // The column is nullable, so the accounts created before it exists must not
     // face an empty deck — including the offers that carry no trade either.
     it('serves every trade to a candidate who named none', async () => {

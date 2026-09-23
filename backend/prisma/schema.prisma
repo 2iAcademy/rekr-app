@@ -263,6 +263,9 @@ model JobFamily {
 model CandidateJobFamily {
   candidateUserId Int @map("fk_user_candidate")
   jobFamilyId     Int @map("fk_job_family")
+  /// 0 is the primary trade, the others follow. Rows written before the rank
+  /// existed all read 0, which `primaryJobFamilyOf` reads as « none preferred ».
+  rank            Int @default(0) @db.SmallInt
 
   user      User      @relation(fields: [candidateUserId], references: [id], onDelete: Cascade)
   jobFamily JobFamily @relation(fields: [jobFamilyId], references: [id], onDelete: Cascade)

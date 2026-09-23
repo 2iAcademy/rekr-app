@@ -60,6 +60,7 @@ describe('OfferSearchService', () => {
       service.rankOfferIds(
         {
           jobFamilyIds: [13],
+          primaryJobFamilyId: null,
           skills: ['TypeScript'],
           contractTypes: ['CDI'],
           experienceLevel: 'CONFIRME',
@@ -116,6 +117,7 @@ describe('OfferSearchService', () => {
       service.rankOfferIds(
         {
           jobFamilyIds: [],
+          primaryJobFamilyId: null,
           skills: [],
           contractTypes: [],
           experienceLevel: null,
@@ -141,6 +143,7 @@ describe('OfferSearchService', () => {
       service.rankOfferIds(
         {
           jobFamilyIds: [],
+          primaryJobFamilyId: null,
           skills: ['React'],
           contractTypes: ['CDI'],
           experienceLevel: null,

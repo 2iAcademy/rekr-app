@@ -29,6 +29,15 @@ import {
 export const CRITERION_WEIGHTS = {
   /** What separates two offers of the same trade. */
   skills: 5,
+  /**
+   * The trade the candidate ranked first. Every trade they named is already a
+   * filter, so this only orders what the filter let through — and it is kept
+   * below the skills on purpose: it breaks ties between comparable offers, it
+   * does not sort the deck by block. An offer of a secondary trade that uses
+   * the candidate's whole skill set still comes before one of the primary
+   * trade that uses none of it.
+   */
+  jobFamily: 2,
   /** A junior on a lead role is a lost application on both sides. */
   experience: 4,
   contractType: 3,
@@ -37,8 +46,8 @@ export const CRITERION_WEIGHTS = {
   location: 1,
   /**
    * Zero, so remote work only ever excludes — which is all the source table
-   * asked of it, and it keeps the six weights above summing to the scale that
-   * table set. `REMOTE_AFFINITY` already grades the pairs it allows: raise this
+   * asked of it, and it keeps the axes that table listed summing to the 17 it
+   * set; the primary trade came later and adds its own 2. `REMOTE_AFFINITY` already grades the pairs it allows: raise this
    * to 1 and an hybrid candidate starts preferring an hybrid post to a fully
    * remote one, without another line changing.
    */
@@ -47,7 +56,7 @@ export const CRITERION_WEIGHTS = {
   freshness: 1,
 } as const;
 
-/** The highest total an offer can reach — 17 with the weights above. */
+/** The highest total an offer can reach — 19 with the weights above. */
 export const MAX_RANKING_SCORE = Object.values(CRITERION_WEIGHTS).reduce(
   (total, weight) => total + weight,
   0,

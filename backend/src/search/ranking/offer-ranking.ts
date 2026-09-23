@@ -31,6 +31,11 @@ import {
 /** Everything the ranking reads about the candidate, and nothing else. */
 export interface CandidateRankingProfile {
   jobFamilyIds: number[];
+  /**
+   * The trade the candidate ranked first, or `null` when there is nothing to
+   * prefer — a single trade, or an account whose trades were never ranked.
+   */
+  primaryJobFamilyId: number | null;
   skills: string[];
   contractTypes: ContractType[];
   experienceLevel: ExperienceLevel | null;
@@ -42,6 +47,31 @@ export interface CandidateRankingProfile {
   mobilityRadiusKm: number | null;
   mobilityNationwide: boolean | null;
 }
+
+/** A trade the candidate named, with the place they gave it. */
+export interface RankedJobFamily {
+  jobFamilyId: number;
+  rank: number;
+}
+
+/**
+ * The trade to lift above the others, or `null` when there is none to prefer.
+ *
+ * A single trade has nothing to be preferred over. Several trades sharing the
+ * lowest rank are the accounts written before the rank existed: the migration
+ * could not recover an intention, and electing one of them would boost a trade
+ * the candidate never chose.
+ */
+export const primaryJobFamilyOf = (
+  families: RankedJobFamily[],
+): number | null => {
+  if (families.length < 2) return null;
+
+  const lowest = Math.min(...families.map(({ rank }) => rank));
+  const first = families.filter(({ rank }) => rank === lowest);
+
+  return first.length === 1 ? first[0].jobFamilyId : null;
+};
 
 export interface OfferRankingQuery {
   /** Hard rules. An offer failing any of these never reaches the deck. */
@@ -92,6 +122,7 @@ export const buildOfferRankingQuery = (
   ],
   functions: [
     ...skillFunctions(profile),
+    ...jobFamilyFunctions(profile),
     ...remotePolicyFunctions(profile),
     ...experienceFunctions(profile),
     ...contractTypeFunctions(profile),
@@ -111,6 +142,25 @@ const jobFamilyFilter = ({
   jobFamilyIds,
 }: CandidateRankingProfile): QueryDslQueryContainer[] =>
   jobFamilyIds.length > 0 ? [{ terms: { jobFamilyId: jobFamilyIds } }] : [];
+
+/**
+ * The primary trade orders, it never narrows: the filter above keeps every
+ * trade the candidate named, and this only lifts the one they ranked first.
+ * A primary missing from the filter is ignored — it would score offers the
+ * deck never shows.
+ */
+const jobFamilyFunctions = ({
+  jobFamilyIds,
+  primaryJobFamilyId,
+}: CandidateRankingProfile): QueryDslFunctionScoreContainer[] =>
+  primaryJobFamilyId !== null && jobFamilyIds.includes(primaryJobFamilyId)
+    ? [
+        {
+          filter: { term: { jobFamilyId: primaryJobFamilyId } },
+          weight: CRITERION_WEIGHTS.jobFamily,
+        },
+      ]
+    : [];
 
 /**
  * Asking for remote work is usually being unable to come on site — a child to
