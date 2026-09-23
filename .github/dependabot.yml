@@ -39,6 +39,14 @@ updates:
         update-types:
           - minor
           - patch
+      # Catch-all, kept last: Dependabot assigns each dependency to the first
+      # matching group, so the named groups above keep their own PRs. Without
+      # it every other production dependency gets its own PR, and each one
+      # rewrites package-lock.json and conflicts with the next.
+      everything-else:
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: npm
     directory: /clientApp
@@ -61,6 +69,14 @@ updates:
           - '@sentry/*'
       dev-tooling:
         dependency-type: development
+        update-types:
+          - minor
+          - patch
+      # Catch-all, kept last: Dependabot assigns each dependency to the first
+      # matching group, so the named groups above keep their own PRs. Without
+      # it every other production dependency gets its own PR, and each one
+      # rewrites package-lock.json and conflicts with the next.
+      everything-else:
         update-types:
           - minor
           - patch
