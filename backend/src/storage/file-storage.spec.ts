@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { InMemoryFileStorage } from '../../test/in-memory-file-storage';
 import { pdfBuffer, pngBuffer } from '../../test/file-fixtures';
+import { FileScope } from './file-kind';
 import { FileStorage } from './file-storage.interface';
 import { LocalFileStorage } from './local-file-storage';
 import { buildStorageKey } from './storage-key';
@@ -92,6 +93,52 @@ describe.each([
     const key = buildStorageKey('candidates', 1, 'cv', 'pdf');
 
     await expect(storage.delete(key)).resolves.toBeUndefined();
+  });
+
+  /**
+   * What an account deletion calls: every file of one owner, including the
+   * ones no row points at any more — a replaced picture whose unlink failed, an
+   * upload that raced the deletion.
+   */
+  it('deletes every file of one owner, and nobody else’s', async () => {
+    const mine = [
+      buildStorageKey('candidates', 1, 'cv', 'pdf'),
+      buildStorageKey('candidates', 1, 'picture', 'png'),
+      buildStorageKey('candidates', 1, 'picture', 'png'),
+    ];
+    // `12` starts with `1`: a prefix compared as a bare string would take it.
+    const neighbour = buildStorageKey('candidates', 12, 'cv', 'pdf');
+    const otherScope = buildStorageKey('companies', 1, 'logo', 'png');
+    for (const key of [...mine, neighbour, otherScope]) {
+      await storage.save(key, pdfBuffer());
+    }
+
+    await storage.deleteOwner('candidates', 1);
+
+    for (const key of mine) {
+      expect(await storage.read(key)).toBeNull();
+    }
+    expect(await storage.read(neighbour)).toEqual(pdfBuffer());
+    expect(await storage.read(otherScope)).toEqual(pdfBuffer());
+  });
+
+  it('deletes an owner with no file without complaining', async () => {
+    await expect(storage.deleteOwner('companies', 7)).resolves.toBeUndefined();
+  });
+
+  it.each([0, -1, 1.5, Number.NaN])(
+    'refuses to delete the files of the owner %p',
+    async (ownerId) => {
+      await expect(
+        storage.deleteOwner('candidates', ownerId),
+      ).rejects.toThrow();
+    },
+  );
+
+  it('refuses a scope that is not one of ours', async () => {
+    await expect(
+      storage.deleteOwner('..' as unknown as FileScope, 1),
+    ).rejects.toThrow();
   });
 
   it.each(TRAVERSAL_KEYS)(

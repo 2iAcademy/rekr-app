@@ -28,7 +28,10 @@ interface TestContext {
 }
 
 async function createTestContext(): Promise<TestContext> {
-  const prisma = { user: { findUnique: jest.fn(), create: jest.fn() } };
+  const prisma = {
+    user: { findUnique: jest.fn(), create: jest.fn() },
+    $executeRaw: jest.fn(),
+  };
   const refreshTokens = {
     issue: jest.fn().mockResolvedValue({
       token: 'raw-refresh',
@@ -149,6 +152,7 @@ describe('AuthService.login — enumeration hardening', () => {
         email: 'new@test.dev',
         password: 'Sup3rSecret!',
         userType: 'candidate',
+        acceptTerms: true,
       },
       { ip: '10.0.0.2' },
     );
@@ -458,7 +462,12 @@ describe('AuthService — profile completion in the session', () => {
     prisma.user.create.mockResolvedValue(CANDIDATE);
 
     const session = await service.signup(
-      { email: CANDIDATE.email, password: 'whatever', userType: 'candidate' },
+      {
+        email: CANDIDATE.email,
+        password: 'whatever',
+        userType: 'candidate',
+        acceptTerms: true,
+      },
       {},
     );
 

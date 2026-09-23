@@ -13,10 +13,15 @@
  * A stream API would add lifecycle handling to every call site and buy nothing
  * at this size.
  */
+import type { FileScope } from './file-kind';
+
 export const FILE_STORAGE = 'FILE_STORAGE';
 
 export interface FileStorage {
   save(key: string, content: Buffer): Promise<void>;
   read(key: string): Promise<Buffer | null>;
   delete(key: string): Promise<void>;
+  /** Every file stored under `<scope>/<ownerId>/`, whether a row still points
+   * at it or not. What erasing an account relies on. */
+  deleteOwner(scope: FileScope, ownerId: number): Promise<void>;
 }

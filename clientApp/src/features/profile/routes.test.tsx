@@ -25,6 +25,8 @@ vi.mock('@/api/generated', () => ({
   companyControllerRemoveCoverImage: vi.fn(),
   sectorControllerFindAll: vi.fn(),
   cityControllerSearch: vi.fn(),
+  accountControllerDelete: vi.fn(),
+  accountControllerExport: vi.fn(),
 }));
 
 const findCandidateProfile = vi.mocked(candidateProfileControllerFindMine);
@@ -174,4 +176,16 @@ describe('ProfileRoute', () => {
     expect(profileHeading()).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Connexion' })).not.toBeInTheDocument();
   });
+
+  it.each(['candidate', 'recruiter'] as const)(
+    'offre à un %s l’export et la suppression de son compte',
+    async (userType) => {
+      authenticateAs(userType);
+      renderProfile();
+
+      expect(await screen.findByRole('heading', { name: 'Mes données' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Télécharger mes données' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Supprimer mon compte' })).toBeInTheDocument();
+    },
+  );
 });

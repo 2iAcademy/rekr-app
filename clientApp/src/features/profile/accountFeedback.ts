@@ -38,3 +38,17 @@ export const fileReplaceBusiness: BusinessMessages = {
 export const fileRemoveBusiness: BusinessMessages = {
   404: MISSING_RECORD,
 };
+
+export const ACCOUNT_EXPORT_SUCCESS = 'Vos données sont téléchargées.';
+export const ACCOUNT_DELETE_SUCCESS = 'Votre compte a été supprimé.';
+
+/** Shown inline, next to the field, rather than in a toast: it asks for a new
+ * attempt in the very place the user is typing. */
+export const ACCOUNT_DELETE_WRONG_PASSWORD = 'Mot de passe incorrect.';
+
+export const accountExportBusiness: BusinessMessages = {};
+
+export const accountDeleteBusiness: BusinessMessages = {
+  // The shared 400 speaks of the login form's email; here only the password is sent.
+  400: 'Saisissez votre mot de passe pour confirmer.',
+};

@@ -30,6 +30,9 @@ const DEFAULT_TTL_SECONDS = 60;
  * minute — and behind a proxy with `TRUST_PROXY_HOPS=0` every visitor shares
  * the counter. It still caps a scraper walking the key space, which is the only
  * abuse this route allows.
+ *
+ * `accountDelete` is as tight as `login`, for the same reason: the route checks
+ * a password, so it is a guessing oracle for whoever holds a stolen token.
  */
 const DEFAULT_LIMITS: Record<ThrottleBudgetName, number> = {
   default: 100,
@@ -50,6 +53,7 @@ const DEFAULT_LIMITS: Record<ThrottleBudgetName, number> = {
   // keep the token space from being walked, and 256 bits of randomness put
   // that far out of reach anyway.
   passwordReset: 10,
+  accountDelete: 5,
 };
 
 export function buildThrottlerOptions(
@@ -123,6 +127,11 @@ function readLimits(
       configService,
       'THROTTLE_PASSWORD_RESET_LIMIT',
       DEFAULT_LIMITS.passwordReset,
+    ),
+    accountDelete: readPositiveInt(
+      configService,
+      'THROTTLE_ACCOUNT_DELETE_LIMIT',
+      DEFAULT_LIMITS.accountDelete,
     ),
   };
 }

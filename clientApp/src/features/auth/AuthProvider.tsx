@@ -77,6 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
         userType,
+        // The checkbox is what let the form submit at all; this is the server
+        // being told so, since only a stored consent can be shown later.
+        acceptTerms: true,
       } as Parameters<typeof authControllerSignup>[0]);
       adopt(res.data as unknown as SessionPayload);
     },
@@ -101,8 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, login, signup, logout, markProfileCompleted }),
-    [status, user, login, signup, logout, markProfileCompleted],
+    () => ({ status, user, login, signup, logout, accountDeleted: abandon, markProfileCompleted }),
+    [status, user, login, signup, logout, abandon, markProfileCompleted],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

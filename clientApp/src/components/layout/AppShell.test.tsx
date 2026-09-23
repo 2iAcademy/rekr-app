@@ -16,6 +16,7 @@ const callbacks = () => ({
   login: vi.fn(),
   signup: vi.fn(),
   logout: vi.fn(),
+  accountDeleted: vi.fn(),
   markProfileCompleted: vi.fn(),
 });
 
