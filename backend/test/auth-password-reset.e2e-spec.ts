@@ -30,9 +30,12 @@ describe('Auth password reset (e2e)', () => {
   };
 
   const signup = (email: string) =>
-    httpRequest(app)
-      .post('/api/auth/signup')
-      .send({ email, password: PASSWORD, userType: 'candidate' });
+    httpRequest(app).post('/api/auth/signup').send({
+      email,
+      password: PASSWORD,
+      userType: 'candidate',
+      acceptTerms: true,
+    });
 
   const forgot = (email: string) =>
     httpRequest(app).post('/api/auth/password/forgot').send({ email });

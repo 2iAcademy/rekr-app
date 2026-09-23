@@ -1,6 +1,7 @@
 import { isValidElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
 import { AnonymousOnly } from '@/features/auth/AnonymousOnly';
@@ -491,6 +492,83 @@ describe('détail d’une offre', () => {
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/offres/12');
+    });
+  });
+});
+
+/**
+ * The privacy policy and the legal notice are linked from the sign-up form, so
+ * an anonymous visitor has to read them before an account exists — and an
+ * account holder has to be able to reread them. Neither guard may catch them.
+ */
+describe('pages légales', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+  });
+
+  it.each([
+    ['/confidentialite', 'Politique de confidentialité'],
+    ['/mentions-legales', 'Mentions légales'],
+  ])('laisse un visiteur anonyme lire %s', async (path, title) => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+
+    const router = renderAt(path);
+
+    expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(path);
+  });
+
+  it.each(['/confidentialite', '/mentions-legales'])(
+    'laisse une session établie relire %s',
+    async (path) => {
+      authenticateAs('candidate');
+      const router = renderAt(path);
+
+      await screen.findByRole('heading', { level: 1 });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(router.state.location.pathname).toBe(path);
+    },
+  );
+
+  /*
+   * The sign-up form opens these pages in a new tab: no entry of the app sits
+   * behind them, and going back through the history would leave the site.
+   */
+  it('ramène à l’accueil quand la page a été ouverte sans historique dans l’app', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+    const router = renderAt('/confidentialite');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Retour' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/');
+    });
+  });
+
+  it('revient à l’écran précédent quand on y est arrivé depuis l’app', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+    const router = renderAt('/inscription');
+    await screen.findByRole('heading', { level: 1, name: 'Créer un compte' });
+    await router.navigate('/mentions-legales');
+    await screen.findByRole('heading', { level: 1, name: 'Mentions légales' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Retour' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/inscription');
     });
   });
 });

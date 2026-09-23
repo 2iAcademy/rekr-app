@@ -1,6 +1,7 @@
 import { isRecruiter, userTypeLabel } from '@/domain/userType';
 import { RouteGuard } from '@/features/auth/RouteGuard';
 import { AccountPage } from '@/features/profile/pages/AccountPage';
+import { AccountDataSection } from '@/features/profile/sections/AccountDataSection';
 import { CandidateAccountSection } from '@/features/profile/sections/CandidateAccountSection';
 import { RecruiterAccountSection } from '@/features/profile/sections/RecruiterAccountSection';
 
@@ -12,6 +13,7 @@ export function ProfileRoute() {
           {/* `isRecruiter` treats an unknown user type as a candidate, matching
               `userTypeLabel`: an unrecognised session lands on the narrower half. */}
           {isRecruiter(user.userType) ? <RecruiterAccountSection /> : <CandidateAccountSection />}
+          <AccountDataSection />
         </AccountPage>
       )}
     </RouteGuard>

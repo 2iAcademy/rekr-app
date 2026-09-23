@@ -25,6 +25,8 @@ export interface SignupDto {
    */
   password: string;
   userType: SignupDtoUserType;
+  /** Acceptance of the privacy policy and the terms of use. */
+  acceptTerms: true;
 }
 
 export interface LoginDto {
@@ -498,6 +500,10 @@ export interface LikeListItemDto {
   counterpart: MatchCounterpartDto;
 }
 
+export interface DeleteAccountDto {
+  password: string;
+}
+
 export type CandidateProfileControllerReplacePictureBody = {
   file: Blob | File;
 };
@@ -624,6 +630,8 @@ export type LikeControllerFindReceivedParams = {
    */
   limit?: number;
 };
+
+export type AccountControllerExport200 = { [key: string]: unknown };
 
 export type appControllerGetHelloResponse200 = {
   data: void;
@@ -2195,9 +2203,25 @@ export type matchControllerFindMineResponse200 = {
   status: 200;
 };
 
+export type matchControllerFindMineResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type matchControllerFindMineResponse403 = {
+  data: void;
+  status: 403;
+};
+
 export type matchControllerFindMineResponseSuccess = matchControllerFindMineResponse200 & {
   headers: Headers;
 };
+export type matchControllerFindMineResponseError = (
+  matchControllerFindMineResponse401 | matchControllerFindMineResponse403
+) & {
+  headers: Headers;
+};
+
 export const getMatchControllerFindMineUrl = (params?: MatchControllerFindMineParams) => {
   const normalizedParams = new URLSearchParams();
 
@@ -2397,4 +2421,68 @@ export const likeControllerFindReceived = async (
       method: 'GET',
     },
   );
+};
+
+export type accountControllerDeleteResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type accountControllerDeleteResponseSuccess = accountControllerDeleteResponse204 & {
+  headers: Headers;
+};
+export const getAccountControllerDeleteUrl = () => {
+  return `/api/account`;
+};
+
+export const accountControllerDelete = async (
+  deleteAccountDto: DeleteAccountDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<accountControllerDeleteResponseSuccess> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<accountControllerDeleteResponseSuccess>(getAccountControllerDeleteUrl(), {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(deleteAccountDto),
+  });
+};
+
+export type accountControllerExportResponse200 = {
+  data: AccountControllerExport200;
+  status: 200;
+};
+
+export type accountControllerExportResponseSuccess = accountControllerExportResponse200 & {
+  headers: Headers;
+};
+export const getAccountControllerExportUrl = () => {
+  return `/api/account/export`;
+};
+
+export const accountControllerExport = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<accountControllerExportResponseSuccess> => {
+  return customFetch<accountControllerExportResponseSuccess>(getAccountControllerExportUrl(), {
+    ...options,
+    method: 'GET',
+  });
 };

@@ -25,6 +25,7 @@ const renderLogout = (logout: AuthContextValue['logout']) => {
         login: vi.fn(),
         signup: vi.fn(),
         logout,
+        accountDeleted: vi.fn(),
         markProfileCompleted: vi.fn(),
       }}
     >

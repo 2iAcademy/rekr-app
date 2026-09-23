@@ -25,6 +25,24 @@ interface SignupPageProps {
   onSubmit?: (data: { role: Role; email: string; password: string }) => void;
 }
 
+/**
+ * A new tab, so that reading the policy does not throw away a half-filled form.
+ * A plain anchor rather than a router `Link`: the page renders outside any
+ * router in its own tests, and a new tab reloads the app anyway.
+ */
+function LegalLink({ href, children }: { href: string; children: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-medium text-role-strong underline-offset-2 hover:underline"
+    >
+      {children}
+    </a>
+  );
+}
+
 export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
   const { signup } = useAuth();
   const [role, setRole] = useState<Role>(roleOptions[0].value);
@@ -160,7 +178,8 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
             />
           </span>
           <span className="text-xs leading-snug text-ink-muted">
-            J'accepte les CGU et la politique de confidentialité.
+            J'accepte les <LegalLink href="/mentions-legales">CGU</LegalLink> et la{' '}
+            <LegalLink href="/confidentialite">politique de confidentialité</LegalLink>.
           </span>
         </label>
 

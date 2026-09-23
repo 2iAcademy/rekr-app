@@ -1,7 +1,8 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
+import type { FileScope } from './file-kind';
 import { FileStorage } from './file-storage.interface';
-import { isStorageKey } from './storage-key';
+import { isStorageKey, ownerPrefix } from './storage-key';
 
 export class LocalFileStorage implements FileStorage {
   private readonly root: string;
@@ -31,6 +32,19 @@ export class LocalFileStorage implements FileStorage {
 
   async delete(key: string): Promise<void> {
     await rm(this.pathFor(key), { force: true });
+  }
+
+  async deleteOwner(scope: FileScope, ownerId: number): Promise<void> {
+    const path = resolve(join(this.root, ownerPrefix(scope, ownerId)));
+    // Same containment check as `pathFor`, and more needed here: this one is
+    // recursive.
+    if (!path.startsWith(`${this.root}${sep}`)) {
+      throw new Error(
+        `The owner "${scope}/${ownerId}" resolves outside the uploads root.`,
+      );
+    }
+
+    await rm(path, { recursive: true, force: true });
   }
 
   /**

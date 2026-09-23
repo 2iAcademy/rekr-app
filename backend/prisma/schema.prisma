@@ -111,6 +111,17 @@ model User {
   /// nothing to compare against, so nothing is refused.
   passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
 
+  /// Consent to the privacy policy, recorded at sign-up with the version of the
+  /// text that was accepted: proving consent means proving *what* was agreed
+  /// to. NULL on accounts created before the checkbox reached the server.
+  termsAcceptedAt DateTime? @map("terms_accepted_at") @db.Timestamptz(6)
+  termsVersion    String?   @map("terms_version") @db.VarChar(20)
+
+  /// Last sign-up, login or session refresh — the clock the retention period of
+  /// inactive accounts runs on. Written by raw SQL so that `updatedAt` keeps
+  /// meaning "the account changed" rather than "the tab was reopened".
+  lastActiveAt DateTime? @map("last_active_at") @db.Timestamptz(6)
+
   candidateProfile     CandidateProfile?
   createdOffers        Offer[]
   likedOffers          CandidateLikesOffer[]

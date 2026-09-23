@@ -6,7 +6,7 @@ import { useAuth } from './useAuth';
 import { clearAccessToken, getAccessToken } from '@/api/tokenStore';
 
 const Probe = () => {
-  const { status, user, markProfileCompleted } = useAuth();
+  const { status, user, markProfileCompleted, accountDeleted } = useAuth();
 
   return (
     <div>
@@ -15,6 +15,9 @@ const Probe = () => {
       <span data-testid="has-profile">{String(user?.hasProfile ?? '')}</span>
       <button type="button" onClick={markProfileCompleted}>
         terminer l’onboarding
+      </button>
+      <button type="button" onClick={accountDeleted}>
+        compte supprimé
       </button>
     </div>
   );
@@ -158,5 +161,37 @@ describe('AuthProvider — fin de l’onboarding', () => {
 
     expect(screen.getByTestId('status')).toHaveTextContent('anonymous');
     expect(screen.getByTestId('has-profile')).toHaveTextContent('');
+  });
+
+  /*
+   * The server has already erased the account and cleared the cookie: there is
+   * nobody left to log out, and calling the logout route would only fail.
+   */
+  it('oublie la session locale une fois le compte supprimé, sans appeler le serveur', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        accessToken: 'fresh',
+        user: {
+          id: 1,
+          email: 'leaving@test.dev',
+          role: 'user',
+          userType: 'candidate',
+          isActive: true,
+          hasProfile: true,
+        },
+      }),
+    } as unknown as Response);
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'));
+    fetchSpy.mockClear();
+
+    await userEvent.click(screen.getByRole('button', { name: 'compte supprimé' }));
+
+    expect(screen.getByTestId('status')).toHaveTextContent('anonymous');
+    expect(screen.getByTestId('email')).toHaveTextContent('');
+    expect(getAccessToken()).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

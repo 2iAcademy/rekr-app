@@ -13,6 +13,7 @@ import {
   SignupRoute,
   SplashRoute,
 } from '@/features/onboarding/routes';
+import { LegalNoticeRoute, PrivacyPolicyRoute } from '@/features/legal/routes';
 import { OfferDetailRoute } from '@/features/offers/routes';
 import { ProfileRoute } from '@/features/profile/routes';
 import { OfferApplicantsRoute } from '@/features/recruiter-candidates/routes';
@@ -30,6 +31,10 @@ export const routes = [
       { path: '/reinitialiser-mot-de-passe', element: <ResetPasswordRoute /> },
     ],
   },
+
+  // Under neither guard: read before an account exists, and reread after.
+  { path: '/confidentialite', element: <PrivacyPolicyRoute /> },
+  { path: '/mentions-legales', element: <LegalNoticeRoute /> },
 
   { path: '/candidat/onboarding', element: <CandidateOnboardingRoute /> },
   { path: '/recruteur/onboarding', element: <RecruiterOnboardingRoute /> },

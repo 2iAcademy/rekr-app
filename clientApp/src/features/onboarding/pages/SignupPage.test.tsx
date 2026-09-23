@@ -66,6 +66,7 @@ describe('SignupPage', () => {
       email: 'candidat@rekr.fr',
       password: 'motdepasse1',
       userType: 'candidate',
+      acceptTerms: true,
     });
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith({
@@ -73,6 +74,16 @@ describe('SignupPage', () => {
       email: 'candidat@rekr.fr',
       password: 'motdepasse1',
     });
+  });
+
+  it('donne accès à la politique de confidentialité et aux mentions légales depuis la case à cocher', () => {
+    renderSignup();
+
+    expect(screen.getByRole('link', { name: 'politique de confidentialité' })).toHaveAttribute(
+      'href',
+      '/confidentialite',
+    );
+    expect(screen.getByRole('link', { name: 'CGU' })).toHaveAttribute('href', '/mentions-legales');
   });
 
   it('transmet le rôle recruteur quand il est sélectionné', async () => {

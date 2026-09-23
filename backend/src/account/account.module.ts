@@ -1,0 +1,13 @@
+import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
+import { StorageModule } from '../storage/storage.module';
+import { AccountController } from './account.controller';
+import { AccountRetentionService } from './account-retention.service';
+import { AccountService } from './account.service';
+
+@Module({
+  imports: [AuthModule, StorageModule],
+  controllers: [AccountController],
+  providers: [AccountService, AccountRetentionService],
+})
+export class AccountModule {}

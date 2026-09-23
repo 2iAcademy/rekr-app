@@ -16,6 +16,7 @@ const session: AuthContextValue = {
   login: vi.fn(),
   signup: vi.fn(),
   logout: vi.fn().mockResolvedValue(undefined),
+  accountDeleted: vi.fn(),
   markProfileCompleted: vi.fn(),
 };
 
