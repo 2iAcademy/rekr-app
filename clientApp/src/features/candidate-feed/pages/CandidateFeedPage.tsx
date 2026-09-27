@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
+import { CircleAlert, RotateCcw } from 'lucide-react';
 import { offerControllerLike, offerControllerPass } from '@/api/generated';
 import { notifyFailure } from '@/lib/feedback/notify';
 import { likeFailureBusiness } from '../likeFeedback';
 import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { EmptyDeck } from '@/components/feed/EmptyDeck';
 import { FeedActions } from '@/components/feed/FeedActions';
 import { SwipeHint } from '@/components/feed/SwipeHint';
@@ -38,17 +40,19 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
   const deck = remainingItems(offers, decisions, () => true);
   const [current] = deck;
   const liked = likedCount(decisions);
+  // Answered offers leave `deck` but stay in `offers`, so the gap is how far in we are.
+  const position = offers.length - deck.length + 1;
 
   /**
-   * « Tu as tout vu » est faux sur un deck vide à l'arrivée : le candidat n'a
+   * « Vous avez tout vu » est faux sur un deck vide à l'arrivée : le candidat n'a
    * rien vu du tout, ses critères n'ont simplement rien laissé passer. Aucune
    * décision prise sur un paquet vide, c'est exactement ce cas.
    */
   const untouched = Object.keys(decisions).length === 0;
   const deckEndTitle =
     offers.length === 0 && untouched
-      ? 'Aucune offre ne correspond à tes critères'
-      : 'Tu as tout vu';
+      ? 'Aucune offre ne correspond à vos critères'
+      : 'Vous avez tout vu';
 
   /**
    * The card leaves the deck the moment it is answered, before the server has
@@ -103,22 +107,54 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
   });
 
   return (
-    <div className="mx-auto mt-5 flex w-full max-w-xl flex-col gap-4 md:mx-0 md:mt-0">
+    <div className="mx-auto mt-5 flex w-full max-w-xl flex-col gap-4 md:mt-0">
       <h1 className="sr-only">Offres</h1>
 
       {status === 'loading' && (
-        <p role="status" className="text-sm text-ink-muted">
-          Chargement…
-        </p>
+        <div className="flex flex-col gap-4">
+          <p role="status" className="sr-only">
+            Chargement…
+          </p>
+          <div
+            aria-hidden="true"
+            className="flex flex-col gap-4 rounded-2xl border border-line bg-card p-5 shadow-card sm:p-6"
+          >
+            <div className="flex items-center gap-3">
+              <div className="size-12 shrink-0 animate-pulse rounded-full bg-surface" />
+              <div className="flex flex-1 flex-col gap-2">
+                <div className="h-3.5 w-2/5 animate-pulse rounded-xl bg-surface" />
+                <div className="h-3 w-1/4 animate-pulse rounded-xl bg-surface" />
+              </div>
+            </div>
+            <div className="h-6 w-4/5 animate-pulse rounded-xl bg-surface" />
+            <div className="flex flex-col gap-3">
+              {[0, 1, 2, 3].map((row) => (
+                <div key={row} className="h-4 animate-pulse rounded-xl bg-surface" />
+              ))}
+            </div>
+            <div className="h-10 animate-pulse rounded-xl bg-surface" />
+          </div>
+        </div>
       )}
 
       {status === 'failed' && (
-        <p role="alert" className="text-sm text-destructive">
-          Impossible de charger les offres.{' '}
-          <button type="button" onClick={reload} className="cursor-pointer underline">
+        <div className="flex flex-col items-center rounded-2xl border border-line bg-card px-6 py-10 text-center shadow-card">
+          <span className="flex size-14 items-center justify-center rounded-full bg-destructive-tint text-destructive">
+            <CircleAlert className="size-6" aria-hidden="true" />
+          </span>
+          <p role="alert" className="mt-4 text-[0.9375rem] font-bold text-ink">
+            Impossible de charger les offres.
+          </p>
+          <p className="mt-1 text-sm text-ink-muted">Vérifiez votre connexion, puis réessayez.</p>
+          <button
+            type="button"
+            onClick={reload}
+            className={cn(buttonVariants({ variant: 'outline', size: 'xl' }), 'mt-5')}
+          >
+            <RotateCcw aria-hidden="true" />
             Réessayer
           </button>
-        </p>
+        </div>
       )}
 
       <section
@@ -128,7 +164,7 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
         className="flex flex-1 flex-col gap-5 outline-none"
       >
         {/* Announced only once the answer is in: `offers` starts empty, so
-            saying « tu as tout vu » before that — or on a failed load, next to
+            saying « vous avez tout vu » before that — or on a failed load, next to
             the alert that says the opposite — would be a lie read aloud. */}
         {status === 'ready' && (
           <p role="status" className="sr-only">
@@ -138,6 +174,9 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
 
         {current ? (
           <>
+            <p className="tabular -mb-2 self-end text-xs font-semibold text-ink-muted">
+              {`Offre ${position} sur ${offers.length}`}
+            </p>
             <div
               {...swipe.handlers}
               className={cn(
@@ -155,7 +194,7 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
               <OfferCard offer={current} onViewOffer={() => onOpenOffer(current.id)} />
               <SwipeHint offset={swipe.offset} threshold={SWIPE_THRESHOLD} />
             </div>
-            <div className="sticky bottom-0 z-10 mt-auto bg-gradient-to-t from-background from-40% via-background/85 to-transparent pt-8 pb-4">
+            <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 mt-auto bg-background pt-3 pb-4">
               <FeedActions
                 subject="offre"
                 onPass={() => decide('passed')}

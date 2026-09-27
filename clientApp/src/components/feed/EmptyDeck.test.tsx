@@ -7,7 +7,7 @@ const renderDeck = (overrides: Partial<Parameters<typeof EmptyDeck>[0]> = {}) =>
   render(
     <MemoryRouter>
       <EmptyDeck
-        title="Tu as tout vu"
+        title="Vous avez tout vu"
         itemPlural="offres"
         likedCount={0}
         likedLabel={(count) => `${count} likées`}
@@ -20,7 +20,7 @@ describe('EmptyDeck', () => {
   it('annonce la fin du paquet avec le titre reçu', () => {
     renderDeck();
 
-    expect(screen.getByRole('heading', { name: 'Tu as tout vu' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Vous avez tout vu' })).toBeInTheDocument();
   });
 
   it('emprunte le vocabulaire du feed pour le corps du message', () => {

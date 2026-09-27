@@ -149,7 +149,7 @@ describe('OfferApplicantsRoute', () => {
     } as unknown as Awaited<ReturnType<typeof offerControllerLikeApplicant>>);
     const router = renderAt(APPLICANTS_PATH);
 
-    await user.click(await screen.findByRole('button', { name: 'Liker Camille' }));
+    await user.click(await screen.findByRole('button', { name: "Ça m'intéresse : Camille" }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/match'));
     expect(
@@ -192,6 +192,39 @@ describe('OfferApplicantsRoute', () => {
 
     expect(profileParam(router)).toBeNull();
     expect(screen.queryByRole('region', { name: 'Profil de Camille' })).not.toBeInTheDocument();
+  });
+
+  // Le titre de l'offre arrive avec la navigation depuis la liste : il doit
+  // survivre à l'ouverture puis à la fermeture d'un profil, qui réécrivent l'URL.
+  it('garde le titre de l’offre transmis par la liste en ouvrant puis refermant un profil', async () => {
+    const user = userEvent.setup();
+    authenticateAs('recruiter');
+    const router = createMemoryRouter(routes, {
+      initialEntries: [
+        { pathname: APPLICANTS_PATH, state: { offerTitle: 'Développeuse backend' } },
+      ],
+    });
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText('Développeuse backend')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Voir le profil de Camille' }));
+    await user.click(await screen.findByRole('button', { name: 'Retour à la liste' }));
+
+    expect(await screen.findByText('Développeuse backend')).toBeInTheDocument();
+  });
+
+  it('se passe du titre de l’offre sur une visite directe', async () => {
+    authenticateAs('recruiter');
+    renderAt(APPLICANTS_PATH);
+
+    await screen.findByRole('button', { name: 'Voir le profil de Camille' });
+
+    expect(screen.queryByText('Développeuse backend')).not.toBeInTheDocument();
   });
 
   it.each(['0', 'abc', ' 1 ', ''])('nettoie un paramètre de profil illisible (%s)', async (raw) => {

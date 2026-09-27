@@ -1,6 +1,8 @@
 import { useId, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { SKILL_CHIP } from '@/components/ui/chip-variants';
+import { cn } from '@/lib/utils';
 import { MAX_TAG_LABEL_LENGTH, MAX_TAGS } from '@/lib/bounds';
 
 interface TagInputProps {
@@ -95,7 +97,7 @@ export function TagInput({
 
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={fieldId} className="text-xs text-ink-muted">
+      <label htmlFor={fieldId} className="text-sm font-semibold text-ink">
         {label}
       </label>
       <Input
@@ -115,26 +117,28 @@ export function TagInput({
           Maximum {MAX_TAGS} éléments.
         </p>
       ) : (
-        <p id={helpId} className="text-xs text-ink-faint">
-          Validez avec Entrée, ou séparez par des virgules.
+        <p id={helpId} className="text-xs text-ink-muted">
+          Entrée pour valider, ou séparer par des virgules.
         </p>
       )}
 
       {values.length > 0 && (
-        <ul className="flex flex-wrap gap-2">
+        <ul className="flex flex-wrap gap-2 pt-1">
           {values.map((value) => (
             <li
               key={value}
-              className="flex items-center gap-1.5 rounded-[0.9375rem] bg-brand-tint px-3 py-1.5 text-sm text-ink"
+              className={cn(SKILL_CHIP, 'inline-flex items-center gap-1 py-1.5 pr-1.5')}
             >
               {value}
               <button
                 type="button"
                 aria-label={`Retirer ${value}`}
                 onClick={() => onChange(values.filter((kept) => kept !== value))}
-                className="cursor-pointer text-ink-muted transition-colors hover:text-destructive"
+                // The hit area overflows the chip: the icon alone would be a
+                // 24px target.
+                className="relative flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-ink-muted transition-colors after:absolute after:-inset-2.5 hover:bg-line hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
               >
-                <X className="size-3.5" />
+                <X aria-hidden="true" className="size-3.5" />
               </button>
             </li>
           ))}

@@ -6,7 +6,6 @@ import { WizardShell } from './WizardShell';
 const renderShell = (props: Partial<Parameters<typeof WizardShell>[0]> = {}) =>
   render(
     <WizardShell
-      role="recruiter"
       title="Ma société"
       current={2}
       total={5}
@@ -29,18 +28,8 @@ describe('WizardShell', () => {
     expect(screen.getByText('Contenu de l’étape')).toBeInTheDocument();
   });
 
-  // Anything outside `ROLE_THEMES` silently falls back to the candidate palette
-  // (jsdom loads no CSS, so only `lib/roleTheme.test.ts` catches the drift).
-  it('applique le thème du rôle demandé', () => {
-    renderShell();
-    expect(screen.getByRole('main')).toHaveAttribute('data-role', 'recruiter');
-
-    renderShell({ role: 'candidate' });
-    expect(screen.getAllByRole('main')[1]).toHaveAttribute('data-role', 'candidate');
-  });
-
-  // The mockups keep both a header chevron (mobile only) and an action-bar
-  // button; they drive the same navigation.
+  // The top bar and the action bar each offer a way back; they drive the same
+  // navigation.
   it('propose deux chemins de retour qui déclenchent la même action', async () => {
     const user = userEvent.setup();
     const onBack = vi.fn();

@@ -8,19 +8,19 @@ const itemFor = (isRecruiter: boolean, label: string) =>
 
 describe('navigationItems', () => {
   it('rend les entrées principales dans l’ordre d’affichage', () => {
-    expect(labels(true)).toEqual(['Mes offres', 'Matches', 'Profil']);
-    expect(labels(false)).toEqual(['Feed', 'Matches', 'Profil']);
+    expect(labels(true)).toEqual(['Mes offres', 'Matchs', 'Profil']);
+    expect(labels(false)).toEqual(['Offres', 'Matchs', 'Profil']);
   });
 
   // Un recruteur ne parcourt pas un paquet de candidats : il publie une annonce
   // et regarde qui s'y intéresse. Le feed reste un geste de candidat.
   it('ne propose plus de feed au recruteur', () => {
-    expect(labels(true)).not.toContain('Feed');
+    expect(labels(true)).not.toContain('Offres');
     expect(navigationItems(true).map((item) => item.to)).not.toContain('/recruteur/candidats');
   });
 
   it('envoie le candidat sur son feed d’offres', () => {
-    expect(navigationItems(false)[0]).toEqual({ label: 'Feed', to: '/candidat/offres' });
+    expect(navigationItems(false)[0]).toEqual({ label: 'Offres', to: '/candidat/offres' });
   });
 
   it('ouvre la gestion des offres au recruteur', () => {
@@ -39,14 +39,14 @@ describe('navigationItems', () => {
     expect(itemFor(true, 'Profil')).toEqual({ label: 'Profil', to: '/profil' });
   });
 
-  // L'écran sert les deux rôles : le candidat y suit ses matches et les offres
-  // qu'il a likées, le recruteur ses matches et les candidats qui l'ont liké.
-  it('ouvre les matches aux deux rôles, à la même destination', () => {
-    expect(itemFor(false, 'Matches')).toEqual({ label: 'Matches', to: '/matches' });
-    expect(itemFor(true, 'Matches')).toEqual({ label: 'Matches', to: '/matches' });
+  // L'écran sert les deux rôles : le candidat y suit ses matchs et les offres
+  // qu'il a likées, le recruteur ses matchs et les candidats qui l'ont liké.
+  it('ouvre les matchs aux deux rôles, à la même destination', () => {
+    expect(itemFor(false, 'Matchs')).toEqual({ label: 'Matchs', to: '/matches' });
+    expect(itemFor(true, 'Matchs')).toEqual({ label: 'Matchs', to: '/matches' });
   });
 
-  // Every chrome (sidebar, header, mobile panel) calls this on each render and
+  // Every chrome (sidebar, header, bottom tab bar) calls this on each render and
   // keys its lists on `to`: a duplicated destination would collapse two items.
   it('produit des destinations distinctes', () => {
     for (const isRecruiter of [true, false]) {
