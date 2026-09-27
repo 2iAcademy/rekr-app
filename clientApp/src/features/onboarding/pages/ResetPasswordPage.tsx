@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { Link2Off } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PasswordInput } from '@/components/form/PasswordInput';
 import { authControllerResetPassword } from '@/api/generated';
@@ -10,6 +10,8 @@ import {
   passwordResetBusiness,
 } from '@/features/auth/authFeedback';
 import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
+import { AuthLayout } from '../components/AuthLayout';
+import { AUTH_LABEL, AUTH_LINK } from '../components/authStyles';
 
 interface ResetPasswordPageProps {
   token: string | null;
@@ -101,34 +103,41 @@ export function ResetPasswordPage({
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background px-6 pt-4 pb-8">
-      <header className="relative flex h-9 items-center justify-center">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Retour"
-          className="absolute left-0 flex size-9 cursor-pointer items-center justify-center rounded-full bg-card text-ink shadow-sm transition-colors hover:bg-muted"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <h1 className="font-heading text-base font-bold text-ink">Nouveau mot de passe</h1>
-      </header>
-
+    <AuthLayout
+      title="Nouveau mot de passe"
+      onBack={onBack}
+      footer={
+        <>
+          Vous vous en souvenez ?
+          <button type="button" onClick={onSignIn} className={AUTH_LINK}>
+            Connexion
+          </button>
+        </>
+      }
+    >
       {rejectedLink !== null ? (
-        <div className="mt-10 flex flex-col gap-1.5" role="status">
+        <div className="flex flex-col gap-1.5" role="status">
+          <span
+            aria-hidden="true"
+            className="mb-3 flex size-14 items-center justify-center rounded-full bg-brand-tint text-brand"
+          >
+            <Link2Off className="size-6" />
+          </span>
           <h2
             ref={rejectedHeadingRef}
             tabIndex={-1}
-            className="font-heading text-2xl font-bold text-ink outline-none"
+            className="text-2xl font-extrabold text-ink outline-none"
           >
             {REJECTED_LINK_COPY[rejectedLink].heading}
           </h2>
-          <p className="text-sm text-ink-muted">{REJECTED_LINK_COPY[rejectedLink].body}</p>
+          <p className="text-sm leading-relaxed text-ink-muted">
+            {REJECTED_LINK_COPY[rejectedLink].body}
+          </p>
           <Button
             type="button"
-            variant="role"
+            variant="brand"
             size="xl"
-            className="mt-6 w-full"
+            className="mt-5 w-full"
             onClick={onRequestNewLink}
           >
             Demander un nouveau lien
@@ -136,16 +145,16 @@ export function ResetPasswordPage({
         </div>
       ) : (
         <>
-          <div className="mt-10 flex flex-col gap-1.5">
-            <h2 className="font-heading text-2xl font-bold text-ink">Choisissez-en un nouveau.</h2>
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-2xl font-extrabold text-ink">Choisissez-en un nouveau.</h2>
             <p className="text-sm text-ink-muted">
               Il remplacera l'ancien et déconnectera vos autres appareils.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
+          <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="reset-password" className="text-xs text-ink-muted">
+              <label htmlFor="reset-password" className={AUTH_LABEL}>
                 Nouveau mot de passe
               </label>
               <PasswordInput
@@ -165,7 +174,7 @@ export function ResetPasswordPage({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="reset-confirm-password" className="text-xs text-ink-muted">
+              <label htmlFor="reset-confirm-password" className={AUTH_LABEL}>
                 Confirmer le mot de passe
               </label>
               <PasswordInput
@@ -185,28 +194,21 @@ export function ResetPasswordPage({
             </div>
 
             {error && (
-              <p id="reset-error" role="alert" className="text-xs text-destructive">
+              <p
+                id="reset-error"
+                role="alert"
+                className="rounded-xl bg-destructive-tint px-4 py-3 text-sm font-medium text-destructive"
+              >
                 {error}
               </p>
             )}
 
-            <Button type="submit" variant="role" size="xl" className="mt-1 w-full">
+            <Button type="submit" variant="brand" size="xl" className="mt-1 w-full">
               Réinitialiser le mot de passe
             </Button>
           </form>
         </>
       )}
-
-      <p className="mt-8 flex items-center justify-center gap-1.5 text-sm text-ink-muted">
-        Vous vous en souvenez ?
-        <button
-          type="button"
-          onClick={onSignIn}
-          className="cursor-pointer font-medium text-role-strong hover:underline"
-        >
-          Connexion
-        </button>
-      </p>
-    </main>
+    </AuthLayout>
   );
 }

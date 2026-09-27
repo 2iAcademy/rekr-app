@@ -69,28 +69,28 @@ describe('Company (e2e)', () => {
   });
 
   /**
-   * `CompanySize` was narrowed to the product's target (TPE, PME). These guard
-   * the contract in both directions: the kept values still pass, and the values
-   * dropped from the enum are refused rather than silently stored.
+   * `CompanySize` covers every company size. These guard the contract in both
+   * directions: every value of the enum passes, and anything else is refused
+   * rather than silently stored.
    */
-  it.each(['TPE', 'PME'])('accepts %s as a company size', async (size) => {
-    const recruiter = await createUser('recruiter');
-
-    await asRecruiter(recruiter.id)
-      .send({ name: 'Acme', size, firstName: 'Rick', lastName: 'Deckard' })
-      .expect(201);
-  });
-
-  it.each(['ETI', 'GE', 'XL'])(
-    'rejects %s, outside the product scope (400)',
+  it.each(['TPE', 'PME', 'ETI', 'GE'])(
+    'accepts %s as a company size',
     async (size) => {
       const recruiter = await createUser('recruiter');
 
       await asRecruiter(recruiter.id)
         .send({ name: 'Acme', size, firstName: 'Rick', lastName: 'Deckard' })
-        .expect(400);
+        .expect(201);
     },
   );
+
+  it.each(['XL', 'tpe'])('rejects %s, outside the enum (400)', async (size) => {
+    const recruiter = await createUser('recruiter');
+
+    await asRecruiter(recruiter.id)
+      .send({ name: 'Acme', size, firstName: 'Rick', lastName: 'Deckard' })
+      .expect(400);
+  });
 
   it('creates the company and the linked recruiter profile', async () => {
     const recruiter = await createUser('recruiter');

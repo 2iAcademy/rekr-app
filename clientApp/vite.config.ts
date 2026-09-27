@@ -35,7 +35,8 @@ export default defineConfig({
       manifest: {
         name: 'Rekr',
         short_name: 'Rekr',
-        theme_color: '#0EA672',
+        theme_color: '#ffffff',
+        background_color: '#f6f6f8',
         lang: 'fr',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },

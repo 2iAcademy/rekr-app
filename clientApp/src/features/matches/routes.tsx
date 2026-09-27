@@ -28,13 +28,14 @@ interface MatchRouteState {
 export function MatchRoute() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { matchedProfile = { name: 'Votre match', avatarUrl: null } } =
-    (location.state as MatchRouteState | null) ?? {};
+  // Without state (a reload, a typed URL) the screen says « Nouveau match »
+  // rather than inventing a name.
+  const { matchedProfile } = (location.state as MatchRouteState | null) ?? {};
 
   return (
     <RouteGuard>
       {(user) => {
-        const currentUserName = user.email.split('@')[0] || 'Toi';
+        const currentUserName = user.email.split('@')[0] || 'Vous';
 
         return (
           <MatchPage

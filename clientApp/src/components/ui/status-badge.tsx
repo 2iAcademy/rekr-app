@@ -8,21 +8,18 @@ import { offerStatusLabel, offerStatusTone, type OfferStatus } from '@/domain/of
  * elements borrow, whereas a status is always rendered by this component — the
  * tone must not be pickable independently of the status it stands for.
  *
- * Every tone pairs a tinted surface with an ink or brand foreground rather than
- * colouring the text with the accent itself: `coral` and `role` are too light
- * to carry text at this size. Nothing is hard-coded, so the recruiter palette —
- * which redefines `--line` — repaints the neutral badge along with the rest of
- * the chrome.
+ * Status colours are semantic, not the brand accent: a published offer reads as
+ * a go, a paused one as a caution, whichever side of the product looks at it.
  */
 const statusBadgeVariants = cva(
-  'inline-flex shrink-0 items-center rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap',
+  'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap before:size-1.5 before:rounded-full before:bg-current',
   {
     variants: {
       tone: {
         neutral: 'border-line bg-card text-ink-soft',
-        positive: 'border-transparent bg-brand-tint text-brand-strong',
-        warning: 'border-transparent bg-coral/20 text-ink',
-        muted: 'border-transparent bg-ink/5 text-ink-muted',
+        positive: 'border-transparent bg-success-tint text-success',
+        warning: 'border-transparent bg-amber-100 text-amber-800',
+        muted: 'border-transparent bg-surface text-ink-muted',
       },
     },
     defaultVariants: {

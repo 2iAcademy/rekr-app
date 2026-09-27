@@ -14,7 +14,7 @@ const Toaster = ({ theme = "light", ...props }: ToasterProps) => {
       className="toaster group"
       icons={{
         success: (
-          <CircleCheckIcon className="size-4 text-brand-strong" />
+          <CircleCheckIcon className="size-4 text-success" />
         ),
         info: (
           <InfoIcon className="size-4" />
@@ -34,14 +34,14 @@ const Toaster = ({ theme = "light", ...props }: ToasterProps) => {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          "--border-radius": "calc(var(--radius) * 1.4)",
         } as React.CSSProperties
       }
       toastOptions={{
         closeButtonAriaLabel: "Fermer la notification",
         classNames: {
-          success: "[--normal-bg:var(--brand-tint)] [--normal-border:var(--brand)] [--normal-text:var(--ink)]",
-          error: "[--normal-bg:var(--destructive-tint)] [--normal-border:var(--destructive)] [--normal-text:var(--ink)]",
+          toast: "font-sans shadow-raised!",
+          title: "font-semibold",
         },
       }}
       {...props}
