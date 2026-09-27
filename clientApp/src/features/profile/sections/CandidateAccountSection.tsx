@@ -19,6 +19,7 @@ import { TagInput } from '@/components/form/TagInput';
 import { TextField } from '@/components/form/TextField';
 import { ProfileSection, ProfileSections } from '@/components/ui/accordion';
 import { candidateSummaries } from '@/features/profile/candidateSummaries';
+import { JobFamilyChips } from '@/features/job-families/JobFamilyChips';
 import { Button } from '@/components/ui/button';
 import {
   AVAILABILITY_OPTIONS,
@@ -337,8 +338,33 @@ export function CandidateAccountSection() {
           </ProfileSection>
 
           <ProfileSection value="project" title="Mon projet" summary={summaries.project}>
+            {/* First in the section: the trades are the one criterion that
+                decides what the feed can contain at all. */}
+            <div className="flex flex-col gap-2">
+              {/* Any edit of the trades is a choice about them: from then on
+                  the order on screen is the one saved. */}
+              <JobFamilyChips
+                values={form.jobFamilyIds}
+                primaryChosen={form.primaryJobFamilyChosen}
+                onChange={(jobFamilyIds) => change({ jobFamilyIds, primaryJobFamilyChosen: true })}
+              />
+              {/* Allowed, unlike at sign-up: it is where every account older
+                  than the field lives, and the way back to a wide search. */}
+              {form.jobFamilyIds.length === 0 && (
+                <p className="text-xs text-ink-muted">
+                  Aucun domaine choisi : toutes les offres vous sont proposées, quel que soit le
+                  métier.
+                </p>
+              )}
+            </div>
+
+            {/* Kept as a free precision the recruiter reads — « développeur
+                front React » says what a twenty-value trade cannot — and kept
+                out of the ranking on purpose: free text is too unstable to
+                match on. */}
             <TextField
               label="Poste recherché"
+              hint="Une précision pour les recruteurs : elle ne change pas les offres proposées."
               maxLength={255}
               value={form.desiredJobTitle}
               onChange={(event) => change({ desiredJobTitle: event.target.value })}

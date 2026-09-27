@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDate,
@@ -151,15 +152,19 @@ export class CreateCandidateProfileDto {
    * The trades this candidate is looking for, which decide what their feed can
    * contain at all.
    *
+   * Ordered: the first trade is the primary one, which the feed ranks above
+   * the others without filtering them out.
+   *
    * Required at creation: a profile without a trade is served every trade, and
    * that is the bucket this field exists to close. `UpdateCandidateProfileDto`
-   * is a `PartialType` of this class, so a patch that does not mention the
-   * trades leaves them alone — and `findFeed` still serves an unfiltered deck
-   * to the accounts created before the column, rather than an empty one.
+   * redeclares it without that minimum, so a candidate can empty the list from
+   * their profile — and `findFeed` serves an unfiltered deck to an empty list,
+   * as it does to the accounts created before the column.
    */
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(MAX_JOB_FAMILIES)
+  @ArrayUnique()
   @IsInt({ each: true })
   @Min(1, { each: true })
   @Max(MAX_INT4, { each: true })

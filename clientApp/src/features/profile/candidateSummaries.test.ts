@@ -28,6 +28,16 @@ describe('candidateSummaries', () => {
     expect(summaries.project).toBe('Développeuse back-end · CDI, Freelance · Confirmé');
   });
 
+  // Un compte : les libellés des domaines viennent du référentiel, que le
+  // résumé n'a pas sous la main.
+  it('compte les domaines recherchés en tête du projet', () => {
+    const summaries = candidateSummaries(
+      form({ jobFamilyIds: ['13', '4'], desiredJobTitle: 'Lead Front' }),
+    );
+
+    expect(summaries.project).toBe('2 domaines · Lead Front');
+  });
+
   // Le même vocabulaire que le reste du produit : « 42 - 48 k€ », pas les
   // chiffres bruts saisis dans le formulaire.
   it('exprime la prétention dans l’unité employée ailleurs', () => {

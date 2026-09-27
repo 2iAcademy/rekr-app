@@ -29,6 +29,16 @@ vi.mock('@/api/generated', () => ({
   candidateProfileControllerRemoveCv: vi.fn(),
   // Imported by `CityField`, which the form renders.
   cityControllerSearch: vi.fn(),
+  // Imported by `JobFamilyChips`, which the form renders.
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({
+      data: [
+        { id: 13, label: 'Informatique' },
+        { id: 4, label: 'Commerce' },
+        { id: 7, label: 'Restauration' },
+      ],
+    }),
+  ),
 }));
 
 const findMine = vi.mocked(candidateProfileControllerFindMine);
@@ -71,6 +81,8 @@ const profile = (
   cvUrl: CV_KEY,
   skills: ['React', 'TypeScript'],
   languages: ['Anglais'],
+  jobFamilyIds: [13],
+  primaryJobFamilyId: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-02T00:00:00.000Z',
   ...overrides,
@@ -262,6 +274,7 @@ describe('CandidateAccountSection', () => {
         city: 'Lyon',
         postalCode: '69003',
         desiredJobTitle: 'Développeuse Front React',
+        jobFamilyIds: [13],
         contractTypes: ['CDI', 'FREELANCE'],
         experienceLevel: 'SENIOR',
         availability: 'WITHIN_DELAY',
@@ -274,6 +287,110 @@ describe('CandidateAccountSection', () => {
         skills: ['React', 'TypeScript'],
         languages: ['Anglais'],
         linkedinUrl: 'https://linkedin.com/in/camille-martin',
+      });
+    });
+
+    describe('les métiers recherchés', () => {
+      // Asked at sign-up and never shown again: a candidate who picked the
+      // wrong trade could not even see it, let alone fix it.
+      it('affiche les métiers choisis à l’inscription', async () => {
+        await renderLoaded(profile({ jobFamilyIds: [4, 13], primaryJobFamilyId: 4 }));
+
+        expect(await screen.findByRole('checkbox', { name: /Commerce/ })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /Informatique/ })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /Restauration/ })).not.toBeChecked();
+        expect(screen.getByRole('radio', { name: 'Commerce' })).toBeChecked();
+      });
+
+      it('enregistre les métiers modifiés, principal en tête', async () => {
+        const user = userEvent.setup();
+        await renderLoaded();
+
+        await user.click(await screen.findByRole('checkbox', { name: /Commerce/ }));
+        await user.click(screen.getByRole('radio', { name: 'Commerce' }));
+        await user.click(saveButton());
+
+        await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+        expect(update).toHaveBeenCalledWith(expect.objectContaining({ jobFamilyIds: [4, 13] }));
+      });
+
+      describe('sur un compte antérieur au métier principal', () => {
+        const legacy = () => profile({ jobFamilyIds: [13, 4], primaryJobFamilyId: null });
+
+        it('n’affiche aucun principal', async () => {
+          await renderLoaded(legacy());
+
+          expect(await screen.findByRole('radio', { name: 'Informatique' })).not.toBeChecked();
+          expect(screen.getByRole('radio', { name: 'Commerce' })).not.toBeChecked();
+        });
+
+        // Saving the bio must not elect whichever trade the API listed first.
+        it('n’envoie pas les métiers quand seul un autre champ change', async () => {
+          const user = userEvent.setup();
+          await renderLoaded(legacy());
+
+          await user.click(saveButton());
+
+          await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+          expect(update.mock.calls[0][0]).not.toHaveProperty('jobFamilyIds');
+        });
+
+        it('envoie les métiers dès que le principal est choisi', async () => {
+          const user = userEvent.setup();
+          await renderLoaded(legacy());
+
+          await user.click(await screen.findByRole('radio', { name: 'Commerce' }));
+          await user.click(saveButton());
+
+          await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+          expect(update).toHaveBeenCalledWith(expect.objectContaining({ jobFamilyIds: [4, 13] }));
+        });
+
+        // Editing the trades is a choice about them: the order shown becomes
+        // the one saved, and the screen says so before the save.
+        it('assume un principal dès que les métiers sont modifiés', async () => {
+          const user = userEvent.setup();
+          await renderLoaded(legacy());
+
+          await user.click(await screen.findByRole('checkbox', { name: /Restauration/ }));
+
+          expect(screen.getByRole('radio', { name: 'Informatique' })).toBeChecked();
+
+          await user.click(saveButton());
+
+          await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+          expect(update).toHaveBeenCalledWith(
+            expect.objectContaining({ jobFamilyIds: [13, 4, 7] }),
+          );
+        });
+      });
+
+      /**
+       * The state every account older than the feature lives in: allowed, and
+       * said for what it does rather than refused as an error.
+       */
+      it('accepte une liste vide et dit qu’elle ouvre le feed à tous les métiers', async () => {
+        const user = userEvent.setup();
+        await renderLoaded();
+
+        await user.click(await screen.findByRole('checkbox', { name: /Informatique/ }));
+
+        expect(screen.getByText(/toutes les offres vous sont proposées/i)).toBeInTheDocument();
+
+        await user.click(saveButton());
+
+        await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+        expect(update).toHaveBeenCalledWith(expect.objectContaining({ jobFamilyIds: [] }));
+      });
+
+      // Kept, but for what it is: a precision the recruiter reads, which the
+      // feed deliberately ignores.
+      it('présente le poste recherché comme une précision qui ne filtre pas', async () => {
+        await renderLoaded();
+
+        expect(screen.getByLabelText('Poste recherché')).toHaveAccessibleDescription(
+          /ne change pas les offres proposées/i,
+        );
       });
     });
 

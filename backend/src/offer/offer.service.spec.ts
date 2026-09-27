@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
+import { OfferSearchService } from '../search/offer-search.service';
 import { OfferService } from './offer.service';
 import { CityService } from '../city/city.service';
 import { JobFamilyService } from '../job-family/job-family.service';
@@ -546,6 +547,46 @@ describe('OfferService', () => {
       await service.findFeed(candidate, new OfferFeedQueryDto());
 
       expect(whereOf()).not.toHaveProperty('jobFamilyId');
+    });
+
+    /**
+     * The trades are read in the order the candidate ranked them: the feed
+     * sends the first one to the ranking as the primary, and an unordered read
+     * would elect whichever row Postgres returned first.
+     */
+    it('ranks the primary trade the candidate chose', async () => {
+      const search = { rankOfferIds: jest.fn().mockResolvedValue([]) };
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          OfferService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: CityService, useValue: cities },
+          { provide: MatchService, useValue: matches },
+          { provide: JobFamilyService, useValue: jobFamilies },
+          { provide: OfferSearchService, useValue: search },
+        ],
+      }).compile();
+      prisma.candidateJobFamily.findMany.mockResolvedValue([
+        { jobFamilyId: 13, rank: 0 },
+        { jobFamilyId: 5, rank: 1 },
+      ]);
+
+      await moduleRef
+        .get(OfferService)
+        .findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(prisma.candidateJobFamily.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ rank: 'asc' }, { jobFamilyId: 'asc' }],
+        }),
+      );
+      expect(search.rankOfferIds).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobFamilyIds: [13, 5],
+          primaryJobFamilyId: 13,
+        }),
+        expect.any(Number),
+      );
     });
 
     it('leaves out every filter the query does not carry', async () => {

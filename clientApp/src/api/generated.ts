@@ -126,6 +126,9 @@ export interface CandidateProfileResponseDto {
   cvUrl: string | null;
   skills: string[];
   languages: string[];
+  jobFamilyIds: number[];
+  /** @nullable */
+  primaryJobFamilyId: number | null;
   createdAt: string;
   updatedAt: string;
 }

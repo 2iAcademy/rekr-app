@@ -20,6 +20,7 @@ type PrismaMock = {
   candidateTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   candidateJobFamily: { deleteMany: jest.Mock; createMany: jest.Mock };
   $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
 };
 
 const buildPrismaMock = (): PrismaMock => {
@@ -33,6 +34,8 @@ const buildPrismaMock = (): PrismaMock => {
     candidateTag: { deleteMany: jest.fn(), createMany: jest.fn() },
     candidateJobFamily: { deleteMany: jest.fn(), createMany: jest.fn() },
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
+    // The row lock `update` takes before rewriting the trades.
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
   return mock;
 };
@@ -314,7 +317,10 @@ describe('CandidateProfileService', () => {
       lastName: 'Lovelace',
       latitude: null,
       longitude: null,
-      user: { candidateTags: [] as unknown[] },
+      user: {
+        candidateTags: [] as unknown[],
+        candidateJobFamilies: [] as unknown[],
+      },
       ...overrides,
     });
 
@@ -331,7 +337,7 @@ describe('CandidateProfileService', () => {
      * caller, and the only thing read off the `user` relation is the tag links —
      * `passwordHash` lives on that same row.
      */
-    it('keys the read on the caller and reads nothing off the account but its tags', async () => {
+    it('keys the read on the caller and reads nothing off the account but its tags and trades', async () => {
       prisma.candidateProfile.findUnique.mockResolvedValue(profileRow());
 
       await service.findMine(42);
@@ -346,6 +352,10 @@ describe('CandidateProfileService', () => {
                   orderBy: { tag: { label: 'asc' } },
                   select: { tag: { select: { label: true, category: true } } },
                 },
+                candidateJobFamilies: {
+                  orderBy: [{ rank: 'asc' }, { jobFamilyId: 'asc' }],
+                  select: { jobFamilyId: true, rank: true },
+                },
               },
             },
           }) as object,
@@ -357,6 +367,7 @@ describe('CandidateProfileService', () => {
       prisma.candidateProfile.findUnique.mockResolvedValue(
         profileRow({
           user: {
+            candidateJobFamilies: [],
             candidateTags: [
               { tag: { label: 'Anglais', category: 'language' } },
               { tag: { label: 'React', category: 'skill' } },
@@ -379,6 +390,7 @@ describe('CandidateProfileService', () => {
       prisma.candidateProfile.findUnique.mockResolvedValue(
         profileRow({
           user: {
+            candidateJobFamilies: [],
             candidateTags: [{ tag: { label: 'Docker', category: 'tech' } }],
           },
         }),
