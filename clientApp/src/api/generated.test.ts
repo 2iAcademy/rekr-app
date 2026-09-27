@@ -44,6 +44,7 @@ describe('generated API client', () => {
     const promise = authControllerSignup({
       ...credentials,
       userType: SignupDtoUserType.candidate,
+      acceptTerms: true,
     });
 
     await expect(promise).rejects.toBeInstanceOf(ApiError);
@@ -57,7 +58,11 @@ describe('generated API client', () => {
     stubFetch(409, '{"message":"Email already registered","statusCode":409}');
 
     await expect(
-      authControllerSignup({ ...credentials, userType: SignupDtoUserType.recruiter }),
+      authControllerSignup({
+        ...credentials,
+        userType: SignupDtoUserType.recruiter,
+        acceptTerms: true,
+      }),
     ).rejects.toBeInstanceOf(ApiError);
   });
 

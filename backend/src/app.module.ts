@@ -10,6 +10,7 @@ import { buildThrottlerOptions } from './common/throttling/throttling.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaExceptionFilter } from './prisma/prisma-exception.filter';
 import { LogsModule } from './logs/logs.module';
+import { AccountModule } from './account/account.module';
 import { AuthModule } from './auth/auth.module';
 import { CandidateProfileModule } from './candidate-profile/candidate-profile.module';
 import { CityModule } from './city/city.module';
@@ -43,6 +44,7 @@ import { MatchModule } from './match/match.module';
     StorageModule,
     MatchModule,
     LikeModule,
+    AccountModule,
   ],
   controllers: [AppController],
   providers: [

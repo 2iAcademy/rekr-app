@@ -86,6 +86,7 @@ describe('Rate limiting (e2e) — M1 / M2', () => {
         email: `burst-${index}@test.dev`,
         password: 'Sup3rSecret!',
         userType: 'candidate',
+        acceptTerms: true,
       }),
     );
 
@@ -98,6 +99,7 @@ describe('Rate limiting (e2e) — M1 / M2', () => {
       email: 'normal@test.dev',
       password: 'Sup3rSecret!',
       userType: 'candidate',
+      acceptTerms: true,
     }).expect(201);
 
     const statuses = await collectStatuses(NORMAL_USAGE, () =>
@@ -116,6 +118,7 @@ describe('Rate limiting (e2e) — M1 / M2', () => {
         email: `normal-${index}@test.dev`,
         password: 'Sup3rSecret!',
         userType: 'candidate',
+        acceptTerms: true,
       }),
     );
 
@@ -127,6 +130,7 @@ describe('Rate limiting (e2e) — M1 / M2', () => {
       email: 'me@test.dev',
       password: 'Sup3rSecret!',
       userType: 'candidate',
+      acceptTerms: true,
     }).expect(201);
 
     const token = (created.body as { accessToken: string }).accessToken;
@@ -153,6 +157,7 @@ describe('Rate limiting (e2e) — M1 / M2', () => {
       email: 'duplicate@test.dev',
       password: 'Sup3rSecret!',
       userType: 'candidate',
+      acceptTerms: true,
     };
 
     await post('/api/auth/signup', payload).expect(201);
@@ -164,6 +169,7 @@ describe('Rate limiting (e2e) — M1 / M2', () => {
       email: 'known@test.dev',
       password: 'Sup3rSecret!',
       userType: 'candidate',
+      acceptTerms: true,
     }).expect(201);
 
     const statuses = await collectStatuses(BURST, (index) =>
@@ -171,6 +177,7 @@ describe('Rate limiting (e2e) — M1 / M2', () => {
         email: `probe-${index}@test.dev`,
         password: 'Sup3rSecret!',
         userType: 'candidate',
+        acceptTerms: true,
       }),
     );
 

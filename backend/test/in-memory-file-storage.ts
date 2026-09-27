@@ -1,5 +1,6 @@
 import { FileStorage } from '../src/storage/file-storage.interface';
-import { isStorageKey } from '../src/storage/storage-key';
+import type { FileScope } from '../src/storage/file-kind';
+import { isStorageKey, ownerPrefix } from '../src/storage/storage-key';
 
 /**
  * Test double for `FileStorage`, held to the same contract in
@@ -27,6 +28,16 @@ export class InMemoryFileStorage implements FileStorage {
   async delete(key: string): Promise<void> {
     await Promise.resolve();
     this.files.delete(this.assertKey(key));
+  }
+
+  async deleteOwner(scope: FileScope, ownerId: number): Promise<void> {
+    await Promise.resolve();
+    const prefix = ownerPrefix(scope, ownerId);
+    for (const key of [...this.files.keys()]) {
+      if (key.startsWith(prefix)) {
+        this.files.delete(key);
+      }
+    }
   }
 
   keys(): string[] {

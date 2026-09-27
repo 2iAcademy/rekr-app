@@ -9,6 +9,7 @@ import { configureApp } from '../src/setup-app';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
 import { jobFamilyIdFor } from './job-family-reference';
+import { PRIVACY_POLICY_VERSION } from '../src/account/privacy-policy';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
@@ -21,7 +22,7 @@ describe('Auth (e2e)', () => {
   const signup = (email: string, userType: 'candidate' | 'recruiter') =>
     httpRequest(app)
       .post('/api/auth/signup')
-      .send({ email, password: 'Sup3rSecret!', userType });
+      .send({ email, password: 'Sup3rSecret!', userType, acceptTerms: true });
 
   const tokenOf = (res: request.Response): string =>
     (res.body as { accessToken: string }).accessToken;
@@ -60,6 +61,77 @@ describe('Auth (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  describe('consent and activity', () => {
+    it.each([
+      ['without the consent field', {}],
+      ['with consent refused', { acceptTerms: false }],
+      ['with a truthy string instead of true', { acceptTerms: 'true' }],
+    ])('refuses a sign-up %s (400)', async (_case, consent) => {
+      await httpRequest(app)
+        .post('/api/auth/signup')
+        .send({
+          email: 'no-consent@test.dev',
+          password: 'Sup3rSecret!',
+          userType: 'candidate',
+          ...consent,
+        })
+        .expect(400);
+
+      expect(
+        await prisma.user.count({ where: { email: 'no-consent@test.dev' } }),
+      ).toBe(0);
+    });
+
+    it('records when and which version of the policy was accepted', async () => {
+      const before = Date.now();
+      await signup('consent@test.dev', 'candidate').expect(201);
+
+      const user = await prisma.user.findUniqueOrThrow({
+        where: { email: 'consent@test.dev' },
+      });
+      expect(user.termsVersion).toBe(PRIVACY_POLICY_VERSION);
+      expect(user.termsAcceptedAt?.getTime()).toBeGreaterThanOrEqual(
+        before - 1000,
+      );
+      expect(user.lastActiveAt?.getTime()).toBeGreaterThanOrEqual(
+        before - 1000,
+      );
+    });
+
+    it('moves the activity clock on login and refresh, and leaves updatedAt alone', async () => {
+      const created = await signup('active@test.dev', 'candidate');
+      const stale = new Date('2020-01-01T00:00:00Z');
+      await prisma.$executeRaw`UPDATE "user" SET last_active_at = ${stale} WHERE email = 'active@test.dev'`;
+      const { updatedAt } = await prisma.user.findUniqueOrThrow({
+        where: { email: 'active@test.dev' },
+      });
+
+      await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', refreshCookieOf(created))
+        .expect(200);
+
+      const refreshed = await prisma.user.findUniqueOrThrow({
+        where: { email: 'active@test.dev' },
+      });
+      expect(refreshed.lastActiveAt!.getTime()).toBeGreaterThan(
+        stale.getTime(),
+      );
+      expect(refreshed.updatedAt).toEqual(updatedAt);
+
+      await prisma.$executeRaw`UPDATE "user" SET last_active_at = ${stale} WHERE email = 'active@test.dev'`;
+      await httpRequest(app)
+        .post('/api/auth/login')
+        .send({ email: 'active@test.dev', password: 'Sup3rSecret!' })
+        .expect(200);
+
+      const loggedIn = await prisma.user.findUniqueOrThrow({
+        where: { email: 'active@test.dev' },
+      });
+      expect(loggedIn.lastActiveAt!.getTime()).toBeGreaterThan(stale.getTime());
+    });
   });
 
   it('rejects /auth/me without a token', async () => {
@@ -219,7 +291,12 @@ describe('Auth (e2e)', () => {
     const password = 'a'.repeat(72);
     await httpRequest(app)
       .post('/api/auth/signup')
-      .send({ email: 'prefix@test.dev', password, userType: 'candidate' })
+      .send({
+        email: 'prefix@test.dev',
+        password,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
       .expect(201);
 
     await httpRequest(app)
@@ -242,7 +319,12 @@ describe('Auth (e2e)', () => {
     const password = `${'a'.repeat(200)}-tail`;
     await httpRequest(app)
       .post('/api/auth/signup')
-      .send({ email: 'long@test.dev', password, userType: 'candidate' })
+      .send({
+        email: 'long@test.dev',
+        password,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
       .expect(201);
 
     await httpRequest(app)
@@ -257,7 +339,12 @@ describe('Auth (e2e)', () => {
     const password = 'é'.repeat(40);
     await httpRequest(app)
       .post('/api/auth/signup')
-      .send({ email: 'multibyte@test.dev', password, userType: 'candidate' })
+      .send({
+        email: 'multibyte@test.dev',
+        password,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
       .expect(201);
 
     await httpRequest(app)
@@ -275,6 +362,7 @@ describe('Auth (e2e)', () => {
         email: 'absurd@test.dev',
         password: 'a'.repeat(5000),
         userType: 'candidate',
+        acceptTerms: true,
       })
       .expect(400);
   });

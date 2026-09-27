@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { jpegBuffer, pdfBuffer, pngBuffer } from '../../test/file-fixtures';
 import { InMemoryFileStorage } from '../../test/in-memory-file-storage';
@@ -186,6 +186,41 @@ describe('FileSlotService', () => {
 
       expect(result).toEqual({ cleared: true });
       expect(persist).toHaveBeenCalledWith(null);
+    });
+  });
+
+  describe('discardOwner', () => {
+    it('deletes every file stored for the owner', async () => {
+      const picture = buildStorageKey('candidates', 3, 'picture', 'png');
+      const cv = buildStorageKey('candidates', 3, 'cv', 'pdf');
+      const kept = buildStorageKey('candidates', 4, 'cv', 'pdf');
+      await storage.save(picture, pngBuffer());
+      await storage.save(cv, pdfBuffer());
+      await storage.save(kept, pdfBuffer());
+
+      await service.discardOwner('candidates', 3);
+
+      expect(storage.keys()).toEqual([kept]);
+    });
+
+    /**
+     * Called after the rows are gone: the account is already erased, and a
+     * disk that refuses the unlink must not turn that into a 500 the user
+     * would read as "your account still exists".
+     */
+    it('reports a failure instead of throwing it', async () => {
+      jest.spyOn(storage, 'deleteOwner').mockRejectedValue(new Error('EIO'));
+      const logged = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      await expect(
+        service.discardOwner('companies', 9),
+      ).resolves.toBeUndefined();
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining('companies/9/'),
+        expect.anything(),
+      );
     });
   });
 
