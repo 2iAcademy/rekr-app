@@ -54,7 +54,7 @@ describe('Rate limiting (e2e) — M1 / M2', () => {
 
     app = moduleRef.createNestApplication();
     configureApp(app);
-    await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = app.get(PrismaService);
   });

@@ -77,7 +77,7 @@ describe('Security hardening (e2e) — verifier bypasses', () => {
 
     app = moduleRef.createNestApplication();
     configureApp(app);
-    await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = app.get(PrismaService);
     jobFamilyId = await jobFamilyIdFor(prisma);

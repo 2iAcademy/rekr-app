@@ -71,18 +71,6 @@ export class OfferController {
     return this.service.findFeed(user, query);
   }
 
-  // Literal segment, declared before the `:id` sibling for the same reason as
-  // `feed`: read after it, the word would be parsed as an identifier.
-  @Get('liked')
-  @Roles('candidate')
-  @ApiOkResponse({ type: OfferFeedItemDto, isArray: true })
-  findLiked(
-    @CurrentUser() user: AuthUser,
-    @Query() query: OfferApplicantsQueryDto,
-  ): Promise<OfferFeedItemDto[]> {
-    return this.service.findLiked(user.id, query);
-  }
-
   // 404 and not 403 on an offer the caller may not read: telling a stranger
   // « you may not touch this one » already tells them the id exists.
   @Get(':id')

@@ -559,21 +559,6 @@ export type OfferControllerFindFeedParams = {
   limit?: number;
 };
 
-export type OfferControllerFindLikedParams = {
-  /**
-   * Numéro de page, à partir de 1.
-   * @minimum 1
-   * @maximum 2147483647
-   */
-  page?: number;
-  /**
-   * Nombre maximum de candidats par page.
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-};
-
 export type OfferControllerFindApplicantsParams = {
   /**
    * Numéro de page, à partir de 1.
@@ -1722,59 +1707,6 @@ export const offerControllerFindFeed = async (
 ): Promise<offerControllerFindFeedResponseSuccess> => {
   return customFetch<offerControllerFindFeedResponseSuccess>(
     getOfferControllerFindFeedUrl(params),
-    {
-      ...options,
-      method: 'GET',
-    },
-  );
-};
-
-export type offerControllerFindLikedResponse200 = {
-  data: OfferFeedItemDto[];
-  status: 200;
-};
-
-export type offerControllerFindLikedResponse401 = {
-  data: void;
-  status: 401;
-};
-
-export type offerControllerFindLikedResponse403 = {
-  data: void;
-  status: 403;
-};
-
-export type offerControllerFindLikedResponseSuccess = offerControllerFindLikedResponse200 & {
-  headers: Headers;
-};
-export type offerControllerFindLikedResponseError = (
-  offerControllerFindLikedResponse401 | offerControllerFindLikedResponse403
-) & {
-  headers: Headers;
-};
-
-export const getOfferControllerFindLikedUrl = (params?: OfferControllerFindLikedParams) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value));
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0
-    ? `/api/offers/liked?${stringifiedParams}`
-    : `/api/offers/liked`;
-};
-
-export const offerControllerFindLiked = async (
-  params?: OfferControllerFindLikedParams,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<offerControllerFindLikedResponseSuccess> => {
-  return customFetch<offerControllerFindLikedResponseSuccess>(
-    getOfferControllerFindLikedUrl(params),
     {
       ...options,
       method: 'GET',
