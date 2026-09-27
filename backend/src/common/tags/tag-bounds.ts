@@ -9,3 +9,7 @@ export const MAX_SKILLS = 50;
 export const MAX_BENEFITS = 50;
 
 export const MAX_LANGUAGES = 50;
+
+// A candidate names the trades they are looking for. Three is enough for a
+// reconversion or a double skill set; beyond that the filter stops filtering.
+export const MAX_JOB_FAMILIES = 3;

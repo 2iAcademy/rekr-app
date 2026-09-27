@@ -117,3 +117,20 @@ export function parseStorageKey(candidate: unknown): StorageKeyParts | null {
 export function isStorageKey(candidate: unknown): boolean {
   return parseStorageKey(candidate) !== null;
 }
+
+/**
+ * `<scope>/<ownerId>/`, the directory holding every file of one owner. Checked
+ * as strictly as a key: this is what gets removed recursively.
+ */
+export function ownerPrefix(scope: FileScope, ownerId: number): string {
+  if (scope !== 'candidates' && scope !== 'companies') {
+    throw new Error(`Unknown file scope "${String(scope)}".`);
+  }
+  if (!Number.isInteger(ownerId) || ownerId < 1) {
+    throw new Error(
+      `An owner prefix needs a positive integer owner, received "${String(ownerId)}".`,
+    );
+  }
+
+  return `${scope}/${ownerId}/`;
+}

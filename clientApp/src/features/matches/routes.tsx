@@ -5,13 +5,14 @@ import { RouteGuard } from '@/features/auth/RouteGuard';
 import { MatchPage } from '@/features/matches/pages/MatchPage';
 
 /**
- * Candidate-only: a match is born of a reciprocal like on one given offer, so a
- * recruiter reads it on the offer concerned rather than in a list spanning every
- * post of their company.
+ * Open to both roles: the screen now also holds the likes left unanswered, and
+ * those only exist on one side each — the offers a candidate liked without a
+ * match, the candidates who liked a recruiter's offers without a reply. The
+ * page picks its tabs from the session's role.
  */
 export function MatchesRoute() {
   return (
-    <RouteGuard allowedUserTypes={['candidate']}>
+    <RouteGuard>
       <MatchesPage />
     </RouteGuard>
   );

@@ -28,6 +28,14 @@ export interface CandidateAccountForm {
   city: string;
   postalCode: string;
   desiredJobTitle: string;
+  /** Chip values, primary first — see `JobFamilyChips`. */
+  jobFamilyIds: string[];
+  /**
+   * False on an account written before the rank: several trades, none ranked
+   * above the others. Their order is then the API's, not the candidate's, and
+   * the list stays out of the payload until they choose.
+   */
+  primaryJobFamilyChosen: boolean;
   contractTypes: ContractType[];
   experienceLevel: ExperienceLevel | '';
   availability: Availability | '';
@@ -50,6 +58,8 @@ export const emptyCandidateAccountForm: CandidateAccountForm = {
   city: '',
   postalCode: '',
   desiredJobTitle: '',
+  jobFamilyIds: [],
+  primaryJobFamilyChosen: true,
   contractTypes: [],
   experienceLevel: '',
   availability: '',
@@ -82,6 +92,7 @@ export type CandidateAccountPayload = {
   city: string;
   postalCode: string;
   desiredJobTitle: string;
+  jobFamilyIds?: number[];
   contractTypes: ContractType[];
   experienceLevel?: ExperienceLevel;
   availability?: Availability;
@@ -129,6 +140,9 @@ export const toCandidateAccountForm = (
   city: profile.city ?? '',
   postalCode: profile.postalCode ?? '',
   desiredJobTitle: profile.desiredJobTitle ?? '',
+  jobFamilyIds: profile.jobFamilyIds.map(String),
+  // A single trade has nothing to be ranked above, so there is no choice to wait for.
+  primaryJobFamilyChosen: profile.primaryJobFamilyId !== null || profile.jobFamilyIds.length < 2,
   contractTypes: profile.contractTypes,
   experienceLevel: profile.experienceLevel ?? '',
   availability: profile.availability ?? '',
@@ -167,6 +181,10 @@ export const buildCandidateAccountPayload = (form: CandidateAccountForm): Candid
     city: form.city.trim(),
     postalCode: form.postalCode.trim(),
     desiredJobTitle: form.desiredJobTitle.trim(),
+    // Sent empty too: an omitted list leaves the previous trades in place, and
+    // emptying it is how the feed reopens to every trade. Held back only while
+    // no primary was chosen, since saving the API's order would elect its first.
+    jobFamilyIds: form.primaryJobFamilyChosen ? form.jobFamilyIds.map(Number) : undefined,
     contractTypes: form.contractTypes,
     experienceLevel: form.experienceLevel || undefined,
     availability: form.availability || undefined,

@@ -40,3 +40,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 process.env.UPLOADS_DIR = join(tmpdir(), 'rekr-uploads-e2e');
 process.env.REFRESH_TOKEN_REPLAY_SECONDS =
   process.env.REFRESH_TOKEN_REPLAY_SECONDS || '1';
+
+// The retention purge runs at boot and on a timer. Off for the suite, which
+// drives it explicitly: a purge firing mid-test would race `resetDb`.
+process.env.ACCOUNT_PURGE_INTERVAL_HOURS = '0';

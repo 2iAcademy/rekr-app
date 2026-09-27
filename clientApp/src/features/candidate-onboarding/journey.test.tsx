@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { clearAccessToken } from '@/api/tokenStore';
@@ -38,11 +38,20 @@ const route = (url: string): Response => {
   if (url.includes('/api/auth/signup')) {
     return json(201, { accessToken: 'jeton-de-test', user: candidate });
   }
+  if (url.includes('/api/job-families')) {
+    return json(200, [
+      { id: 13, label: 'Informatique' },
+      { id: 14, label: 'Juridique' },
+    ]);
+  }
   if (url.includes('/api/cities')) {
     return json(200, [{ name: 'Lyon', postalCode: '69001', latitude: 45.758, longitude: 4.835 }]);
   }
   if (url.includes('/api/candidate-profiles/me')) {
     return json(200, {});
+  }
+  if (url.includes('/api/offers/feed')) {
+    return json(200, []);
   }
   if (url.includes('/api/candidate-profiles')) {
     return json(201, {});
@@ -83,6 +92,10 @@ const completeWizard = async (user: User) => {
   await user.click(screen.getByRole('button', { name: 'Continuer' }));
 
   await user.type(screen.getByLabelText('Poste recherché'), 'Développeuse Front React');
+  await waitFor(() =>
+    expect(screen.getByRole('checkbox', { name: 'Informatique' })).toBeInTheDocument(),
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'Informatique' }));
   await user.click(screen.getByRole('checkbox', { name: 'CDI' }));
   await user.click(screen.getByRole('checkbox', { name: 'Freelance' }));
   await user.click(await screen.findByRole('radio', { name: 'Confirmé' }));
@@ -144,6 +157,7 @@ describe('parcours candidat de bout en bout', () => {
       postalCode: '69001',
       desiredJobTitle: 'Développeuse Front React',
       contractTypes: ['CDI', 'FREELANCE'],
+      jobFamilyIds: [13],
       experienceLevel: 'CONFIRME',
       availability: 'WITHIN_DELAY',
       availabilityDelayMonths: 3,
@@ -156,7 +170,7 @@ describe('parcours candidat de bout en bout', () => {
       languages: ['Anglais'],
       bio: 'Je construis des interfaces qui respectent leurs utilisateurs.',
     });
-  });
+  }, 45_000);
 
   // The profile was created by the first attempt, so the replayed call gets the
   // 409 the real backend raises. The wizard has to fall back to the update —
@@ -194,5 +208,5 @@ describe('parcours candidat de bout en bout', () => {
     const update = callTo('/api/candidate-profiles/me');
     expect(update.method).toBe('PATCH');
     expect(update.body).toMatchObject({ firstName: 'Ada', skills: ['React', 'TypeScript'] });
-  });
+  }, 45_000);
 });

@@ -5,6 +5,7 @@ import { buildOfferPayload, emptyOfferForm, offerFormFromDetail } from './offerP
 const filled = {
   ...emptyOfferForm,
   title: 'Développeuse Front',
+  jobFamilyId: '13',
   description: 'Vous construirez le design system.',
   city: 'Lyon',
   postalCode: '69003',
@@ -26,6 +27,7 @@ const filled = {
 const detail: OfferDetailDto = {
   id: 12,
   title: 'Développeuse Front',
+  jobFamilyId: 13,
   description: 'Vous construirez le design system.',
   city: 'Lyon',
   postalCode: '69003',
@@ -60,6 +62,7 @@ describe('buildOfferPayload', () => {
   it('construit la charge utile complète d’un formulaire rempli', () => {
     expect(buildOfferPayload(filled, 'create')).toEqual({
       title: 'Développeuse Front',
+      jobFamilyId: 13,
       description: 'Vous construirez le design system.',
       city: 'Lyon',
       postalCode: '69003',
@@ -182,6 +185,7 @@ describe('offerFormFromDetail', () => {
   it('préremplit le formulaire depuis une offre existante', () => {
     expect(offerFormFromDetail(detail)).toEqual({
       title: 'Développeuse Front',
+      jobFamilyId: '13',
       description: 'Vous construirez le design system.',
       city: 'Lyon',
       postalCode: '69003',
@@ -200,6 +204,8 @@ describe('offerFormFromDetail', () => {
     const bare = offerFormFromDetail({
       ...detail,
       description: null,
+      // Null on every offer written before job families existed.
+      jobFamilyId: null,
       city: null,
       postalCode: null,
       contractType: null,

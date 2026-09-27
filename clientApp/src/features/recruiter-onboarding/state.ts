@@ -19,6 +19,7 @@ export interface RecruiterOnboardingState {
   description: string;
   benefits: string[];
   offerTitle: string;
+  offerJobFamilyId: string;
   offerCity: string;
   offerPostalCode: string;
   offerDescription: string;
@@ -43,6 +44,7 @@ export const emptyRecruiterOnboarding: RecruiterOnboardingState = {
   description: '',
   benefits: [],
   offerTitle: '',
+  offerJobFamilyId: '',
   offerCity: '',
   offerPostalCode: '',
   offerDescription: '',

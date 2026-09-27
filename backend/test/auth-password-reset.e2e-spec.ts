@@ -30,9 +30,12 @@ describe('Auth password reset (e2e)', () => {
   };
 
   const signup = (email: string) =>
-    httpRequest(app)
-      .post('/api/auth/signup')
-      .send({ email, password: PASSWORD, userType: 'candidate' });
+    httpRequest(app).post('/api/auth/signup').send({
+      email,
+      password: PASSWORD,
+      userType: 'candidate',
+      acceptTerms: true,
+    });
 
   const forgot = (email: string) =>
     httpRequest(app).post('/api/auth/password/forgot').send({ email });
@@ -85,7 +88,7 @@ describe('Auth password reset (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     configureApp(app);
-    await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = app.get(PrismaService);
   });

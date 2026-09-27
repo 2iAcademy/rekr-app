@@ -20,6 +20,9 @@ import {
 } from './OfferFormPage';
 
 vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   offerControllerCreate: vi.fn(),
   offerControllerUpdate: vi.fn(),
   offerControllerFindOneById: vi.fn(),
@@ -145,6 +148,8 @@ describe('OfferFormPage', () => {
       await user.type(screen.getByLabelText('Compétences recherchées'), 'React{Enter}');
       await user.type(screen.getByRole('combobox', { name: 'Ville du poste' }), 'Lyon');
       await user.click(await screen.findByRole('option', { name: 'Lyon (69003)' }));
+      await waitFor(() => expect(screen.getByLabelText('Domaine du poste')).toBeEnabled());
+      await user.selectOptions(screen.getByLabelText('Domaine du poste'), '13');
       await user.click(screen.getByRole('radio', { name: 'CDI' }));
       await user.click(screen.getByRole('radio', { name: 'Confirmé' }));
       await user.click(screen.getByRole('radio', { name: 'Hybride' }));
@@ -187,6 +192,8 @@ describe('OfferFormPage', () => {
       );
       await user.type(screen.getByRole('combobox', { name: 'Ville du poste' }), 'Lyon');
       await user.click(await screen.findByRole('option', { name: 'Lyon (69003)' }));
+      await waitFor(() => expect(screen.getByLabelText('Domaine du poste')).toBeEnabled());
+      await user.selectOptions(screen.getByLabelText('Domaine du poste'), '13');
       await user.click(screen.getByRole('button', { name: 'Créer l’offre' }));
 
       expect(await screen.findByText(NO_COMPANY)).toBeInTheDocument();

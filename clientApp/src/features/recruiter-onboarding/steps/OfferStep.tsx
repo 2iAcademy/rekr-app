@@ -1,4 +1,5 @@
 import { CityField } from '@/components/form/CityField';
+import { JobFamilySelect } from '@/features/job-families/JobFamilySelect';
 import { RichTextField } from '@/components/form/RichTextField';
 import { TagInput } from '@/components/form/TagInput';
 import { TextField } from '@/components/form/TextField';
@@ -21,6 +22,13 @@ export function OfferStep({ state, onChange, invalidField }: StepProps) {
         value={state.offerTitle}
         onChange={(event) => onChange({ offerTitle: event.target.value })}
         placeholder="Chargé de clientèle"
+      />
+
+      <JobFamilySelect
+        value={state.offerJobFamilyId}
+        onChange={(offerJobFamilyId) => onChange({ offerJobFamilyId })}
+        invalid={invalidField === 'offerJobFamilyId'}
+        describedBy={markIfInvalid(invalidField, 'offerJobFamilyId')['aria-describedby']}
       />
 
       <CityField

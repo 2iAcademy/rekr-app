@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class MatchOfferDto {
   @ApiProperty({ example: 4 })
@@ -9,18 +9,15 @@ export class MatchOfferDto {
 }
 
 /**
- * The other side of a match, seen by the candidate whose list it is: always the
- * company behind the offer.
+ * The other side of a match. Candidates see the company behind the offer;
+ * recruiters see the matched candidate.
  *
- * `kind` survives as a single-valued discriminator rather than being dropped:
- * the reciprocal view — a recruiter reading who applied to one of their offers —
- * carries a candidate, and it will land on its own route with its own shape.
- * Keeping the tag means the client can branch on it the day a second shape
- * exists, without the field having to be reintroduced everywhere.
+ * The discriminator keeps the response role-safe while letting the generated
+ * client represent both views through the same endpoint contract.
  */
 export class MatchCounterpartDto {
-  @ApiProperty({ enum: ['company'], example: 'company' })
-  kind!: 'company';
+  @ApiProperty({ enum: ['company', 'candidate'], example: 'company' })
+  kind!: 'company' | 'candidate';
 
   @ApiProperty({ example: 8 })
   id!: number;
@@ -28,14 +25,14 @@ export class MatchCounterpartDto {
   @ApiProperty({ example: 'Acme Corp' })
   name!: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     type: String,
     example: 'companies/8/logo/acme.webp',
     nullable: true,
   })
   avatarUrl!: string | null;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     type: String,
     example: 'Développeur Full-Stack',
     nullable: true,

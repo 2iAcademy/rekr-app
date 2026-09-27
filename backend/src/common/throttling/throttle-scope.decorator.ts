@@ -10,7 +10,8 @@ export type ThrottleScopeName =
   | 'cities'
   | 'files'
   | 'passwordForgot'
-  | 'passwordReset';
+  | 'passwordReset'
+  | 'accountDelete';
 
 export const ThrottleScope = (scope: ThrottleScopeName) =>
   SetMetadata(THROTTLE_SCOPE_KEY, scope);

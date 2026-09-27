@@ -6,18 +6,22 @@ import { ApiError } from '@/api/customFetch';
 import {
   offerControllerFindApplicants,
   offerControllerLikeApplicant,
+  offerControllerPassApplicant,
   type OfferApplicantDto,
 } from '@/api/generated';
 import { anApplicant } from '../fixtures';
+import type { LikeResultDto } from '@/api/generated';
 import { OfferApplicantsPage } from './OfferApplicantsPage';
 
 vi.mock('@/api/generated', () => ({
   offerControllerFindApplicants: vi.fn(),
   offerControllerLikeApplicant: vi.fn(),
+  offerControllerPassApplicant: vi.fn(),
 }));
 
 const findApplicants = vi.mocked(offerControllerFindApplicants);
 const likeApplicant = vi.mocked(offerControllerLikeApplicant);
+const passApplicant = vi.mocked(offerControllerPassApplicant);
 
 const answer = (data: OfferApplicantDto[]) =>
   ({ data, status: 200, headers: new Headers() }) as unknown as Awaited<
@@ -32,6 +36,7 @@ const applicant = (over: Partial<OfferApplicantDto> = {}): OfferApplicantDto => 
 const renderPage = (openApplicantId: number | null = null) => {
   const onOpenProfile = vi.fn();
   const onCloseProfile = vi.fn();
+  const onMatch = vi.fn();
 
   render(
     <MemoryRouter>
@@ -40,11 +45,12 @@ const renderPage = (openApplicantId: number | null = null) => {
         openApplicantId={openApplicantId}
         onOpenProfile={onOpenProfile}
         onCloseProfile={onCloseProfile}
+        onMatch={onMatch}
       />
     </MemoryRouter>,
   );
 
-  return { onOpenProfile, onCloseProfile };
+  return { onOpenProfile, onCloseProfile, onMatch };
 };
 
 const rows = () =>
@@ -58,6 +64,9 @@ describe('OfferApplicantsPage', () => {
     findApplicants.mockResolvedValue(answer([applicant()]));
     likeApplicant.mockResolvedValue(
       undefined as unknown as Awaited<ReturnType<typeof offerControllerLikeApplicant>>,
+    );
+    passApplicant.mockResolvedValue(
+      undefined as unknown as Awaited<ReturnType<typeof offerControllerPassApplicant>>,
     );
   });
 
@@ -125,11 +134,45 @@ describe('OfferApplicantsPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Liker Camille' }));
 
     await waitFor(() => expect(likeApplicant).toHaveBeenCalledWith(12, 1));
-    expect(
-      await screen.findByRole('button', { name: 'Camille, intérêt enregistré' }),
-    ).toBeDisabled();
+    expect(await screen.findByRole('status')).toHaveTextContent('Intérêt déjà enregistré');
+    const actions = screen.getAllByRole('button', { name: /Camille, Intérêt déjà enregistré/ });
+    expect(actions).toHaveLength(2);
+    actions.forEach((button) => expect(button).toBeDisabled());
   });
 
+  it('signale le nouveau match avec les informations du candidat retournées par l’API', async () => {
+    const user = userEvent.setup();
+    likeApplicant.mockResolvedValue({
+      data: {
+        likeCreated: true,
+        matchCreated: true,
+        match: {
+          id: 55,
+          matchedAt: '2026-09-16T09:30:00.000Z',
+          offer: { id: 12, title: 'Développeuse back-end' },
+          counterpart: {
+            kind: 'candidate',
+            id: 1,
+            name: 'Camille',
+            avatarUrl: 'candidates/1/picture/camille.webp',
+            headline: 'Développeuse back-end',
+          },
+        },
+      } satisfies LikeResultDto,
+      status: 201,
+      headers: new Headers(),
+    } as unknown as Awaited<ReturnType<typeof offerControllerLikeApplicant>>);
+    const { onMatch } = renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Liker Camille' }));
+
+    await waitFor(() =>
+      expect(onMatch).toHaveBeenCalledWith({
+        name: 'Camille',
+        avatarUrl: 'candidates/1/picture/camille.webp',
+      }),
+    );
+  });
   it('ouvre le profil d’un candidat', async () => {
     const user = userEvent.setup();
     const { onOpenProfile } = renderPage();

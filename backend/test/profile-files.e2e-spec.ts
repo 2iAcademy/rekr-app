@@ -71,7 +71,7 @@ describe('Profile files (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     configureApp(app);
-    await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = app.get(PrismaService);
   });

@@ -10,13 +10,16 @@ import { buildThrottlerOptions } from './common/throttling/throttling.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaExceptionFilter } from './prisma/prisma-exception.filter';
 import { LogsModule } from './logs/logs.module';
+import { AccountModule } from './account/account.module';
 import { AuthModule } from './auth/auth.module';
 import { CandidateProfileModule } from './candidate-profile/candidate-profile.module';
 import { CityModule } from './city/city.module';
 import { CompanyModule } from './company/company.module';
 import { OfferModule } from './offer/offer.module';
+import { JobFamilyModule } from './job-family/job-family.module';
 import { SectorModule } from './sector/sector.module';
 import { StorageModule } from './storage/storage.module';
+import { LikeModule } from './like/like.module';
 import { MatchModule } from './match/match.module';
 
 @Module({
@@ -36,9 +39,12 @@ import { MatchModule } from './match/match.module';
     CityModule,
     CompanyModule,
     OfferModule,
+    JobFamilyModule,
     SectorModule,
     StorageModule,
     MatchModule,
+    LikeModule,
+    AccountModule,
   ],
   controllers: [AppController],
   providers: [

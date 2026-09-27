@@ -27,7 +27,7 @@ describe('Swagger (e2e)', () => {
     app = moduleRef.createNestApplication();
     configureApp(app);
     mountSwaggerIfExposed(app);
-    await app.init();
+    await app.listen(0, '127.0.0.1');
   });
 
   beforeEach(() => {
@@ -66,6 +66,20 @@ describe('Swagger (e2e)', () => {
 
     expect(res.headers['content-security-policy']).toBeUndefined();
     expect((res.body as { openapi?: string }).openapi).toBeDefined();
+  });
+
+  /**
+   * The front client is generated from this document, so a route left in it
+   * keeps a typed function alive that nothing calls. `/likes/sent` replaced
+   * this one in #144, and excludes the offers already matched where it did
+   * not (gh#191).
+   */
+  it('no longer documents GET /offers/liked, superseded by /likes/sent', async () => {
+    const res = await httpRequest(app).get('/api/docs-json').expect(200);
+    const paths = Object.keys((res.body as { paths: object }).paths);
+
+    expect(paths).toContain('/api/likes/sent');
+    expect(paths).not.toContain('/api/offers/liked');
   });
 
   /**

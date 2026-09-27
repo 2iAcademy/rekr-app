@@ -7,6 +7,9 @@ import type { OfferFormError } from '@/features/recruiter-offers/offerValidation
 import { OfferForm } from './OfferForm';
 
 vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   cityControllerSearch: vi.fn(),
 }));
 
@@ -19,6 +22,7 @@ const answer = (data: unknown) =>
 
 const filled: OfferFormValue = {
   title: 'Développeuse Front',
+  jobFamilyId: '13',
   description: 'Vous construirez le design system.',
   city: 'Lyon',
   postalCode: '69003',

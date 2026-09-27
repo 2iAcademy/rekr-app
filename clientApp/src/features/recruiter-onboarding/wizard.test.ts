@@ -14,6 +14,7 @@ const complete: RecruiterOnboardingState = {
   postalCode: '69003',
   description: 'On construit le matching qui respecte les candidats.',
   offerTitle: 'Développeur Front React',
+  offerJobFamilyId: '13',
   offerCity: 'Lyon',
   offerPostalCode: '69003',
   offerDescription: 'Construire les écrans du swipe.',

@@ -92,4 +92,22 @@ export class OfferApplicantDto {
 
   @ApiProperty({ type: [String], example: ['React', 'TypeScript'] })
   tags!: string[];
+
+  /** Interest recorded by the current recruiter for this offer, if any. */
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    example: '2026-09-16T09:30:00.000Z',
+  })
+  recruiterLikedAt!: Date | null;
+
+  /** Pass recorded by the current recruiter for this candidate, if any. */
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    example: '2026-09-16T09:30:00.000Z',
+  })
+  recruiterPassedAt!: Date | null;
 }

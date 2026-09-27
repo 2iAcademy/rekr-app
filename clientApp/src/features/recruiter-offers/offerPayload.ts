@@ -14,6 +14,8 @@ import { optionalEnum, optionalInteger, withoutEmptyFields } from '@/lib/payload
  */
 export interface OfferFormValue {
   title: string;
+  /** Held as a string like the other selects: an empty one means « not chosen yet ». */
+  jobFamilyId: string;
   description: string;
   city: string;
   postalCode: string;
@@ -30,6 +32,7 @@ export interface OfferFormValue {
 /** A new offer starts as a draft: publishing is a decision, not a default. */
 export const emptyOfferForm: OfferFormValue = {
   title: '',
+  jobFamilyId: '',
   description: '',
   city: '',
   postalCode: '',
@@ -80,6 +83,10 @@ const salaryToWrite = (value: string, intent: OfferWriteIntent): number | null |
 export const buildOfferPayload = (form: OfferFormValue, intent: OfferWriteIntent): CreateOfferDto =>
   withoutEmptyFields({
     title: form.title.trim(),
+    // Not `optionalInteger`: the API requires it, so an unchosen family has to
+    // reach the server as an invalid body rather than as a silent omission the
+    // recruiter would only notice through a missing feed.
+    jobFamilyId: Number(form.jobFamilyId),
     description: form.description.trim(),
     city: form.city.trim(),
     postalCode: form.postalCode.trim(),
@@ -120,6 +127,7 @@ const ownerFieldsOf = (offer: OfferDetailDto): { postalCode: string; status: Off
  */
 export const offerFormFromDetail = (offer: OfferDetailDto): OfferFormValue => ({
   title: offer.title,
+  jobFamilyId: offer.jobFamilyId === null ? '' : String(offer.jobFamilyId),
   description: offer.description ?? '',
   city: offer.city ?? '',
   skills: labelsOfCategory(offer, 'skill'),

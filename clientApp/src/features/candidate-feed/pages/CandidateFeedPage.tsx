@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { offerControllerLike } from '@/api/generated';
+import { offerControllerLike, offerControllerPass } from '@/api/generated';
 import { notifyFailure } from '@/lib/feedback/notify';
 import { likeFailureBusiness } from '../likeFeedback';
 import { cn } from '@/lib/utils';
@@ -19,14 +19,16 @@ import type { OfferFeedItemDto } from '@/api/generated';
 import { likedOfferCountLabel } from '../labels';
 import { useOfferFeed } from '../useOfferFeed';
 import { OfferCard } from '../components/OfferCard';
+import { matchedCompany } from '@/features/matches/likeResult';
 
 const SWIPE_THRESHOLD = 120;
 
 interface CandidateFeedPageProps {
   onOpenOffer: (id: number) => void;
+  onMatch: (matchedProfile: { name: string; avatarUrl: string | null }) => void;
 }
 
-export function CandidateFeedPage({ onOpenOffer }: CandidateFeedPageProps) {
+export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPageProps) {
   const { offers, status, reload } = useOfferFeed();
   const [decisions, setDecisions] = useState(noDecisions);
   const deckRef = useRef<HTMLElement>(null);
@@ -55,7 +57,7 @@ export function CandidateFeedPage({ onOpenOffer }: CandidateFeedPageProps) {
    * silently has to be redone. The failure is surfaced as a toast, and the
    * endpoint is idempotent, so liking the same offer again is harmless.
    *
-   * Only a like is written: nothing stores a pass in this scope.
+   * Both decisions are persisted through their idempotent endpoints.
    */
   const decide = useCallback(
     (decision: Decision, offer: OfferFeedItemDto | undefined = current): void => {
@@ -65,17 +67,26 @@ export function CandidateFeedPage({ onOpenOffer }: CandidateFeedPageProps) {
 
       setDecisions((previous) => recordDecision(previous, offer.id, decision));
 
-      if (decision === 'liked') {
-        void offerControllerLike(offer.id).catch((cause: unknown) =>
+      if (decision === 'passed') {
+        void offerControllerPass(offer.id).catch((cause: unknown) =>
           notifyFailure(cause, likeFailureBusiness),
         );
+      }
+
+      if (decision === 'liked') {
+        void offerControllerLike(offer.id)
+          .then((response) => {
+            const counterpart = matchedCompany(response.data);
+            if (counterpart) onMatch({ name: counterpart.name, avatarUrl: counterpart.avatarUrl });
+          })
+          .catch((cause: unknown) => notifyFailure(cause, likeFailureBusiness));
       }
 
       if (deck.length === 1) {
         deckRef.current?.focus();
       }
     },
-    [current, deck.length],
+    [current, deck.length, onMatch],
   );
 
   const swipe = useCardSwipe({

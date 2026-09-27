@@ -1,5 +1,12 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsIn, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  Equals,
+  IsEmail,
+  IsIn,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { normalizeEmail } from 'src/common/transforms/emails.transforms';
 import { MAX_PASSWORD_LENGTH } from 'src/common/validation/password-bounds';
 import { ApiProperty } from '@nestjs/swagger';
@@ -48,4 +55,16 @@ export class SignupDto {
   @Transform(({ value }) => normalizeUserType(value))
   @IsIn(allowedUserTypes)
   userType!: (typeof allowedUserTypes)[number];
+
+  /**
+   * The sign-up form's checkbox, repeated to the server: a consent that only
+   * the client checked is one the server cannot prove it collected. `true`
+   * exactly — not `"true"`, not `1` — since the global pipe does not coerce.
+   */
+  @ApiProperty({
+    enum: [true],
+    description: 'Acceptance of the privacy policy and the terms of use.',
+  })
+  @Equals(true, { message: 'The privacy policy must be accepted.' })
+  acceptTerms!: true;
 }

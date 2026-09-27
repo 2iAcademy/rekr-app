@@ -174,4 +174,18 @@ export class CreateOfferDto {
   @MaxLength(MAX_TAG_LABEL_LENGTH, { each: true })
   @NoControlCharacters({ each: true })
   benefits?: string[];
+
+  /**
+   * The trade this post belongs to, required because it is what keeps the
+   * offer out of the feeds of every other trade.
+   *
+   * Required here while the column stays nullable: the offers written before
+   * job families existed keep their empty value, and only new ones have to
+   * name a family. An offer without one matches no candidate who named theirs.
+   */
+  @ApiProperty({ example: 13 })
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT4)
+  jobFamilyId!: number;
 }
