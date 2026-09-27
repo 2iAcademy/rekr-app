@@ -38,37 +38,52 @@ Démarre `postgres` (5432), `kafka` (29092), `kafka-ui` (8085), `backend` (3001)
 
 Flux: `backend` (producer) → topic Kafka `logs.raw` → `logs-sink` (consumer) → table Postgres `logs_raw`.
 
-1. Vérifier que les services tournent:
+Cette chaîne a sa propre pile, `docker/docker-compose.yml`, séparée du `compose.yml` racine. Les commandes ci-dessous se lancent depuis la racine du dépôt.
+
+1. Démarrer Kafka, Kafka UI et Postgres, puis appliquer les migrations **avant** `logs-sink`. Sinon `logs-sink` crée `logs_raw` dans une base vide et `prisma migrate deploy` refuse ensuite de migrer (P3005).
 
 ```bash
-docker compose ps
-docker compose logs -f backend logs-sink
+export JWT_SECRET="<secret-long-et-aleatoire>"   # l'API refuse de démarrer sans
+docker compose -f docker/docker-compose.yml up -d --build kafka kafka-ui postgres backend
+docker compose -f docker/docker-compose.yml exec backend npx prisma migrate deploy
+docker compose -f docker/docker-compose.yml up -d logs-sink
 ```
 
-2. Produire un message de test (depuis le conteneur backend, fonctionne même si `localhost:3001` n'est pas joignable depuis l'hôte):
+Si le port 5432 est déjà pris sur l'hôte, préfixer par `POSTGRES_PORT=55433`. Elasticsearch n'est pas dans cette pile : le backend y tourne avec `ELASTICSEARCH_ENABLED=false`.
+
+2. Obtenir un jeton administrateur. `/api/logs/*` est réservé au type `admin`, qui ne s'obtient pas à l'inscription : créer un compte, le passer en admin en base, puis se connecter.
 
 ```bash
-docker compose exec backend sh -lc "wget -qSO- --post-data='' http://127.0.0.1:3001/api/logs/sample 2>&1"
+curl -s -H 'Content-Type: application/json' \
+  -d '{"email":"admin@test.localhost","password":"<mot-de-passe>","userType":"candidate","acceptTerms":true}' \
+  http://localhost:3001/api/auth/signup
+docker compose -f docker/docker-compose.yml exec postgres psql -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-backend} \
+  -c "UPDATE \"user\" SET user_type='admin', role='admin' WHERE email='admin@test.localhost';"
+TOKEN=$(curl -s -H 'Content-Type: application/json' \
+  -d '{"email":"admin@test.localhost","password":"<mot-de-passe>"}' \
+  http://localhost:3001/api/auth/login | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
 ```
 
-3. Variante erreur simulée:
+3. Produire un message de test, puis une erreur simulée:
 
 ```bash
-docker compose exec backend sh -lc "wget -qSO- --header='Content-Type: application/json' --post-data='{\"message\":\"test error\"}' http://127.0.0.1:3001/api/logs/error 2>&1"
+curl -s -X POST -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/logs/sample
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"message":"test error"}' http://localhost:3001/api/logs/error
 ```
 
 4. Vérifier la consommation:
 
 ```bash
-docker compose logs -f logs-sink
+docker compose -f docker/docker-compose.yml logs -f logs-sink
 ```
 
-5. Vérifier côté Kafka UI: http://localhost:8085
+5. Vérifier côté Kafka UI: http://localhost:8085 (topic `logs.raw`, onglet Messages).
 
 6. Vérifier la persistance en base:
 
 ```bash
-docker compose exec postgres psql -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c "SELECT event_id, level, message, occurred_at FROM logs_raw ORDER BY created_at DESC LIMIT 10;"
+docker compose -f docker/docker-compose.yml exec postgres psql -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-backend} -c "SELECT event_id, level, message, occurred_at FROM logs_raw ORDER BY created_at DESC LIMIT 10;"
 ```
 
 ### 3. Initialiser la base (depuis l'hôte)

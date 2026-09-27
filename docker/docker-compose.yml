@@ -1,7 +1,6 @@
 services:
   kafka:
     image: apache/kafka:4.0.0
-    container_name: kafka
     hostname: kafka
     ports:
       - "29092:29092"
@@ -30,7 +29,6 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
-    container_name: kafka-ui
     depends_on:
       kafka:
         condition: service_healthy
@@ -58,7 +56,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: ../backend
       dockerfile: Dockerfile
       target: dev
     command: npm run start:dev
@@ -69,8 +67,10 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: logs.raw
       SENTRY_DSN: ${SENTRY_DSN:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      ELASTICSEARCH_ENABLED: "false"
     volumes:
-      - ./backend:/app
+      - ../backend:/app
       - /app/node_modules
     ports:
       - "${PORT:-3001}:3001"
@@ -83,8 +83,9 @@ services:
 
   logs-sink:
     build:
-      context: ./backend
+      context: ../backend
       dockerfile: Dockerfile
+      target: dev
     command: npm run start:logs-sink
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-backend}
@@ -92,7 +93,7 @@ services:
       KAFKA_TOPIC: logs.raw
       KAFKA_GROUP_ID: rekr-logs-sink
     volumes:
-      - ./backend:/app
+      - ../backend:/app
       - /app/node_modules
     depends_on:
       kafka:
@@ -102,14 +103,14 @@ services:
 
   frontend:
     build:
-      context: ./clientApp
+      context: ../clientApp
       dockerfile: Dockerfile
     command: npm run dev
     environment:
       VITE_API_TARGET: http://backend:3001
       VITE_API_URL: /api
     volumes:
-      - ./clientApp:/app
+      - ../clientApp:/app
       - /app/node_modules
     ports:
       - "8080:8080"
