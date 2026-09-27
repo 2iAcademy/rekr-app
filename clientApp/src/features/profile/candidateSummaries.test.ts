@@ -38,14 +38,14 @@ describe('candidateSummaries', () => {
     expect(summaries.project).toBe('2 domaines · Lead Front');
   });
 
-  // Le même vocabulaire que le reste du produit : « 42 - 48 k€ », pas les
+  // Le même vocabulaire que le reste du produit : « 42–48 k€ », pas les
   // chiffres bruts saisis dans le formulaire.
   it('exprime la prétention dans l’unité employée ailleurs', () => {
     const summaries = candidateSummaries(
       form({ remotePolicy: 'HYBRID', salaryMin: '42000', salaryMax: '48000' }),
     );
 
-    expect(summaries.preferences).toBe('Hybride · 42 - 48 k€');
+    expect(summaries.preferences).toBe('Hybride · 42–48 k€');
   });
 
   it('n’annonce pas de fourchette quand aucune borne n’est donnée', () => {

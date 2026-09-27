@@ -22,7 +22,7 @@ export function PasswordInput({
         type="button"
         onClick={() => setVisible((shown) => !shown)}
         aria-label={`${visible ? 'Masquer' : 'Afficher'} ${subject}`}
-        className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center rounded-r-xl text-ink-muted transition-colors hover:text-ink focus-visible:ring-3 focus-visible:ring-role/20 focus-visible:outline-none"
+        className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center rounded-r-xl text-ink-muted transition-colors hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
       >
         <Icon className="size-5" />
       </button>

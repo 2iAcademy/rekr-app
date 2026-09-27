@@ -42,7 +42,6 @@ import { MAX_FREE_TEXT_LENGTH } from '@/lib/bounds';
 import type { BusinessMessages } from '@/lib/feedback/failureMessage';
 import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
 import { fileUrl } from '@/lib/fileUrl';
-import { cn } from '@/lib/utils';
 
 type Status = 'loading' | 'ready' | 'absent' | 'failed';
 
@@ -198,11 +197,11 @@ export function RecruiterAccountSection() {
 
   if (status === 'failed') {
     return (
-      <div className="mt-6 flex flex-col items-start gap-3 rounded-2xl border border-line bg-card p-5">
+      <div className="mt-6 flex flex-col items-start gap-3 rounded-2xl border border-line bg-card p-5 shadow-card">
         <p role="alert" className="text-sm text-destructive">
           Impossible de charger les informations de votre société.
         </p>
-        <Button variant="soft" size="lg" onClick={reload}>
+        <Button variant="outline" size="lg" onClick={reload}>
           Réessayer
         </Button>
       </div>
@@ -211,11 +210,15 @@ export function RecruiterAccountSection() {
 
   if (status === 'absent') {
     return (
-      <div className="mt-6 flex flex-col items-start gap-3 rounded-2xl border border-line bg-card p-5">
-        <p className="text-sm text-ink">Vous n’avez pas encore renseigné votre société.</p>
+      <div className="mt-6 flex flex-col items-start gap-4 rounded-2xl border border-line bg-card p-5 shadow-card">
+        <p className="text-sm text-ink-soft">Vous n’avez pas encore renseigné votre société.</p>
         <Link
           to="/recruteur/onboarding"
-          className={cn(buttonVariants({ variant: 'role', size: 'lg' }))}
+          className={buttonVariants({
+            variant: 'brand',
+            size: 'xl',
+            className: 'w-full sm:w-auto',
+          })}
         >
           Compléter ma fiche société
         </Link>
@@ -335,12 +338,14 @@ export function RecruiterAccountSection() {
 
       {/* Outside the form and outside the accordion: each image is written the
           moment it is picked, so it answers to no save button. */}
-      <section className="mt-6 flex flex-col gap-5 rounded-2xl border border-line bg-card p-5">
-        <h2 className="font-heading text-base font-semibold text-ink">Images de la société</h2>
-        <p className="text-sm text-ink-muted">
-          Ces images sont celles de la société : elles sont partagées avec les autres recruteurs de
-          votre société. Chaque envoi est enregistré aussitôt.
-        </p>
+      <section className="mt-3 flex flex-col gap-5 rounded-2xl border border-line bg-card p-5 shadow-card">
+        <div>
+          <h2 className="text-base font-bold text-ink">Images de la société</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Ces images sont celles de la société : elles sont partagées avec les autres recruteurs
+            de votre société. Chaque envoi est enregistré aussitôt.
+          </p>
+        </div>
 
         {/* Côte à côte dès `sm` : empilées, les deux zones de téléversement
             doublaient inutilement la hauteur du bloc. */}
@@ -373,11 +378,11 @@ export function RecruiterAccountSection() {
           Left inside the form, the bar landed between the two and `sticky` kept
           it there: it only sticks when it would otherwise leave the viewport.
           `form` is what still ties the button to the fields it saves. */}
-      <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-line bg-background px-4 py-3 sm:-mx-6 sm:px-6">
+      <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 mt-6 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:bottom-4 md:mx-0 md:rounded-2xl md:border md:px-5 md:shadow-float md:float-bar">
         <Button
           type="submit"
           form={formId}
-          variant="role"
+          variant="brand"
           size="xl"
           disabled={saving}
           className="w-full sm:w-auto"

@@ -1,7 +1,9 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
+  useState,
   type ClipboardEvent,
   type DragEvent,
   type KeyboardEvent,
@@ -21,6 +23,8 @@ const COMMANDS = [
   { label: 'Italique', icon: Italic, command: 'italic' },
   { label: 'Liste à puces', icon: List, command: 'insertUnorderedList' },
 ] as const;
+
+type Command = (typeof COMMANDS)[number]['command'];
 
 const placeCaretAtEnd = (target: HTMLElement): void => {
   const selection = window.getSelection();
@@ -63,6 +67,39 @@ export function RichTextField({
   // value changed somewhere else (a restored draft, a formatting command).
   const emitted = useRef<string | null>(null);
 
+  // Which formats apply at the caret, so the toolbar shows what a click would
+  // toggle off. Read from the browser rather than tracked, since it alone knows
+  // what the current selection covers.
+  const [active, setActive] = useState<readonly Command[]>([]);
+
+  const refreshActive = useCallback((): void => {
+    const target = editor.current;
+    const anchor = window.getSelection()?.anchorNode ?? null;
+    const inside = target !== null && anchor !== null && target.contains(anchor);
+    const next = COMMANDS.map(({ command }) => command).filter((command) => {
+      if (!inside || typeof document.queryCommandState !== 'function') {
+        return false;
+      }
+      try {
+        return document.queryCommandState(command);
+      } catch {
+        return false;
+      }
+    });
+
+    setActive((current) =>
+      current.length === next.length && current.every((command, i) => command === next[i])
+        ? current
+        : next,
+    );
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('selectionchange', refreshActive);
+
+    return () => document.removeEventListener('selectionchange', refreshActive);
+  }, [refreshActive]);
+
   useEffect(() => {
     if (editor.current && value !== emitted.current) {
       editor.current.innerHTML = markdownToHtml(value);
@@ -97,6 +134,7 @@ export function RichTextField({
     editor.current?.focus();
     document.execCommand(command);
     publish();
+    refreshActive();
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -140,62 +178,72 @@ export function RichTextField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span id={fieldId} className="text-xs text-ink-muted">
+      <span id={fieldId} className="text-sm font-semibold text-ink">
         {label}
       </span>
 
-      <div className="flex gap-1" role="toolbar" aria-label={`Mise en forme de « ${label} »`}>
-        {COMMANDS.map(({ label: name, icon: Icon, command }) => (
-          <button
-            key={name}
-            type="button"
-            aria-label={name}
-            title={name}
-            // Keeps the selection: blurring the editor would collapse it before
-            // the command runs.
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => run(command)}
-            className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-brand-tint hover:text-ink focus-visible:ring-3 focus-visible:ring-role/30 focus-visible:outline-none"
-          >
-            <Icon className="size-4" />
-          </button>
-        ))}
-      </div>
-
-      <div className="relative">
-        {value === '' && placeholder && (
-          <p
-            aria-hidden="true"
-            className="pointer-events-none absolute top-3 left-4 text-sm text-muted-foreground"
-          >
-            {placeholder}
-          </p>
+      {/* Toolbar and text area read as one control, the way a mail composer
+          does; the frame takes the focus and error rings for both. */}
+      <div
+        className={cn(
+          'overflow-hidden rounded-xl border border-line bg-card transition-colors',
+          'has-[[role=textbox]:focus-visible]:border-brand has-[[role=textbox]:focus-visible]:ring-3 has-[[role=textbox]:focus-visible]:ring-brand/20',
+          'has-[[aria-invalid=true]]:border-destructive has-[[aria-invalid=true]]:ring-3 has-[[aria-invalid=true]]:ring-destructive/20',
         )}
-
+      >
         <div
-          ref={editor}
-          role="textbox"
-          contentEditable
-          suppressContentEditableWarning
-          aria-multiline="true"
-          aria-labelledby={fieldId}
-          aria-describedby={[hintId, describedBy].filter(Boolean).join(' ')}
-          {...aria}
-          onInput={publish}
-          onBlur={publish}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          onDrop={handleDrop}
-          className={cn(
-            'min-h-40 w-full overflow-auto rounded-xl border border-line bg-card px-4 py-3 text-sm text-ink outline-none transition-colors',
-            'focus-visible:border-role focus-visible:ring-3 focus-visible:ring-role/20',
-            'aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20',
-            '[&_ul]:list-disc [&_ul]:pl-5',
+          className="flex gap-1 border-b border-line p-1"
+          role="toolbar"
+          aria-label={`Mise en forme de « ${label} »`}
+        >
+          {COMMANDS.map(({ label: name, icon: Icon, command }) => (
+            <button
+              key={name}
+              type="button"
+              aria-label={name}
+              aria-pressed={active.includes(command)}
+              title={name}
+              // Keeps the selection: blurring the editor would collapse it before
+              // the command runs.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => run(command)}
+              className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none aria-pressed:bg-brand-tint aria-pressed:text-brand-strong"
+            >
+              <Icon className="size-4" />
+            </button>
+          ))}
+        </div>
+
+        <div className="relative">
+          {value === '' && placeholder && (
+            <p
+              aria-hidden="true"
+              className="pointer-events-none absolute top-3 left-4 text-sm text-muted-foreground"
+            >
+              {placeholder}
+            </p>
           )}
-        />
+
+          <div
+            ref={editor}
+            role="textbox"
+            contentEditable
+            suppressContentEditableWarning
+            aria-multiline="true"
+            aria-labelledby={fieldId}
+            aria-describedby={[hintId, describedBy].filter(Boolean).join(' ')}
+            {...aria}
+            onInput={publish}
+            onBlur={publish}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onDrop={handleDrop}
+            className="min-h-40 w-full overflow-auto px-4 py-3 text-sm text-ink outline-none [&_ul]:list-disc [&_ul]:pl-5"
+          />
+        </div>
       </div>
 
-      <p id={hintId} className="text-right text-xs text-ink-faint">
+      <p id={hintId} className="tabular text-right text-xs text-ink-muted">
         {(maxLength - value.length).toLocaleString('fr-FR')} caractères restants
       </p>
     </div>

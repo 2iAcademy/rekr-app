@@ -85,7 +85,7 @@ export function ProfileSection({ value, title, summary, children }: ProfileSecti
   const isOpen = sections.isOpen(value);
 
   return (
-    <section className="rounded-2xl border border-line bg-card">
+    <section className="rounded-2xl border border-line bg-card shadow-card">
       <h2 className="m-0">
         <button
           type="button"
@@ -94,8 +94,9 @@ export function ProfileSection({ value, title, summary, children }: ProfileSecti
           onClick={() => sections.toggle(value)}
           className={cn(
             'flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left',
-            'font-heading text-base font-semibold text-ink transition-colors hover:bg-brand-tint/40',
-            'outline-none focus-visible:ring-3 focus-visible:ring-role/40',
+            'text-base font-bold text-ink transition-colors hover:bg-surface',
+            'outline-none focus-visible:ring-3 focus-visible:ring-brand/30',
+            isOpen && 'rounded-b-none',
           )}
         >
           <span className="flex min-w-0 flex-col gap-0.5">
@@ -109,7 +110,7 @@ export function ProfileSection({ value, title, summary, children }: ProfileSecti
           <ChevronDown
             aria-hidden="true"
             className={cn(
-              'size-5 shrink-0 text-ink-muted transition-transform duration-200',
+              'size-5 shrink-0 text-ink-faint transition-transform duration-200',
               isOpen && 'rotate-180',
             )}
           />
