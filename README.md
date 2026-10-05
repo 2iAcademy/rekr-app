@@ -208,17 +208,19 @@ Changing a weight or a matrix cell affects the next search immediately. Use `ELA
 
 ### Production deployment
 
-The Compose Elasticsearch service is deliberately **not** a production template. It is a single node with security disabled and port 9200 published to the host. Never deploy it as-is.
+The Compose Elasticsearch service in `compose.yml` is deliberately **not** a production template. It is a single node with security disabled and port 9200 published to the host. Never deploy it as-is.
 
-Before enabling Elasticsearch in staging or production:
+The VPS stack, `compose.prod.yml`, runs Elasticsearch this way (procedure in [docs/deploiement-vps.md](docs/deploiement-vps.md)):
 
-1. Prefer a managed Elastic deployment. It provides node orchestration, TLS, authentication, backups, and monitoring. For self-managed Elasticsearch, run at least a resilient multi-node cluster with persistent storage and a tested snapshot repository.
-2. Keep Elasticsearch private: do not publish port 9200 to the public internet. Allow access only from the backend network and authorised operational tooling.
-3. Enable Elastic security and TLS for both HTTP client traffic and node-to-node traffic. Use a least-privilege Elasticsearch API key for the backend; do not use the `elastic` superuser or store passwords in the repository.
-4. Add the API-key and CA-certificate settings to the backend deployment secrets before setting `ELASTICSEARCH_ENABLED=true`. The current code accepts `ELASTICSEARCH_NODE` only, so production enablement is blocked until the client is extended to read those secrets and authenticate over HTTPS.
-5. Run Prisma migrations against PostgreSQL first. Then deploy the backend with `ELASTICSEARCH_REINDEX_ON_STARTUP=true` exactly once to build `rekr-offers-v2`; remove that flag for normal restarts. PostgreSQL is the source of truth and rebuilding the index must always be safe.
-6. Monitor cluster health, disk watermarks, indexing failures, search latency, and backend fallback warnings. Configure snapshots and practise restoring them. Kibana is optional but useful for these operational tasks.
+1. **Private.** No port is published: only the backend reaches it, over the internal Docker network.
+2. **Security on.** `xpack.security.enabled=true`, the `elastic` password lives in the server's `.env`, never in the repository.
+3. **Least-privilege API key.** The backend authenticates with `ELASTICSEARCH_API_KEY`, created once by `docker/elasticsearch/create-api-key.sh`. The key holds no cluster privilege and can only check, create, delete, read and write `rekr-offers-*`. The `elastic` superuser is used for that single call, never by the application. With `ELASTICSEARCH_API_KEY` left empty the client sends no credentials, which is what the local stack relies on.
+4. **Index built from PostgreSQL.** Migrations run first, then the backend starts once with `ELASTICSEARCH_REINDEX_ON_STARTUP=true` to build `rekr-offers-v2`; the flag goes back to `false` for normal restarts. PostgreSQL is the source of truth, so rebuilding the index is always safe.
+
+What this deployment does **not** do, knowingly, compared with Elastic's production guidance:
+
+- **No TLS on HTTP traffic.** It never leaves the server's internal Docker network. TLS becomes mandatory the day Elasticsearch moves to another machine or a managed service.
+- **Single node, no snapshot repository.** The index is disposable and rebuilt from PostgreSQL; losing it degrades the feed to PostgreSQL ordering, it loses no data.
+- **No dedicated monitoring yet** beyond the backend's fallback warnings.
 
 Keep the PostgreSQL eligibility recheck and fallback enabled in production. Elasticsearch only chooses the order of ids; it must never become the authority for authentication, likes, passes, matches, or offer visibility.
-
-Elastic's production guidance covers resilience, snapshots, and monitoring. Its security guidance requires security to remain enabled and recommends TLS plus restricted network access.

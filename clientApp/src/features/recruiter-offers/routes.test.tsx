@@ -173,6 +173,8 @@ describe('routes des offres recruteur', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Modifier l’offre' }),
     ).toBeInTheDocument();
-    expect(findOneById).toHaveBeenCalledWith(12);
+    // The title paints before the fetch effect runs: RouterProvider renders in a
+    // transition, so under load the effect can land after the heading is found.
+    await waitFor(() => expect(findOneById).toHaveBeenCalledWith(12));
   });
 });
