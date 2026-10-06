@@ -20,6 +20,7 @@ export const SignupDtoUserType = {
 export interface SignupDto {
   email: string;
   /**
+   * Refused when made of fewer than 5 distinct characters, when it is a keyboard or alphabet walk, a common password, or the account address.
    * @minLength 8
    * @maxLength 512
    */
@@ -43,6 +44,7 @@ export interface ResetPasswordDto {
   /** Jeton reçu par e-mail, tel qu’il figure dans le lien. */
   token: string;
   /**
+   * Refused when made of fewer than 5 distinct characters, when it is a keyboard or alphabet walk, a common password, or the account address.
    * @minLength 8
    * @maxLength 512
    */

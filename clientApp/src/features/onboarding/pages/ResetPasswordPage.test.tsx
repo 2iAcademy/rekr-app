@@ -49,13 +49,13 @@ describe('ResetPasswordPage', () => {
     const onSuccess = vi.fn();
     renderReset({ token: 'jeton-valide', onSuccess });
 
-    await fillPasswords(user, 'motdepasse1');
+    await fillPasswords(user, 'Tr0mbone-Vert');
     await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
 
     expect(resetRequest).toHaveBeenCalledTimes(1);
     expect(resetRequest).toHaveBeenCalledWith({
       token: 'jeton-valide',
-      password: 'motdepasse1',
+      password: 'Tr0mbone-Vert',
     });
 
     const message = await screen.findByText(
@@ -84,7 +84,7 @@ describe('ResetPasswordPage', () => {
     );
     renderReset({ token: 'jeton-perime', onRequestNewLink });
 
-    await fillPasswords(user, 'motdepasse1');
+    await fillPasswords(user, 'Tr0mbone-Vert');
     await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
 
     expect(
@@ -99,7 +99,7 @@ describe('ResetPasswordPage', () => {
     const user = userEvent.setup();
     renderReset();
 
-    await fillPasswords(user, 'motdepasse1', 'motdepasse2');
+    await fillPasswords(user, 'Tr0mbone-Vert', 'Tr0mbone-Bleu');
     await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('Les mots de passe ne correspondent pas.');
@@ -119,12 +119,43 @@ describe('ResetPasswordPage', () => {
     expect(resetRequest).not.toHaveBeenCalled();
   });
 
+  it('dit ce qui manque au mot de passe sans appeler le serveur', async () => {
+    const user = userEvent.setup();
+    renderReset();
+
+    await fillPasswords(user, 'aaaaaaaa');
+    await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Utilisez au moins 5 caractères différents.',
+    );
+    expect(resetRequest).not.toHaveBeenCalled();
+  });
+
+  it('garde le formulaire et porte le motif dans un toast quand le serveur refuse le mot de passe', async () => {
+    const user = userEvent.setup();
+    resetRequest.mockRejectedValue(
+      apiError(400, { statusCode: 400, message: ['password must not reuse the email address'] }),
+    );
+    renderReset();
+
+    await fillPasswords(user, 'Tr0mbone-Vert');
+    await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
+
+    const toast = await screen.findByText('Le mot de passe ne doit pas reprendre votre email.');
+    expect(toast.closest('[data-sonner-toast]')).toHaveAttribute('data-type', 'error');
+    expect(screen.queryByRole('heading', { name: 'Ce lien n’est plus valide.' })).toBeNull();
+    expect(screen.getByLabelText('Nouveau mot de passe')).toHaveAccessibleDescription(
+      /8 caractères minimum/,
+    );
+  });
+
   it('signale une panne serveur par un toast, en laissant le formulaire ressaisissable', async () => {
     const user = userEvent.setup();
     resetRequest.mockRejectedValue(apiError(500, { statusCode: 500 }));
     renderReset();
 
-    await fillPasswords(user, 'motdepasse1');
+    await fillPasswords(user, 'Tr0mbone-Vert');
     await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
 
     const message = await screen.findByText('Une erreur est survenue. Réessayez dans un instant.');

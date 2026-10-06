@@ -89,8 +89,8 @@ const callTo = (path: string) => {
 const signUpAsRecruiter = async (user: User) => {
   await user.click(await screen.findByRole('radio', { name: /Recruteur/ }));
   await user.type(await screen.findByLabelText('Email'), 'recruteur@rekr.fr');
-  await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-  await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+  await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+  await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
   await user.click(screen.getByRole('checkbox'));
   await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 };
