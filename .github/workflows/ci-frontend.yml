@@ -15,9 +15,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Both workflows run on every pull request because their gate is a required
+  # check: a path filter on the trigger would leave it pending forever.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      frontend: ${{ github.event_name != 'pull_request' || steps.filter.outputs.frontend == 'true' }}
+
+    steps:
+      - name: Detect frontend changes
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'clientApp/**'
+              - '.github/workflows/ci-frontend.yml'
+
   build:
     name: Build
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     defaults:
       run:
         working-directory: clientApp
@@ -92,7 +116,7 @@ jobs:
   gate:
     name: Frontend CI
     runs-on: ubuntu-latest
-    needs: [build, lint, test]
+    needs: [changes, build, lint, test]
     if: always()
 
     steps:
@@ -100,7 +124,7 @@ jobs:
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "build / lint / test : $RESULTS"
+          echo "changes / build / lint / test : $RESULTS"
           case "$RESULTS" in
             *failure*|*cancelled*)
               echo "::error::Le pipeline frontend a echoue, la PR ne peut pas etre mergee."
