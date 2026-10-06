@@ -120,3 +120,7 @@ docker run --rm -v rekr_backend_uploads:/data:ro -v "$PWD":/out alpine \
 
 L'index Elasticsearch ne se sauvegarde pas : il se reconstruit depuis
 PostgreSQL.
+
+## En cas de panne
+
+Le [runbook](ops/runbook.md) part d'un symptôme et donne le diagnostic, le remède et la vérification.
