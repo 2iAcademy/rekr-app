@@ -42,60 +42,179 @@ EOF
 sudo systemctl restart docker
 ```
 
+## Comment se fait un déploiement
+
+Personne n'écrit le `.env` du serveur à la main. À chaque merge sur `main`, le
+workflow `.github/workflows/deploy.yml` :
+
+1. attend l'approbation de Julien ou de Diego (environnement GitHub
+   `production`) ;
+2. vérifie que tous les secrets obligatoires sont renseignés, avant de toucher
+   au serveur ;
+3. génère le `.env` depuis les secrets et variables de cet environnement ;
+4. l'envoie au serveur en SSH avec le compte `deploy`, qui place le dépôt sur le
+   commit mergé et lance `docker compose -f compose.prod.yml up -d --build` ;
+5. vérifie que `https://rekr.tech/api/auth/me` répond 401.
+
+Le compte `deploy` n'a ni `sudo` ni shell : sa clé SSH ne peut lancer que
+`scripts/deploy/remote-deploy.sh`, qui n'accepte qu'un commit présent sur
+`origin/main`. Julien et Diego gardent leurs comptes pour l'administration et
+le dépannage.
+
+## Préparer le compte `deploy` et le dépôt
+
+Une seule fois, depuis un compte administrateur.
+
+Sur son ordinateur, générer la paire de clés du déploiement (sans phrase de
+passe : un robot ne peut pas en taper une) :
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/rekr_deploy -N "" -C "github-actions-deploy@rekr"
+```
+
+Sur le serveur, créer le compte, sans mot de passe ni `sudo` :
+
+```bash
+sudo adduser --disabled-password --gecos "" deploy
+sudo usermod -aG docker deploy
+sudo install -d -m 700 -o deploy -g deploy /home/deploy/.ssh
+```
+
+Puis poser la clé publique (`~/.ssh/rekr_deploy.pub`), restreinte au script.
+Remplacer `CLE_PUBLIQUE` par le contenu du fichier, en gardant les apostrophes :
+
+```bash
+echo 'restrict,command="/opt/rekr/scripts/deploy/remote-deploy.sh" CLE_PUBLIQUE' | sudo -u deploy tee /home/deploy/.ssh/authorized_keys
+sudo chmod 600 /home/deploy/.ssh/authorized_keys
+```
+
+`restrict` coupe le terminal et les redirections de port, `command=` impose le
+script quoi que demande la connexion. Vérifier que le compte est dans `docker`
+et pas dans `sudo` :
+
+```bash
+id deploy
+```
+
+Le dépôt appartient à `deploy`, dans le groupe `docker` : c'est lui qui le met
+à jour à chaque déploiement, et les administrateurs le lisent par le groupe. Le
+bit `2` de `2775` (setgid) garde tout ce qui est créé dedans dans le groupe
+`docker`.
+
+```bash
+sudo install -d -m 2775 -o deploy -g docker /opt/rekr
+sudo -u deploy git clone https://github.com/2iAcademy/rekr-app.git /opt/rekr
+```
+
+**Toute commande Git sur le serveur passe par `sudo -u deploy`.** Un clone ou
+un `git checkout` lancé depuis un compte administrateur créerait des fichiers
+que `deploy` ne pourrait plus remplacer, et le déploiement suivant échouerait
+sur `Permission denied`.
+
+Relever enfin la clé du serveur, pour le secret `DEPLOY_KNOWN_HOSTS`, et
+comparer son empreinte avec celle lue sur le serveur lui-même :
+
+```bash
+ssh-keyscan -t ed25519 rekr.tech
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+## Configurer l'environnement GitHub `production`
+
+Dépôt GitHub > Settings > Environments > New environment `production` :
+
+- **Required reviewers** : Julien et Diego ;
+- **Deployment branches** : `main` uniquement.
+
+**Secrets** de l'environnement (jamais au niveau du dépôt) :
+
+| Secret                                | Valeur                                                             |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `POSTGRES_PASSWORD`                   | `openssl rand -hex 24`                                             |
+| `JWT_SECRET`                          | `openssl rand -base64 48`                                          |
+| `SMTP_USER`, `SMTP_PASSWORD`          | Identifiants SMTP Brevo                                            |
+| `ELASTIC_PASSWORD`                    | `openssl rand -hex 24`                                             |
+| `ELASTICSEARCH_API_KEY`               | Vide au premier déploiement, voir plus bas                         |
+| `STREAM_API_KEY`, `STREAM_API_SECRET` | App Stream de **production** (EU West), pas celle du développement |
+| `SENTRY_DSN`                          | Facultatif                                                         |
+| `DEPLOY_SSH_KEY`                      | Contenu de `~/.ssh/rekr_deploy` (la clé **privée**)                |
+| `DEPLOY_KNOWN_HOSTS`                  | La ligne affichée par `ssh-keyscan`                                |
+
+**Variables** de l'environnement (non secrètes) :
+
+| Variable                                       | Valeur                                 |
+| ---------------------------------------------- | -------------------------------------- |
+| `DOMAIN`                                       | `rekr.tech`                            |
+| `POSTGRES_USER`, `POSTGRES_DB`                 | `rekr`                                 |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`        | `smtp-relay.brevo.com`, `587`, `false` |
+| `MAIL_FROM`                                    | `Rekr <no-reply@rekr.tech>`            |
+| `DEPLOY_HOST`                                  | `rekr.tech`                            |
+| `DEPLOY_USER`                                  | `deploy`                               |
+| `SENTRY_TRACES_SAMPLE_RATE`, `VITE_SENTRY_DSN` | Facultatifs                            |
+
+`DEPLOY_HOST` doit être exactement le nom passé à `ssh-keyscan` : SSH cherche
+la clé du serveur sous ce nom dans `DEPLOY_KNOWN_HOSTS`, et une adresse IP à la
+place échouerait sur `Host key verification failed`. Le pare-feu doit aussi
+laisser passer le port 22 depuis GitHub Actions, dont les adresses changent à
+chaque exécution.
+
+Une valeur ne doit contenir ni apostrophe ni retour à la ligne : le workflow la
+refuse plutôt que de produire un `.env` faux. `.env.prod.example` reste la
+liste de référence des variables.
+
+Une fois `DEPLOY_SSH_KEY` enregistré, supprimer la clé privée de son
+ordinateur : GitHub la garde, et en cas de perte on en génère une autre.
+
+```bash
+rm ~/.ssh/rekr_deploy
+```
+
 ## Premier déploiement
 
-Le dépôt appartient au groupe `docker`, pour que chaque administrateur puisse
-le mettre à jour depuis son propre compte :
+1. Merger `preprod` dans `main`. Avant d'approuver le déploiement, placer une
+   fois le dépôt du serveur sur `main` : le compte `deploy` ne peut lancer que
+   `scripts/deploy/remote-deploy.sh`, qui doit donc déjà s'y trouver, et un
+   clone frais est sur `preprod`.
 
-```bash
-sudo mkdir -p /opt/rekr && sudo chown "$USER":docker /opt/rekr
-git clone https://github.com/2iAcademy/rekr-app.git /opt/rekr
-cd /opt/rekr
-git config core.sharedRepository group && chmod -R g+w .
-cp .env.prod.example .env && chmod 640 .env
-```
+   ```bash
+   sudo -u deploy git -C /opt/rekr fetch origin main
+   sudo -u deploy git -C /opt/rekr checkout --detach origin/main
+   ```
 
-Chaque autre administrateur, une fois :
+   Puis approuver le déploiement dans l'onglet Actions. Au premier démarrage, Caddy obtient le certificat HTTPS de
+   `rekr.tech` ; le backend démarre sans clé Elasticsearch et bascule sur le tri
+   PostgreSQL : c'est attendu.
 
-```bash
-git config --global --add safe.directory /opt/rekr
-```
+2. Sur le serveur, créer la clé d'API du backend :
 
-`.env` reste lisible par le seul groupe `docker`, dont les membres ont de toute
-façon les droits de root sur le serveur.
+   ```bash
+   cd /opt/rekr
+   sh docker/elasticsearch/create-api-key.sh
+   ```
 
-Renseigner `.env` (les commandes de génération sont en commentaire dans le
-fichier), en laissant `ELASTICSEARCH_API_KEY` vide. Puis :
-
-```bash
-docker compose -f compose.prod.yml up -d --build
-```
-
-Au premier démarrage, Caddy obtient le certificat HTTPS de `rekr.tech`. Le
-backend démarre sans clé Elasticsearch et bascule sur le tri PostgreSQL : c'est
-attendu.
-
-Créer la clé d'API du backend, la reporter dans `.env`, et construire l'index :
-
-```bash
-sh docker/elasticsearch/create-api-key.sh
-# coller la valeur affichée dans ELASTICSEARCH_API_KEY
-# et passer ELASTICSEARCH_REINDEX_ON_STARTUP à true
-docker compose -f compose.prod.yml up -d backend
-# une fois l'index construit, remettre ELASTICSEARCH_REINDEX_ON_STARTUP à false
-docker compose -f compose.prod.yml up -d backend
-```
+3. Coller la valeur affichée dans le secret `ELASTICSEARCH_API_KEY`.
+4. Actions > Deploy > Run workflow, en cochant « Reconstruire l'index
+   Elasticsearch ». Les déploiements suivants repartent sans cette case.
 
 ## Mettre à jour
 
+Merger dans `main`, puis approuver le déploiement. Pour changer un secret : le
+modifier dans l'environnement `production`, puis Actions > Deploy > Run
+workflow. Le service `migrate` applique les nouvelles migrations avant que le
+backend ne redémarre.
+
+**Dépannage sans GitHub**, depuis un compte administrateur : le `.env` du
+dernier déploiement reste en place.
+
 ```bash
-cd /opt/rekr
-git pull
-docker compose -f compose.prod.yml up -d --build
+sudo -u deploy git -C /opt/rekr fetch origin main
+sudo -u deploy git -C /opt/rekr checkout --detach origin/main
+cd /opt/rekr && docker compose -f compose.prod.yml up -d --build
 ```
 
-Le service `migrate` applique les nouvelles migrations avant que le backend ne
-redémarre.
+**Changer la clé de déploiement** (fuite, départ, doute) : générer une nouvelle
+paire, remplacer la ligne de `/home/deploy/.ssh/authorized_keys` et le secret
+`DEPLOY_SSH_KEY`. L'ancienne clé ne sert plus à rien.
 
 ## Vérifier
 

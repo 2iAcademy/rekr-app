@@ -213,7 +213,7 @@ The Compose Elasticsearch service in `compose.yml` is deliberately **not** a pro
 The VPS stack, `compose.prod.yml`, runs Elasticsearch this way (procedure in [docs/deploiement-vps.md](docs/deploiement-vps.md)):
 
 1. **Private.** No port is published: only the backend reaches it, over the internal Docker network.
-2. **Security on.** `xpack.security.enabled=true`, the `elastic` password lives in the server's `.env`, never in the repository.
+2. **Security on.** `xpack.security.enabled=true`, the `elastic` password lives in the GitHub `production` environment, never in the repository; `.github/workflows/deploy.yml` writes it into the server's `.env` at every deploy.
 3. **Least-privilege API key.** The backend authenticates with `ELASTICSEARCH_API_KEY`, created once by `docker/elasticsearch/create-api-key.sh`. The key holds no cluster privilege and can only check, create, delete, read and write `rekr-offers-*`. The `elastic` superuser is used for that single call, never by the application. With `ELASTICSEARCH_API_KEY` left empty the client sends no credentials, which is what the local stack relies on.
 4. **Index built from PostgreSQL.** Migrations run first, then the backend starts once with `ELASTICSEARCH_REINDEX_ON_STARTUP=true` to build `rekr-offers-v2`; the flag goes back to `false` for normal restarts. PostgreSQL is the source of truth, so rebuilding the index is always safe.
 

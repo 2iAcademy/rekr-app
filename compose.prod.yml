@@ -2,10 +2,11 @@
 #
 #   docker compose -f compose.prod.yml up -d --build
 #
-# Values come from a `.env` file next to this one, on the server only (see
-# .env.prod.example and docs/deploiement-vps.md). The `:?` forms below refuse to
-# start the stack when a required secret is missing, instead of booting with an
-# empty one.
+# Values come from a `.env` file next to this one, on the server only. It is
+# generated at every deploy by .github/workflows/deploy.yml from the GitHub
+# `production` environment (see .env.prod.example and docs/deploiement-vps.md).
+# The `:?` forms below refuse to start the stack when a required secret is
+# missing, instead of booting with an empty one.
 #
 # Caddy is the only service with published ports. PostgreSQL, Elasticsearch and
 # the API are reachable on the internal Docker network alone: the Hetzner
@@ -67,6 +68,10 @@ services:
       ELASTICSEARCH_NODE: http://elasticsearch:9200
       ELASTICSEARCH_API_KEY: ${ELASTICSEARCH_API_KEY:-}
       ELASTICSEARCH_REINDEX_ON_STARTUP: ${ELASTICSEARCH_REINDEX_ON_STARTUP:-false}
+      # Messaging. The secret signs Stream user tokens and grants every right
+      # on the Stream app: backend only, never a VITE_ variable.
+      STREAM_API_KEY: ${STREAM_API_KEY:?STREAM_API_KEY is required}
+      STREAM_API_SECRET: ${STREAM_API_SECRET:?STREAM_API_SECRET is required}
       THROTTLE_TTL_SECONDS: ${THROTTLE_TTL_SECONDS:-}
       THROTTLE_DEFAULT_LIMIT: ${THROTTLE_DEFAULT_LIMIT:-}
       THROTTLE_LOGIN_LIMIT: ${THROTTLE_LOGIN_LIMIT:-}
