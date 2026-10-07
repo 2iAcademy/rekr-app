@@ -485,6 +485,25 @@ export interface OfferApplicantDto {
   recruiterPassedAt: string | null;
 }
 
+export interface ChatTokenDto {
+  apiKey: string;
+  /** Identifiant Stream du lecteur. */
+  userId: string;
+  /** Jeton Stream signé pour ce lecteur. */
+  token: string;
+}
+
+export interface MatchChannelDto {
+  channelType: string;
+  channelId: string;
+  /** L’autre partie : la société pour un candidat, le candidat pour un recruteur. */
+  counterpartName: string;
+  /** L’offre du match, pour mener à sa fiche ou à ses candidats. */
+  offerId: number;
+  /** Vrai quand l’offre est pourvue ou fermée : lecture seule. */
+  frozen: boolean;
+}
+
 export interface SectorDto {
   id: number;
   /** @maxLength 100 */
@@ -2126,6 +2145,105 @@ export const offerControllerPassApplicant = async (
 ): Promise<offerControllerPassApplicantResponseSuccess> => {
   return customFetch<offerControllerPassApplicantResponseSuccess>(
     getOfferControllerPassApplicantUrl(id, candidateUserId),
+    {
+      ...options,
+      method: 'POST',
+    },
+  );
+};
+
+export type chatControllerIssueTokenResponse200 = {
+  data: ChatTokenDto;
+  status: 200;
+};
+
+export type chatControllerIssueTokenResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type chatControllerIssueTokenResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type chatControllerIssueTokenResponse503 = {
+  data: void;
+  status: 503;
+};
+
+export type chatControllerIssueTokenResponseSuccess = chatControllerIssueTokenResponse200 & {
+  headers: Headers;
+};
+export type chatControllerIssueTokenResponseError = (
+  | chatControllerIssueTokenResponse401
+  | chatControllerIssueTokenResponse403
+  | chatControllerIssueTokenResponse503
+) & {
+  headers: Headers;
+};
+
+export const getChatControllerIssueTokenUrl = () => {
+  return `/api/chat/token`;
+};
+
+export const chatControllerIssueToken = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<chatControllerIssueTokenResponseSuccess> => {
+  return customFetch<chatControllerIssueTokenResponseSuccess>(getChatControllerIssueTokenUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type chatControllerOpenMatchChannelResponse200 = {
+  data: MatchChannelDto;
+  status: 200;
+};
+
+export type chatControllerOpenMatchChannelResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type chatControllerOpenMatchChannelResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type chatControllerOpenMatchChannelResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type chatControllerOpenMatchChannelResponse503 = {
+  data: void;
+  status: 503;
+};
+
+export type chatControllerOpenMatchChannelResponseSuccess =
+  chatControllerOpenMatchChannelResponse200 & {
+    headers: Headers;
+  };
+export type chatControllerOpenMatchChannelResponseError = (
+  | chatControllerOpenMatchChannelResponse401
+  | chatControllerOpenMatchChannelResponse403
+  | chatControllerOpenMatchChannelResponse404
+  | chatControllerOpenMatchChannelResponse503
+) & {
+  headers: Headers;
+};
+
+export const getChatControllerOpenMatchChannelUrl = (id: number) => {
+  return `/api/matches/${id}/chat`;
+};
+
+export const chatControllerOpenMatchChannel = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<chatControllerOpenMatchChannelResponseSuccess> => {
+  return customFetch<chatControllerOpenMatchChannelResponseSuccess>(
+    getChatControllerOpenMatchChannelUrl(id),
     {
       ...options,
       method: 'POST',

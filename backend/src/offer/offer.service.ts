@@ -13,6 +13,7 @@ import { JobFamilyService } from '../job-family/job-family.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MatchService } from '../match/match.service';
 import { OfferSearchService } from '../search/offer-search.service';
+import { ChatService } from '../chat/chat.service';
 import {
   CONTRACT_TYPE_COUNT,
   primaryJobFamilyOf,
@@ -192,6 +193,7 @@ export class OfferService {
     private readonly matches: MatchService,
     private readonly jobFamilies: JobFamilyService,
     @Optional() private readonly search?: OfferSearchService,
+    @Optional() private readonly chat?: ChatService,
   ) {}
 
   async create(userId: number, dto: CreateOfferDto) {
@@ -237,29 +239,33 @@ export class OfferService {
       coordinates = await this.verifyPatchedLocation(userId, offerId, dto);
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const offer = await tx.offer.findUnique({ where: { id: offerId } });
-      const profile = await tx.recruiterProfile.findUnique({
-        where: { userId },
-      });
+    const { updated, previousStatus } = await this.prisma.$transaction(
+      async (tx) => {
+        const offer = await tx.offer.findUnique({ where: { id: offerId } });
+        const profile = await tx.recruiterProfile.findUnique({
+          where: { userId },
+        });
 
-      // One answer for « no such offer » and « not yours »: a 403 on someone
-      // else's offer confirms the id exists, which is the whole of what an
-      // enumeration needs.
-      if (!offer || !profile || offer.companyId !== profile.companyId) {
-        throw new NotFoundException('Offer not found');
-      }
+        // One answer for « no such offer » and « not yours »: a 403 on someone
+        // else's offer confirms the id exists, which is the whole of what an
+        // enumeration needs.
+        if (!offer || !profile || offer.companyId !== profile.companyId) {
+          throw new NotFoundException('Offer not found');
+        }
 
-      const updated = await tx.offer.update({
-        where: { id: offerId },
-        data: { ...offerData, ...(coordinates ?? {}) },
-      });
+        const updated = await tx.offer.update({
+          where: { id: offerId },
+          data: { ...offerData, ...(coordinates ?? {}) },
+        });
 
-      await this.syncTagLists(tx, offerId, { skills, benefits });
+        await this.syncTagLists(tx, offerId, { skills, benefits });
 
-      return updated;
-    });
+        return { updated, previousStatus: offer.status };
+      },
+    );
     await this.search?.syncOffer(updated.id);
+    if (updated.status !== previousStatus)
+      await this.chat?.syncOfferStatus(updated.id, updated.status);
     return updated;
   }
 

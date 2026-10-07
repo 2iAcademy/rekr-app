@@ -21,6 +21,7 @@ import { SectorModule } from './sector/sector.module';
 import { StorageModule } from './storage/storage.module';
 import { LikeModule } from './like/like.module';
 import { MatchModule } from './match/match.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { MatchModule } from './match/match.module';
     StorageModule,
     MatchModule,
     LikeModule,
+    ChatModule,
     AccountModule,
   ],
   controllers: [AppController],

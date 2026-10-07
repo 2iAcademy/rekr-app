@@ -7,7 +7,7 @@
  * the text changes in substance: consent is given to one version of it, and a
  * later rewrite is not covered by a checkbox ticked before it existed.
  */
-export const PRIVACY_POLICY_VERSION = '2026-09-23';
+export const PRIVACY_POLICY_VERSION = '2026-10-07';
 
 /**
  * Two years without a sign-in, the CNIL reference for a recruitment database.

@@ -168,6 +168,7 @@ describe('OfferApplicantsPage', () => {
 
     await waitFor(() =>
       expect(onMatch).toHaveBeenCalledWith({
+        matchId: 55,
         name: 'Camille',
         avatarUrl: 'candidates/1/picture/camille.webp',
       }),

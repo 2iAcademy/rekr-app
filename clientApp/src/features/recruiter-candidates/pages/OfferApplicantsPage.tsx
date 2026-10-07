@@ -2,7 +2,7 @@ import { Link } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import { notifyFailure } from '@/lib/feedback/notify';
 import { applicantLikeBusiness } from '../applicantFeedback';
-import { matchedCandidate } from '@/features/matches/likeResult';
+import { matchedCandidate, type MatchedProfile } from '@/features/matches/likeResult';
 import { ApplicantRow } from '../components/ApplicantRow';
 import { CandidateDetailPage } from './CandidateDetailPage';
 import { APPLICANTS_PAGE_SIZE, useApplicants } from '../useApplicants';
@@ -13,7 +13,7 @@ interface OfferApplicantsPageProps {
   openApplicantId: number | null;
   onOpenProfile: (candidateUserId: number) => void;
   onCloseProfile: () => void;
-  onMatch: (matchedProfile: { name: string; avatarUrl: string | null }) => void;
+  onMatch: (matchedProfile: MatchedProfile) => void;
 }
 
 const OFFERS_PATH = '/recruteur/offres';
@@ -38,10 +38,8 @@ export function OfferApplicantsPage({
   const answer = (candidateUserId: number): void => {
     void like(candidateUserId)
       .then((result) => {
-        const counterpart = matchedCandidate(result);
-        if (counterpart) {
-          onMatch({ name: counterpart.name, avatarUrl: counterpart.avatarUrl });
-        }
+        const matched = matchedCandidate(result);
+        if (matched) onMatch(matched);
       })
       .catch((cause: unknown) => notifyFailure(cause, applicantLikeBusiness));
   };

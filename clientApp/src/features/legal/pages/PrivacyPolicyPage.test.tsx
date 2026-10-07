@@ -32,6 +32,6 @@ describe('PrivacyPolicyPage', () => {
   it('affiche la version du texte, celle que l’inscription enregistre', () => {
     render(<PrivacyPolicyPage />);
 
-    expect(screen.getByText(/Version du 23 septembre 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Version du 7 octobre 2026/)).toBeInTheDocument();
   });
 });

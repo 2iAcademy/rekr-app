@@ -33,6 +33,8 @@ services:
       ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-true}
       ELASTICSEARCH_NODE: ${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
       ELASTICSEARCH_REINDEX_ON_STARTUP: ${ELASTICSEARCH_REINDEX_ON_STARTUP:-false}
+      STREAM_API_KEY: ${STREAM_API_KEY:-}
+      STREAM_API_SECRET: ${STREAM_API_SECRET:-}
     volumes:
       - ./backend:/app
       - /app/node_modules
