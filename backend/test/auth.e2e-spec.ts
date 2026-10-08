@@ -5,11 +5,16 @@ import { httpRequest } from './http-client';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RefreshTokenService } from '../src/auth/refresh-token.service';
+import { hashPassword } from '../src/auth/password-hash';
 import { configureApp } from '../src/setup-app';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
 import { jobFamilyIdFor } from './job-family-reference';
 import { PRIVACY_POLICY_VERSION } from '../src/account/privacy-policy';
+import { WEAK_PASSWORD_MESSAGES } from '../src/common/validation/password-strength';
+
+/** Repeated to reach a byte length, since a run of one letter is refused. */
+const PASSPHRASE = 'Tr0mbone-Vert-';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
@@ -288,7 +293,7 @@ describe('Auth (e2e)', () => {
   // test that proves the SHA-256 pre-hash is actually wired in: it fails the
   // moment someone passes the raw password to bcrypt again.
   it('does not let a password sharing the first 72 bytes open the account', async () => {
-    const password = 'a'.repeat(72);
+    const password = PASSPHRASE.repeat(6).slice(0, 72);
     await httpRequest(app)
       .post('/api/auth/signup')
       .send({
@@ -316,7 +321,7 @@ describe('Auth (e2e)', () => {
   // Pre-hashing removes the 72-byte ceiling instead of making the user carry
   // it: a long passphrase is accepted in full and remains usable at login.
   it('accepts a password well beyond 72 bytes and keeps it usable', async () => {
-    const password = `${'a'.repeat(200)}-tail`;
+    const password = `${PASSPHRASE.repeat(15).slice(0, 200)}-tail`;
     await httpRequest(app)
       .post('/api/auth/signup')
       .send({
@@ -336,7 +341,7 @@ describe('Auth (e2e)', () => {
   // 40 accented characters are 80 bytes in UTF-8 — truncated before, accepted
   // whole now.
   it('accepts a multi-byte password whose byte length exceeds 72', async () => {
-    const password = 'é'.repeat(40);
+    const password = 'éàüçô'.repeat(8);
     await httpRequest(app)
       .post('/api/auth/signup')
       .send({
@@ -353,6 +358,71 @@ describe('Auth (e2e)', () => {
       .expect(200);
   });
 
+  // Length alone used to let "aaaaaaaa" open an account. The 400 is the
+  // rule's own, not the length floor's, and no account is left behind.
+  it.each([
+    ['aaaaaaaa', WEAK_PASSWORD_MESSAGES.distinct],
+    ['12345678', WEAK_PASSWORD_MESSAGES.walk],
+    ['12345678!', WEAK_PASSWORD_MESSAGES.walk],
+    ['Motdepasse1!', WEAK_PASSWORD_MESSAGES.common],
+    ['$oleil2024', WEAK_PASSWORD_MESSAGES.common],
+    ['weak@test.dev', WEAK_PASSWORD_MESSAGES.email],
+  ])('refuses %s and says why', async (password, reason) => {
+    const res = await httpRequest(app)
+      .post('/api/auth/signup')
+      .send({
+        email: 'weak@test.dev',
+        password,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
+      .expect(400);
+
+    expect((res.body as { message: string[] }).message).toEqual([reason]);
+    await expect(
+      prisma.user.count({ where: { email: 'weak@test.dev' } }),
+    ).resolves.toBe(0);
+  });
+
+  // A payload built to make the rule backtrack: refused by the length bound
+  // alone, and quickly, since the rule does not look past it. It used to hold
+  // the event loop for about ten seconds.
+  it('refuses an oversized password without stalling', async () => {
+    const started = Date.now();
+
+    const res = await httpRequest(app)
+      .post('/api/auth/signup')
+      .send({
+        email: 'huge@test.dev',
+        password: `a${'1234 '.repeat(19_000)}a`,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
+      .expect(400);
+
+    expect((res.body as { message: string[] }).message).toEqual([
+      'password must be shorter than or equal to 512 characters',
+    ]);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  // The rule guards new passwords only: an account created before it keeps
+  // signing in with the one it has.
+  it('still lets in an account whose password predates the rule', async () => {
+    await prisma.user.create({
+      data: {
+        email: 'legacy@test.dev',
+        passwordHash: await hashPassword('aaaaaaaa'),
+        userType: 'candidate',
+      },
+    });
+
+    await httpRequest(app)
+      .post('/api/auth/login')
+      .send({ email: 'legacy@test.dev', password: 'aaaaaaaa' })
+      .expect(200);
+  });
+
   // The ceiling is gone, not the bound: an absurd payload still has no reason
   // to reach the hashing function.
   it('still refuses an absurdly long password', async () => {
@@ -360,7 +430,7 @@ describe('Auth (e2e)', () => {
       .post('/api/auth/signup')
       .send({
         email: 'absurd@test.dev',
-        password: 'a'.repeat(5000),
+        password: PASSPHRASE.repeat(400),
         userType: 'candidate',
         acceptTerms: true,
       })

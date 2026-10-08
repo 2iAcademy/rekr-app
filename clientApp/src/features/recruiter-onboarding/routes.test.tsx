@@ -54,8 +54,8 @@ function renderAt(path: string) {
 const signUpAsRecruiter = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(await screen.findByRole('radio', { name: /recruteur/i }));
   await user.type(await screen.findByLabelText('Email'), 'recruteur@rekr.fr');
-  await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-  await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+  await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+  await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
   await user.click(screen.getByRole('checkbox'));
   await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 };
@@ -153,8 +153,8 @@ describe('navigation création de profil recruteur', () => {
     renderAt('/inscription');
 
     await user.type(await screen.findByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
