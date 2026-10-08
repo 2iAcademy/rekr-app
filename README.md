@@ -17,22 +17,29 @@ Monorepo : `backend/` (NestJS + Prisma + PostgreSQL) + `clientApp/` (React + Vit
 - Docker + Docker Compose
 - Node.js 20+ (pour lancer les commandes Prisma depuis l'hôte)
 
-### 1. Variables d'environnement
-
-```bash
-cp .env.example .env                  # creds PostgreSQL (racine → utilisés par docker-compose)
-cp backend/.env.example backend/.env  # DATABASE_URL + PORT (utilisés par NestJS / Prisma)
-```
-
-⚠️ Les identifiants Postgres de `.env` (racine) et le `DATABASE_URL` de `backend/.env` doivent être cohérents.
-
-### 2. Lancer la stack
+### 1. Lancer la stack
 
 ```bash
 docker compose up -d
 ```
 
-Démarre `postgres` (5432), `kafka` (29092), `kafka-ui` (8085), `backend` (3001), `logs-sink` et `frontend` (8080).
+Aucun `.env` n'est nécessaire : `compose.yml` fournit des valeurs de dev par défaut (base, `JWT_SECRET` jetable) et
+le backend applique les migrations Prisma à chaque démarrage du conteneur.
+
+Démarre `postgres` (5432), `elasticsearch` (9200), `backend` (3001) et `frontend` (8080). L'API répond sur
+`http://localhost:3001/api`, Swagger sur `http://localhost:3001/api/docs`.
+
+### 2. Personnaliser (facultatif)
+
+```bash
+cp .env.example .env                  # surcharge les valeurs de compose.yml (ports, SMTP, Sentry...)
+cp backend/.env.example backend/.env  # pour les commandes lancées depuis l'hôte (CLI Prisma, Prisma Studio)
+```
+
+⚠️ Les identifiants Postgres de `.env` (racine) et le `DATABASE_URL` de `backend/.env` doivent être cohérents.
+
+Le `JWT_SECRET` de dev est public : l'API refuse de démarrer avec lui, ou avec un secret de moins de 32 caractères,
+quand `NODE_ENV=production`.
 
 ### Kafka / logs
 
