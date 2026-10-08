@@ -45,9 +45,12 @@ compose=(docker compose -f compose.prod.yml)
 "${compose[@]}" exec -T postgres \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' >"$dump.part" ||
   fail "pg_dump"
-# A dump PostgreSQL cannot list is not a backup.
-"${compose[@]}" exec -T postgres pg_restore --list <"$dump.part" |
-  grep -q 'TABLE DATA public user ' || fail "the dump has no data for the user table"
+# A dump PostgreSQL cannot list is not a backup. The listing is read whole
+# before searching it: piping it into `grep -q`, which stops at the first
+# match, would cut pg_restore off mid-write and fail the run under pipefail.
+listing="$("${compose[@]}" exec -T postgres pg_restore --list <"$dump.part")" ||
+  fail "pg_restore cannot read the dump"
+grep -q 'TABLE DATA public user ' <<<"$listing" || fail "the dump has no data for the user table"
 
 docker run --rm -v "$UPLOADS_VOLUME":/data:ro "$ARCHIVER_IMAGE" \
   tar czf - -C /data . >"$uploads.part" || fail "archive of $UPLOADS_VOLUME"
