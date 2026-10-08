@@ -15,10 +15,13 @@ seulement.
 ## 0. Repères
 
 - Serveur : VPS Hetzner Cloud, Ubuntu, 2 Go de RAM, console de secours dans l'interface Hetzner.
-- Accès : SSH par clé, compte nominatif avec `sudo`. Le dépôt et le `.env` sont dans `/opt/rekr`.
-- Le dépôt appartient au compte `deploy`, qui déploie depuis GitHub Actions. **Toute commande Git sur le serveur
-  passe par `sudo -u deploy git -C /opt/rekr …`** : lancée depuis un compte nominatif, elle crée des fichiers que
-  `deploy` ne peut plus remplacer, et le déploiement suivant échoue sur `Permission denied`.
+- Accès : SSH par clé, compte nominatif avec `sudo`.
+- `/opt/rekr` ne contient que `.env`, `compose.prod.yml` et `repo.git`, une copie Git sans fichiers de travail.
+  Le serveur ne construit rien : il tire les images que la CI a poussées sur GHCR, taguées par commit. La version
+  en service est la valeur `IMAGE_TAG` du `.env`.
+- Ces fichiers appartiennent au compte `deploy`, qui déploie depuis GitHub Actions. **Toute commande Git sur le
+  serveur passe par `sudo -u deploy git -C /opt/rekr/repo.git …`** : lancée depuis un compte nominatif, elle crée
+  des fichiers que `deploy` ne peut plus remplacer, et le déploiement suivant échoue sur `Permission denied`.
 - Toutes les commandes se lancent depuis `/opt/rekr`. Pour raccourcir :
 
 ```bash
@@ -43,7 +46,7 @@ Le `.env` du serveur est **réécrit à chaque déploiement**, depuis l'environn
 serveur :
 
 1. GitHub > Settings > Environments > `production` : modifier le secret ou la variable.
-2. Actions > Deploy > Run workflow, sur `main`, puis approuver. La CD réécrit le `.env` et recrée les conteneurs
+2. Actions > CI/CD > Run workflow, sur `main`, puis approuver le job Deploy. La CD réécrit le `.env` et recrée les conteneurs
    dont la configuration a changé. ⚠️
 
 **En urgence, si GitHub est indisponible** : `sudo nano /opt/rekr/.env`, puis `dc up -d backend` (✅ pour
@@ -184,7 +187,7 @@ Le dernier cas est le plus probable après un redémarrage du serveur. `depends_
 lancé, pas qu'il soit prêt. Si le backend démarre avant, il ne crée pas l'index et reste sur le tri PostgreSQL
 jusqu'à son prochain redémarrage. Constaté sur la pile locale au premier démarrage (✅).
 
-**Reconstruire l'index** : PostgreSQL est la source de vérité, reconstruire ne perd rien. Actions > Deploy >
+**Reconstruire l'index** : PostgreSQL est la source de vérité, reconstruire ne perd rien. Actions > CI/CD >
 Run workflow, en cochant « Reconstruire l'index Elasticsearch », puis approuver. Le déploiement suivant repart
 sans la case, donc sans reconstruction. ⚠️
 
@@ -200,10 +203,10 @@ dc up -d backend
 **Recréer la clé du backend** (✅) :
 
 ```bash
-sh docker/elasticsearch/create-api-key.sh   # affiche la nouvelle clé
+sudo -u deploy git -C repo.git show main:docker/elasticsearch/create-api-key.sh | sh   # affiche la nouvelle clé
 ```
 
-La coller dans le secret GitHub `ELASTICSEARCH_API_KEY`, puis Actions > Deploy > Run workflow (voir « Changer une
+La coller dans le secret GitHub `ELASTICSEARCH_API_KEY`, puis Actions > CI/CD > Run workflow (voir « Changer une
 valeur du `.env` »).
 
 Puis invalider l'ancienne clé (`DELETE /_security/api_key` avec son id, voir le script).
@@ -250,21 +253,26 @@ dc logs migrate
 **La voie normale est un revert sur `main`** : une PR qui annule le merge fautif, mergée puis déployée par la CD.
 Le lancement manuel de la CD déploie toujours le dernier commit de `main`, jamais un commit plus ancien.
 
-**En urgence**, le temps que le revert passe, directement sur le serveur :
+**En urgence**, le temps que le revert passe, directement sur le serveur. Chaque version reste sur GHCR sous
+le hash de son commit : revenir en arrière, c'est remettre l'ancien hash dans `IMAGE_TAG`, sans rien
+reconstruire (✅ en local).
 
 ```bash
 cd /opt/rekr
-sudo -u deploy git -C /opt/rekr log --oneline -5 origin/main      # repérer le commit qui marchait
-sudo -u deploy git -C /opt/rekr checkout --detach <sha>
-dc up -d --build
+sudo -u deploy git -C repo.git log --format='%H %s' -5 main   # repérer le commit qui marchait
+sudo sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG='<hash complet>'/" .env
+dc up -d --no-build
 ```
+
+`compose.prod.yml` reste celui de la version fautive. S'il a changé entre les deux versions, le reprendre aussi :
+`sudo -u deploy git -C repo.git show <hash>:compose.prod.yml | sudo -u deploy tee compose.prod.yml >/dev/null`.
 
 **Ce retour ne touche que le code.** Si la version fautive a appliqué une migration, la base reste dans son
 nouvel état. Ça marche si la migration ne fait qu'ajouter (colonne, table) : l'ancien code l'ignore. Si elle
 renomme ou supprime, l'ancien code plante, et il faut soit écrire une migration inverse, soit restaurer la
 sauvegarde d'avant le déploiement (fiche 11, avec perte des données écrites depuis).
 
-Le serveur reste sur ce commit jusqu'au déploiement suivant, qui le replace sur `main`. N'approuver ce déploiement
+Le serveur reste sur cette version jusqu'au déploiement suivant, qui réécrit `IMAGE_TAG`. N'approuver ce déploiement
 qu'une fois le revert ou le correctif mergé.
 
 ## 8. Disque plein, mémoire saturée
