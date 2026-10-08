@@ -16,6 +16,9 @@ seulement.
 
 - Serveur : VPS Hetzner Cloud, Ubuntu, 2 Go de RAM, console de secours dans l'interface Hetzner.
 - Accès : SSH par clé, compte nominatif avec `sudo`. Le dépôt et le `.env` sont dans `/opt/rekr`.
+- Le dépôt appartient au compte `deploy`, qui déploie depuis GitHub Actions. **Toute commande Git sur le serveur
+  passe par `sudo -u deploy git -C /opt/rekr …`** : lancée depuis un compte nominatif, elle crée des fichiers que
+  `deploy` ne peut plus remplacer, et le déploiement suivant échoue sur `Permission denied`.
 - Toutes les commandes se lancent depuis `/opt/rekr`. Pour raccourcir :
 
 ```bash
@@ -32,6 +35,20 @@ alias dc='docker compose -f compose.prod.yml'
 | `elasticsearch` | Classement du fil candidat            | 1200 Mo        | Fil trié par PostgreSQL, rien d'autre |
 
 Où lire les erreurs : `dc logs` sur le serveur, et Sentry pour les exceptions du backend et du front.
+
+### Changer une valeur du `.env`
+
+Le `.env` du serveur est **réécrit à chaque déploiement**, depuis l'environnement GitHub `production` (voir
+[deploiement-vps.md](../deploiement-vps.md)). Une valeur se change donc dans GitHub, jamais seulement sur le
+serveur :
+
+1. GitHub > Settings > Environments > `production` : modifier le secret ou la variable.
+2. Actions > Deploy > Run workflow, sur `main`, puis approuver. La CD réécrit le `.env` et recrée les conteneurs
+   dont la configuration a changé. ⚠️
+
+**En urgence, si GitHub est indisponible** : `sudo nano /opt/rekr/.env`, puis `dc up -d backend` (✅ pour
+`dc up`). La modification ne tient que jusqu'au déploiement suivant : reporter la même valeur dans GitHub
+aussitôt, sinon le prochain déploiement remet l'ancienne.
 
 ### ⛔ À ne jamais faire
 
@@ -98,15 +115,17 @@ dc ps -a backend migrate
 dc logs --tail 200 backend
 ```
 
-| Message dans les logs                                                                             | Cause                                 | Remède                                                        |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------- |
-| `JWT_SECRET is required` / `JWT_SECRET still holds the development value` / `must be at least 32` | Secret vide, de dev ou trop court     | Mettre un vrai secret dans `.env` (`openssl rand -base64 48`) |
-| `SMTP_HOST is required in production`                                                             | SMTP absent                           | Renseigner les variables SMTP dans `.env`                     |
-| `... is required` au lancement de `dc up`                                                         | Variable obligatoire vide dans `.env` | Compléter `.env` (`.env.prod.example` les liste)              |
-| `oom=true` dans le triage                                                                         | Plus de 384 Mo                        | Fiche 8                                                       |
-| Le backend n'est même pas créé, `migrate` en `Exited (1)`                                         | Migration en échec                    | Fiche 6                                                       |
+| Message dans les logs                                                                             | Cause                                 | Remède                                                                                  |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------- |
+| `JWT_SECRET is required` / `JWT_SECRET still holds the development value` / `must be at least 32` | Secret vide, de dev ou trop court     | Nouveau `JWT_SECRET` (`openssl rand -base64 48`), voir « Changer une valeur du `.env` » |
+| `SMTP_HOST is required in production`                                                             | SMTP absent                           | Renseigner les variables SMTP, voir « Changer une valeur du `.env` »                    |
+| `... is required` au lancement de `dc up`                                                         | Variable obligatoire vide dans `.env` | La compléter dans GitHub (`.env.prod.example` les liste)                                |
+| `oom=true` dans le triage                                                                         | Plus de 384 Mo                        | Fiche 8                                                                                 |
+| Le backend n'est même pas créé, `migrate` en `Exited (1)`                                         | Migration en échec                    | Fiche 6                                                                                 |
 
-Après correction du `.env` : `dc up -d backend` ✅ (compose recrée le conteneur si sa configuration a changé).
+Une variable obligatoire manquante dans GitHub arrête la CD avant le serveur, à l'étape « Check the production
+settings » : le message nomme toutes celles qui manquent. Après correction en urgence du `.env` :
+`dc up -d backend` ✅ (compose recrée le conteneur si sa configuration a changé).
 
 **Vérification** : `curl -s https://rekr.tech/api/auth/me` répond `401` en JSON (✅), et `/api/health` en `200`.
 
@@ -165,12 +184,16 @@ Le dernier cas est le plus probable après un redémarrage du serveur. `depends_
 lancé, pas qu'il soit prêt. Si le backend démarre avant, il ne crée pas l'index et reste sur le tri PostgreSQL
 jusqu'à son prochain redémarrage. Constaté sur la pile locale au premier démarrage (✅).
 
-**Reconstruire l'index** (✅) : PostgreSQL est la source de vérité, reconstruire ne perd rien.
+**Reconstruire l'index** : PostgreSQL est la source de vérité, reconstruire ne perd rien. Actions > Deploy >
+Run workflow, en cochant « Reconstruire l'index Elasticsearch », puis approuver. Le déploiement suivant repart
+sans la case, donc sans reconstruction. ⚠️
+
+En urgence, sans GitHub (✅) :
 
 ```bash
-# dans .env : ELASTICSEARCH_REINDEX_ON_STARTUP=true
+# sudo nano .env : ELASTICSEARCH_REINDEX_ON_STARTUP='true'
 dc up -d backend
-# une fois l'index reconstruit (logs du backend, ou _cat/indices) : remettre false
+# une fois l'index reconstruit (logs du backend, ou _cat/indices) : remettre 'false'
 dc up -d backend
 ```
 
@@ -178,9 +201,10 @@ dc up -d backend
 
 ```bash
 sh docker/elasticsearch/create-api-key.sh   # affiche la nouvelle clé
-# la coller dans ELASTICSEARCH_API_KEY, dans .env
-dc up -d backend
 ```
+
+La coller dans le secret GitHub `ELASTICSEARCH_API_KEY`, puis Actions > Deploy > Run workflow (voir « Changer une
+valeur du `.env` »).
 
 Puis invalider l'ancienne clé (`DELETE /_security/api_key` avec son id, voir le script).
 
@@ -223,10 +247,15 @@ dc logs migrate
 
 ## 7. Revenir à la version précédente
 
+**La voie normale est un revert sur `main`** : une PR qui annule le merge fautif, mergée puis déployée par la CD.
+Le lancement manuel de la CD déploie toujours le dernier commit de `main`, jamais un commit plus ancien.
+
+**En urgence**, le temps que le revert passe, directement sur le serveur :
+
 ```bash
 cd /opt/rekr
-git log --oneline -5                 # repérer le commit qui marchait
-git checkout <sha>
+sudo -u deploy git -C /opt/rekr log --oneline -5 origin/main      # repérer le commit qui marchait
+sudo -u deploy git -C /opt/rekr checkout --detach <sha>
 dc up -d --build
 ```
 
@@ -235,7 +264,8 @@ nouvel état. Ça marche si la migration ne fait qu'ajouter (colonne, table) : l
 renomme ou supprime, l'ancien code plante, et il faut soit écrire une migration inverse, soit restaurer la
 sauvegarde d'avant le déploiement (fiche 11, avec perte des données écrites depuis).
 
-Revenir ensuite sur la branche : `git checkout main` dès que le correctif est livré.
+Le serveur reste sur ce commit jusqu'au déploiement suivant, qui le replace sur `main`. N'approuver ce déploiement
+qu'une fois le revert ou le correctif mergé.
 
 ## 8. Disque plein, mémoire saturée
 
@@ -283,22 +313,25 @@ dc logs --tail 200 backend | grep -iE 'smtp|mail'
 - `535`, `authentication failed` : identifiants Brevo invalides ou révoqués. ⚠️
 - Rien dans les logs, rien reçu : regarder les spams et le tableau de bord Brevo (DKIM, DMARC, quota). ⚠️
 
-**Remède** : corriger `SMTP_*` dans `.env`, puis `dc up -d backend`.
+**Remède** : corriger les `SMTP_*` dans GitHub, voir « Changer une valeur du `.env` ».
 
 **Vérification** : demander un lien de réinitialisation pour son propre compte et le recevoir. ⚠️
 
 ## 10. Un secret a fuité
 
-Toujours : changer la valeur, redémarrer ce qui la lit, invalider l'ancienne côté fournisseur, puis noter
-l'incident (fiche 12). Générer chaque nouvelle valeur avec `openssl rand -hex 24` ou `openssl rand -base64 48`.
+Toujours : changer la valeur dans l'environnement GitHub `production`, redéployer (« Changer une valeur du
+`.env` »), invalider l'ancienne côté fournisseur, puis noter l'incident (fiche 12). Générer chaque nouvelle
+valeur sans l'afficher : `openssl rand -hex 24 | tr -d '\n' | pbcopy`, ou `-base64 48` pour `JWT_SECRET`.
 
-| Secret                  | Procédure                                                                           |
-| ----------------------- | ----------------------------------------------------------------------------------- |
-| `JWT_SECRET`            | Nouvelle valeur dans `.env`, `dc up -d backend` (✅). Voir l'encadré ci-dessous.    |
-| `POSTGRES_PASSWORD`     | D'abord dans la base, ensuite dans `.env` (✅) : voir ci-dessous.                   |
-| `ELASTICSEARCH_API_KEY` | Recréer la clé (fiche 5), puis invalider l'ancienne.                                |
-| `ELASTIC_PASSWORD`      | `bin/elasticsearch-reset-password -u elastic -i` dans le conteneur, puis `.env`. ⚠️ |
-| `SMTP_PASSWORD`         | Révoquer la clé SMTP dans Brevo, en créer une, `.env`, `dc up -d backend`. ⚠️       |
+| Secret                  | Procédure                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------- |
+| `JWT_SECRET`            | Nouveau secret GitHub, redéployer (✅ pour l'effet). Voir l'encadré ci-dessous.                   |
+| `POSTGRES_PASSWORD`     | D'abord dans la base, ensuite le secret GitHub, puis redéployer (✅) : voir ci-dessous.           |
+| `ELASTICSEARCH_API_KEY` | Recréer la clé (fiche 5), puis invalider l'ancienne.                                              |
+| `ELASTIC_PASSWORD`      | `bin/elasticsearch-reset-password -u elastic -i` dans le conteneur, puis le secret GitHub. ⚠️     |
+| `SMTP_PASSWORD`         | Révoquer la clé SMTP dans Brevo, en créer une, secret GitHub, redéployer. ⚠️                      |
+| `STREAM_API_SECRET`     | Régénérer le secret de l'app Stream de production (API keys), secret GitHub, redéployer. ⚠️       |
+| `DEPLOY_SSH_KEY`        | Nouvelle paire, remplacer la ligne de `/home/deploy/.ssh/authorized_keys` et le secret GitHub. ⚠️ |
 
 **`JWT_SECRET` ne déconnecte pas les utilisateurs.** Les jetons d'accès signés avec l'ancien secret sont refusés
 (✅), mais la session continue : le navigateur obtient un nouveau jeton avec son refresh token, qui est une valeur
@@ -316,12 +349,14 @@ dans `.env` seule casse la connexion du backend.
 ```bash
 dc exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 # dans psql : \password   (demande le nouveau mot de passe sans l'afficher), puis \q
-# ensuite POSTGRES_PASSWORD=<nouveau> dans .env
-dc up -d
 ```
 
-Vérifié avec `ALTER USER ... WITH PASSWORD` puis `dc up -d` : backend et `migrate` recréés, connexion en `200`
-(✅). `\password` fait la même chose sans laisser le mot de passe dans l'historique du shell.
+Ensuite, remplacer le secret GitHub `POSTGRES_PASSWORD` par la même valeur et redéployer. Entre les deux, le
+backend en cours garde sa connexion ouverte ; un redémarrage avant le redéploiement échouerait.
+
+Vérifié avec `ALTER USER ... WITH PASSWORD` puis le nouveau mot de passe dans `.env` et `dc up -d` : backend et
+`migrate` recréés, connexion en `200` (✅). La CD fait cette même écriture du `.env` suivie de `dc up`.
+`\password` fait la même chose qu'`ALTER USER` sans laisser le mot de passe dans l'historique du shell.
 
 ## 11. Restaurer une sauvegarde
 
