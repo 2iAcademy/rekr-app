@@ -204,6 +204,27 @@ describe('CandidateFeedPage', () => {
       expect(leavingCard()).not.toBeInTheDocument();
     });
 
+    // Le retour au centre après un glissé est un mouvement comme un autre.
+    it('coupe le retour au centre de la carte quand le mouvement est réduit', async () => {
+      renderPage();
+
+      const card = (await screen.findByRole('article')).parentElement as HTMLElement;
+
+      expect(card.style.transition).toBe('');
+      expect(card).toHaveClass('motion-reduce:transition-none');
+    });
+
+    // Rien à confirmer encore, et un deck vide n'a pas de compteur : la ligne
+    // reste montée pour les annonces, sans occuper de place.
+    it('ne réserve pas de ligne vide au-dessus d’un deck vide à l’arrivée', async () => {
+      findFeed.mockResolvedValue(answer([]));
+      renderPage();
+
+      await screen.findByRole('heading', { name: 'Aucune offre ne correspond à vos critères' });
+
+      expect(outcome().parentElement).toHaveClass('sr-only');
+    });
+
     // Sans mouvement, la carte sortante n'a rien à montrer : seul le message
     // confirme la décision.
     it('ne montre pas la carte sortante quand le mouvement est réduit', async () => {

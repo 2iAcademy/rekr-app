@@ -83,7 +83,9 @@ export function OfferApplicantsPage({
         </Link>
 
         <div className="flex flex-col gap-1">
-          {offerTitle !== null && (
+          {/* Not over « introuvable »: an open offer of another company has a
+              readable title, but its applicants are not this recruiter's. */}
+          {offerTitle !== null && status !== 'missing' && (
             <p className="text-sm font-semibold break-words text-ink-muted">{offerTitle}</p>
           )}
           <h1 className="text-2xl font-extrabold text-ink md:text-[1.75rem]">

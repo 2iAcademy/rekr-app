@@ -62,11 +62,11 @@ function outcomeText({ title, decision, failed }: Outcome): string {
  * card's own animation counts, not one bubbling up from inside it.
  */
 function LeavingOfferCard({
-  card: { offer, decision, from },
+  card: { key, offer, decision, from },
   onGone,
 }: {
   card: LeavingCard;
-  onGone: () => void;
+  onGone: (key: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const side = decision === 'liked' ? 'right' : 'left';
@@ -76,12 +76,12 @@ function LeavingOfferCard({
     if (!node) return;
 
     const end = (event: Event): void => {
-      if (event.target === node) onGone();
+      if (event.target === node) onGone(key);
     };
     node.addEventListener('animationend', end);
 
     return () => node.removeEventListener('animationend', end);
-  }, [onGone]);
+  }, [key, onGone]);
 
   const style = {
     '--leave-from': `${from}px`,
@@ -96,7 +96,7 @@ function LeavingOfferCard({
       data-leaving={side}
       style={style}
       className={cn(
-        'pointer-events-none absolute inset-x-0 top-0 motion-reduce:hidden',
+        'pointer-events-none absolute inset-x-0 top-0 z-20 motion-reduce:hidden',
         side === 'right' ? 'animate-card-leave-right' : 'animate-card-leave-left',
       )}
     >
@@ -210,18 +210,16 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
     disabled: !current,
   });
 
-  const forget = (key: number): void =>
-    setLeaving((previous) => previous.filter((card) => card.key !== key));
-
-  const leavingCards = (
-    // Zero-height anchor: the cards on their way out sit over whatever comes
-    // next — the following card or the end of the deck — without pushing it.
-    <div className="relative z-20 h-0">
-      {leaving.map((card) => (
-        <LeavingOfferCard key={card.key} card={card} onGone={() => forget(card.key)} />
-      ))}
-    </div>
+  const forget = useCallback(
+    (key: number): void => setLeaving((previous) => previous.filter((card) => card.key !== key)),
+    [],
   );
+
+  // Drawn over whatever takes the answered card's place — the next card or the
+  // end of the deck — inside its wrapper, so they add nothing to the layout.
+  const leavingCards = leaving.map((card) => (
+    <LeavingOfferCard key={card.key} card={card} onGone={forget} />
+  ));
 
   return (
     <div className="mx-auto mt-5 flex w-full max-w-xl flex-col gap-4 md:mt-0">
@@ -290,7 +288,13 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
         )}
 
         {status === 'ready' && (
-          <div className="-mb-2 flex min-h-4 items-center justify-between gap-3">
+          <div
+            className={cn(
+              '-mb-2 flex min-h-4 items-center justify-between gap-3',
+              // Kept mounted, or the first answer could go unannounced.
+              outcome === null && !current && 'sr-only',
+            )}
+          >
             {/* Visible and announced: with reduced motion there is no card
                 leaving, and this line is then the only confirmation. */}
             <p
@@ -311,26 +315,30 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
           </div>
         )}
 
-        {leavingCards}
-
         {current ? (
           <>
-            <div
-              {...swipe.handlers}
-              className={cn(
-                'relative touch-pan-y',
-                swipe.isDragging && 'cursor-grabbing select-none',
-              )}
-              style={{
-                transform:
-                  swipe.offset === 0
-                    ? undefined
-                    : `translateX(${swipe.offset}px) rotate(${swipe.offset / 30}deg)`,
-                transition: swipe.isDragging ? undefined : 'transform 200ms ease-out',
-              }}
-            >
-              <OfferCard offer={current} onViewOffer={() => onOpenOffer(current.id)} />
-              <SwipeHint offset={swipe.offset} threshold={SWIPE_THRESHOLD} />
+            <div className="relative">
+              {leavingCards}
+              <div
+                {...swipe.handlers}
+                className={cn(
+                  'relative touch-pan-y',
+                  // A class rather than an inline style, so reduced motion can
+                  // drop the slide back to the centre after a drag.
+                  swipe.isDragging
+                    ? 'cursor-grabbing select-none'
+                    : 'transition-transform duration-200 ease-out motion-reduce:transition-none',
+                )}
+                style={{
+                  transform:
+                    swipe.offset === 0
+                      ? undefined
+                      : `translateX(${swipe.offset}px) rotate(${swipe.offset / 30}deg)`,
+                }}
+              >
+                <OfferCard offer={current} onViewOffer={() => onOpenOffer(current.id)} />
+                <SwipeHint offset={swipe.offset} threshold={SWIPE_THRESHOLD} />
+              </div>
             </div>
             <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 mt-auto bg-background pt-3 pb-4">
               <FeedActions
@@ -346,12 +354,15 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
           </>
         ) : (
           status === 'ready' && (
-            <EmptyDeck
-              title={deckEndTitle}
-              itemPlural="offres"
-              likedCount={liked}
-              likedLabel={likedOfferCountLabel}
-            />
+            <div className="relative">
+              {leavingCards}
+              <EmptyDeck
+                title={deckEndTitle}
+                itemPlural="offres"
+                likedCount={liked}
+                likedLabel={likedOfferCountLabel}
+              />
+            </div>
           )
         )}
       </section>
