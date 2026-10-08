@@ -1,0 +1,146 @@
+# Deploys main to the VPS. The production `.env` is generated here, at every
+# deploy, from the GitHub `production` environment, and sent to the server
+# over SSH: nobody edits it by hand.
+#
+# The `production` environment requires an approval (Julien or Diego) before
+# this job gets its secrets, so neither a push to main nor a workflow edited
+# in a branch can read them unattended. The SSH key only opens
+# scripts/deploy/remote-deploy.sh on the server, which deploys a commit of
+# main and nothing else. Setup: docs/deploiement-vps.md.
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      reindex:
+        description: Reconstruire l'index Elasticsearch depuis PostgreSQL
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One deploy at a time, and never cancel one halfway through a migration.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://${{ vars.DOMAIN }}
+    # Values are only ever read from the environment below, never pasted into
+    # a script: an expression expanded inside `run` would put them in the
+    # command line, where a quote could break out of it.
+    env:
+      DOMAIN: ${{ vars.DOMAIN }}
+      POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      SMTP_HOST: ${{ vars.SMTP_HOST }}
+      SMTP_PORT: ${{ vars.SMTP_PORT }}
+      SMTP_SECURE: ${{ vars.SMTP_SECURE }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      MAIL_FROM: ${{ vars.MAIL_FROM }}
+      ELASTIC_PASSWORD: ${{ secrets.ELASTIC_PASSWORD }}
+      ELASTICSEARCH_API_KEY: ${{ secrets.ELASTICSEARCH_API_KEY }}
+      ELASTICSEARCH_REINDEX_ON_STARTUP: ${{ inputs.reindex == true }}
+      STREAM_API_KEY: ${{ secrets.STREAM_API_KEY }}
+      STREAM_API_SECRET: ${{ secrets.STREAM_API_SECRET }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_TRACES_SAMPLE_RATE }}
+      VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+    steps:
+      # Fails before the server is touched. compose.prod.yml checks the same
+      # names with `:?`, but only once the stack is already being replaced.
+      - name: Check the production settings
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          required=(
+            DOMAIN POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB JWT_SECRET
+            SMTP_HOST SMTP_USER SMTP_PASSWORD MAIL_FROM ELASTIC_PASSWORD
+            STREAM_API_KEY STREAM_API_SECRET
+            DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing in the production environment: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Write the .env
+        run: |
+          # Single quotes keep every value literal for Compose: no `$`
+          # interpolation inside a password. They cannot be escaped there,
+          # so a value holding one, or a line break, is refused instead.
+          names=(
+            DOMAIN POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB JWT_SECRET
+            SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASSWORD MAIL_FROM
+            ELASTIC_PASSWORD ELASTICSEARCH_API_KEY ELASTICSEARCH_REINDEX_ON_STARTUP
+            STREAM_API_KEY STREAM_API_SECRET
+            SENTRY_DSN SENTRY_TRACES_SAMPLE_RATE VITE_SENTRY_DSN
+          )
+          umask 077
+          : > "$RUNNER_TEMP/production.env"
+          for name in "${names[@]}"; do
+            value="${!name}"
+            if [[ "$value" == *"'"* || "$value" == *$'\n'* ]]; then
+              echo "::error::$name holds a quote or a line break"
+              exit 1
+            fi
+            [ -n "$value" ] || continue
+            printf "%s='%s'\n" "$name" "$value" >> "$RUNNER_TEMP/production.env"
+          done
+
+      - name: Deploy over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          # The server's own key, pinned: a host answering with another one
+          # is refused instead of being trusted on first use.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "deploy $GITHUB_SHA" \
+            < "$RUNNER_TEMP/production.env"
+
+      # The API answers 401 to an anonymous /auth/me once Caddy, the backend
+      # and the database are all up; the backend takes a moment to boot.
+      - name: Check the site answers
+        run: |
+          for attempt in $(seq 1 24); do
+            status="$(curl -s -o /dev/null -w '%{http_code}' "https://$DOMAIN/api/auth/me" || true)"
+            if [ "$status" = 401 ]; then
+              echo "https://$DOMAIN is up"
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $status, retrying in 5 s"
+            sleep 5
+          done
+          echo "::error::https://$DOMAIN/api/auth/me never answered 401"
+          exit 1
+
+      - name: Forget the key and the .env
+        if: always()
+        run: rm -f ~/.ssh/deploy_key "$RUNNER_TEMP/production.env"

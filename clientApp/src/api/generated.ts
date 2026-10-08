@@ -20,11 +20,14 @@ export const SignupDtoUserType = {
 export interface SignupDto {
   email: string;
   /**
+   * Refused when made of fewer than 5 distinct characters, when it is a keyboard or alphabet walk, a common password, or the account address.
    * @minLength 8
    * @maxLength 512
    */
   password: string;
   userType: SignupDtoUserType;
+  /** Acceptance of the privacy policy and the terms of use. */
+  acceptTerms: true;
 }
 
 export interface LoginDto {
@@ -41,6 +44,7 @@ export interface ResetPasswordDto {
   /** Jeton reçu par e-mail, tel qu’il figure dans le lien. */
   token: string;
   /**
+   * Refused when made of fewer than 5 distinct characters, when it is a keyboard or alphabet walk, a common password, or the account address.
    * @minLength 8
    * @maxLength 512
    */
@@ -126,6 +130,9 @@ export interface CandidateProfileResponseDto {
   cvUrl: string | null;
   skills: string[];
   languages: string[];
+  jobFamilyIds: number[];
+  /** @nullable */
+  primaryJobFamilyId: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -145,6 +152,12 @@ export interface CityDto {
   postalCode: string;
   latitude: number;
   longitude: number;
+}
+
+export interface JobFamilyDto {
+  id: number;
+  /** @maxLength 100 */
+  label: string;
 }
 
 export type CompanySize = (typeof CompanySize)[keyof typeof CompanySize];
@@ -312,6 +325,11 @@ export interface OfferDetailDto {
   /** @nullable */
   postalCode?: string | null;
   status?: OfferStatus;
+  /** @nullable */
+  jobFamilyId?: number | null;
+  liked?: boolean;
+  passed?: boolean;
+  matched?: boolean;
 }
 
 export interface CreateOfferDto {
@@ -343,6 +361,7 @@ export interface CreateOfferDto {
   skills?: string[];
   /** @maxItems 50 */
   benefits?: string[];
+  jobFamilyId: number;
 }
 
 export interface OfferDto {
@@ -370,6 +389,8 @@ export interface OfferDto {
   /** @nullable */
   salaryMax: number | null;
   status: OfferStatus;
+  /** @nullable */
+  jobFamilyId: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -403,6 +424,44 @@ export interface UpdateOfferDto {
   skills?: string[];
   /** @maxItems 50 */
   benefits?: string[];
+  jobFamilyId?: number;
+}
+
+export interface MatchOfferDto {
+  id: number;
+  title: string;
+}
+
+export type MatchCounterpartDtoKind =
+  (typeof MatchCounterpartDtoKind)[keyof typeof MatchCounterpartDtoKind];
+
+export const MatchCounterpartDtoKind = {
+  company: 'company',
+  candidate: 'candidate',
+} as const;
+
+export interface MatchCounterpartDto {
+  kind: MatchCounterpartDtoKind;
+  id: number;
+  name: string;
+  /** @nullable */
+  avatarUrl: string | null;
+  /** @nullable */
+  headline: string | null;
+}
+
+export interface MatchListItemDto {
+  id: number;
+  matchedAt: string;
+  offer: MatchOfferDto;
+  counterpart: MatchCounterpartDto;
+}
+
+export interface LikeResultDto {
+  likeCreated: boolean;
+  /** Whether this request completed the reciprocal pair and created its match. */
+  matchCreated: boolean;
+  match?: MatchListItemDto;
 }
 
 export interface OfferApplicantDto {
@@ -422,6 +481,29 @@ export interface OfferApplicantDto {
   availability: Availability | null;
   remotePolicy: RemotePolicy | null;
   tags: string[];
+  /** @nullable */
+  recruiterLikedAt: string | null;
+  /** @nullable */
+  recruiterPassedAt: string | null;
+}
+
+export interface ChatTokenDto {
+  apiKey: string;
+  /** Identifiant Stream du lecteur. */
+  userId: string;
+  /** Jeton Stream signé pour ce lecteur. */
+  token: string;
+}
+
+export interface MatchChannelDto {
+  channelType: string;
+  channelId: string;
+  /** L’autre partie : la société pour un candidat, le candidat pour un recruteur. */
+  counterpartName: string;
+  /** L’offre du match, pour mener à sa fiche ou à ses candidats. */
+  offerId: number;
+  /** Vrai quand l’offre est pourvue ou fermée : lecture seule. */
+  frozen: boolean;
 }
 
 export interface SectorDto {
@@ -430,45 +512,28 @@ export interface SectorDto {
   label: string;
 }
 
-export interface Object {
-  [key: string]: unknown;
-}
-
-export interface MatchOfferDto {
-  id: number;
-  title: string;
-}
-
-export type MatchCounterpartDtoKind =
-  (typeof MatchCounterpartDtoKind)[keyof typeof MatchCounterpartDtoKind];
-
-export const MatchCounterpartDtoKind = {
-  company: 'company',
-} as const;
-
-export interface MatchCounterpartDto {
-  kind: MatchCounterpartDtoKind;
-  id: number;
-  name: string;
-  /** @nullable */
-  avatarUrl?: string | null;
-  /** @nullable */
-  headline?: string | null;
-}
-
-export interface MatchListItemDto {
-  id: number;
-  matchedAt: string;
+export interface LikeListItemDto {
+  offerId: number;
+  /**
+   * Null sur /likes/sent, où le candidat est l’appelant.
+   * @nullable
+   */
+  candidateUserId: number | null;
+  likedAt: string;
   offer: MatchOfferDto;
   counterpart: MatchCounterpartDto;
 }
 
+export interface DeleteAccountDto {
+  password: string;
+}
+
 export type CandidateProfileControllerReplacePictureBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type CandidateProfileControllerReplaceCvBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type CityControllerSearchParams = {
@@ -480,11 +545,11 @@ export type CityControllerSearchParams = {
 };
 
 export type CompanyControllerReplaceLogoBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type CompanyControllerReplaceCoverImageBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type OfferControllerFindMineParams = {
@@ -515,21 +580,6 @@ export type OfferControllerFindFeedParams = {
   limit?: number;
 };
 
-export type OfferControllerFindLikedParams = {
-  /**
-   * Numéro de page, à partir de 1.
-   * @minimum 1
-   * @maximum 2147483647
-   */
-  page?: number;
-  /**
-   * Nombre maximum de candidats par page.
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-};
-
 export type OfferControllerFindApplicantsParams = {
   /**
    * Numéro de page, à partir de 1.
@@ -549,15 +599,48 @@ export type MatchControllerFindMineParams = {
   /**
    * Numéro de page, à partir de 1.
    * @minimum 1
+   * @maximum 2147483647
    */
-  page?: Object;
+  page?: number;
   /**
    * Nombre maximum de matchs par page.
    * @minimum 1
    * @maximum 100
    */
-  limit?: Object;
+  limit?: number;
 };
+
+export type LikeControllerFindSentParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   * @maximum 2147483647
+   */
+  page?: number;
+  /**
+   * Nombre maximum de likes par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type LikeControllerFindReceivedParams = {
+  /**
+   * Numéro de page, à partir de 1.
+   * @minimum 1
+   * @maximum 2147483647
+   */
+  page?: number;
+  /**
+   * Nombre maximum de likes par page.
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type AccountControllerExport200 = { [key: string]: unknown };
 
 export type appControllerGetHelloResponse200 = {
   data: void;
@@ -641,11 +724,24 @@ export const logsControllerPublishError = async (
   publishErrorLogDto: PublishErrorLogDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<logsControllerPublishErrorResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<logsControllerPublishErrorResponseSuccess>(
     getLogsControllerPublishErrorUrl(),
@@ -674,11 +770,24 @@ export const authControllerSignup = async (
   signupDto: SignupDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerSignupResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<authControllerSignupResponseSuccess>(getAuthControllerSignupUrl(), {
     ...options,
@@ -704,11 +813,24 @@ export const authControllerLogin = async (
   loginDto: LoginDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerLoginResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<authControllerLoginResponseSuccess>(getAuthControllerLoginUrl(), {
     ...options,
@@ -777,11 +899,24 @@ export const authControllerForgotPassword = async (
   forgotPasswordDto: ForgotPasswordDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerForgotPasswordResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<authControllerForgotPasswordResponseSuccess>(
     getAuthControllerForgotPasswordUrl(),
@@ -810,11 +945,24 @@ export const authControllerResetPassword = async (
   resetPasswordDto: ResetPasswordDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<authControllerResetPasswordResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<authControllerResetPasswordResponseSuccess>(
     getAuthControllerResetPasswordUrl(),
@@ -890,11 +1038,24 @@ export const candidateProfileControllerUpdate = async (
   updateCandidateProfileDto: UpdateCandidateProfileDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<candidateProfileControllerUpdateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<candidateProfileControllerUpdateResponseSuccess>(
     getCandidateProfileControllerUpdateUrl(),
@@ -924,11 +1085,24 @@ export const candidateProfileControllerCreate = async (
   createCandidateProfileDto: CreateCandidateProfileDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<candidateProfileControllerCreateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<candidateProfileControllerCreateResponseSuccess>(
     getCandidateProfileControllerCreateUrl(),
@@ -1108,6 +1282,30 @@ export const cityControllerSearch = async (
   });
 };
 
+export type jobFamilyControllerFindAllResponse200 = {
+  data: JobFamilyDto[];
+  status: 200;
+};
+
+export type jobFamilyControllerFindAllResponseSuccess = jobFamilyControllerFindAllResponse200 & {
+  headers: Headers;
+};
+export const getJobFamilyControllerFindAllUrl = () => {
+  return `/api/job-families`;
+};
+
+export const jobFamilyControllerFindAll = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<jobFamilyControllerFindAllResponseSuccess> => {
+  return customFetch<jobFamilyControllerFindAllResponseSuccess>(
+    getJobFamilyControllerFindAllUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
 export type filesControllerReadResponse200 = {
   data: void;
   status: 200;
@@ -1178,11 +1376,24 @@ export const companyControllerUpdateMine = async (
   updateCompanyDto: UpdateCompanyDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<companyControllerUpdateMineResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<companyControllerUpdateMineResponseSuccess>(
     getCompanyControllerUpdateMineUrl(),
@@ -1211,11 +1422,24 @@ export const companyControllerCreate = async (
   createCompanyDto: CreateCompanyDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<companyControllerCreateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<companyControllerCreateResponseSuccess>(getCompanyControllerCreateUrl(), {
     ...options,
@@ -1431,11 +1655,24 @@ export const offerControllerCreate = async (
   createOfferDto: CreateOfferDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<offerControllerCreateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<offerControllerCreateResponseSuccess>(getOfferControllerCreateUrl(), {
     ...options,
@@ -1491,59 +1728,6 @@ export const offerControllerFindFeed = async (
 ): Promise<offerControllerFindFeedResponseSuccess> => {
   return customFetch<offerControllerFindFeedResponseSuccess>(
     getOfferControllerFindFeedUrl(params),
-    {
-      ...options,
-      method: 'GET',
-    },
-  );
-};
-
-export type offerControllerFindLikedResponse200 = {
-  data: OfferFeedItemDto[];
-  status: 200;
-};
-
-export type offerControllerFindLikedResponse401 = {
-  data: void;
-  status: 401;
-};
-
-export type offerControllerFindLikedResponse403 = {
-  data: void;
-  status: 403;
-};
-
-export type offerControllerFindLikedResponseSuccess = offerControllerFindLikedResponse200 & {
-  headers: Headers;
-};
-export type offerControllerFindLikedResponseError = (
-  offerControllerFindLikedResponse401 | offerControllerFindLikedResponse403
-) & {
-  headers: Headers;
-};
-
-export const getOfferControllerFindLikedUrl = (params?: OfferControllerFindLikedParams) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value));
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0
-    ? `/api/offers/liked?${stringifiedParams}`
-    : `/api/offers/liked`;
-};
-
-export const offerControllerFindLiked = async (
-  params?: OfferControllerFindLikedParams,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<offerControllerFindLikedResponseSuccess> => {
-  return customFetch<offerControllerFindLikedResponseSuccess>(
-    getOfferControllerFindLikedUrl(params),
     {
       ...options,
       method: 'GET',
@@ -1639,11 +1823,24 @@ export const offerControllerUpdate = async (
   updateOfferDto: UpdateOfferDto,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<offerControllerUpdateResponseSuccess> => {
-  const getHeaders = (h?: HeadersInit | Headers): Record<string, string> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
   return customFetch<offerControllerUpdateResponseSuccess>(getOfferControllerUpdateUrl(id), {
     ...options,
@@ -1654,7 +1851,7 @@ export const offerControllerUpdate = async (
 };
 
 export type offerControllerLikeResponse201 = {
-  data: void;
+  data: LikeResultDto;
   status: 201;
 };
 
@@ -1691,6 +1888,102 @@ export const offerControllerLike = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<offerControllerLikeResponseSuccess> => {
   return customFetch<offerControllerLikeResponseSuccess>(getOfferControllerLikeUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type offerControllerUnlikeResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type offerControllerUnlikeResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerUnlikeResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerUnlikeResponse409 = {
+  data: void;
+  status: 409;
+};
+
+export type offerControllerUnlikeResponseSuccess = offerControllerUnlikeResponse204 & {
+  headers: Headers;
+};
+export type offerControllerUnlikeResponseError = (
+  | offerControllerUnlikeResponse401
+  | offerControllerUnlikeResponse403
+  | offerControllerUnlikeResponse409
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerUnlikeUrl = (id: number) => {
+  return `/api/offers/${id}/like`;
+};
+
+export const offerControllerUnlike = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerUnlikeResponseSuccess> => {
+  return customFetch<offerControllerUnlikeResponseSuccess>(getOfferControllerUnlikeUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type offerControllerPassResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type offerControllerPassResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerPassResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerPassResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerPassResponse409 = {
+  data: void;
+  status: 409;
+};
+
+export type offerControllerPassResponseSuccess = offerControllerPassResponse201 & {
+  headers: Headers;
+};
+export type offerControllerPassResponseError = (
+  | offerControllerPassResponse401
+  | offerControllerPassResponse403
+  | offerControllerPassResponse404
+  | offerControllerPassResponse409
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerPassUrl = (id: number) => {
+  return `/api/offers/${id}/pass`;
+};
+
+export const offerControllerPass = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerPassResponseSuccess> => {
+  return customFetch<offerControllerPassResponseSuccess>(getOfferControllerPassUrl(id), {
     ...options,
     method: 'POST',
   });
@@ -1762,7 +2055,7 @@ export const offerControllerFindApplicants = async (
 };
 
 export type offerControllerLikeApplicantResponse201 = {
-  data: void;
+  data: LikeResultDto;
   status: 201;
 };
 
@@ -1811,25 +2104,153 @@ export const offerControllerLikeApplicant = async (
   );
 };
 
-export type sectorControllerFindAllResponse200 = {
-  data: SectorDto[];
+export type offerControllerPassApplicantResponse201 = {
+  data: void;
+  status: 201;
+};
+
+export type offerControllerPassApplicantResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type offerControllerPassApplicantResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type offerControllerPassApplicantResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type offerControllerPassApplicantResponseSuccess =
+  offerControllerPassApplicantResponse201 & {
+    headers: Headers;
+  };
+export type offerControllerPassApplicantResponseError = (
+  | offerControllerPassApplicantResponse401
+  | offerControllerPassApplicantResponse403
+  | offerControllerPassApplicantResponse404
+) & {
+  headers: Headers;
+};
+
+export const getOfferControllerPassApplicantUrl = (id: number, candidateUserId: number) => {
+  return `/api/offers/${id}/passes/${candidateUserId}`;
+};
+
+export const offerControllerPassApplicant = async (
+  id: number,
+  candidateUserId: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<offerControllerPassApplicantResponseSuccess> => {
+  return customFetch<offerControllerPassApplicantResponseSuccess>(
+    getOfferControllerPassApplicantUrl(id, candidateUserId),
+    {
+      ...options,
+      method: 'POST',
+    },
+  );
+};
+
+export type chatControllerIssueTokenResponse200 = {
+  data: ChatTokenDto;
   status: 200;
 };
 
-export type sectorControllerFindAllResponseSuccess = sectorControllerFindAllResponse200 & {
-  headers: Headers;
-};
-export const getSectorControllerFindAllUrl = () => {
-  return `/api/sectors`;
+export type chatControllerIssueTokenResponse401 = {
+  data: void;
+  status: 401;
 };
 
-export const sectorControllerFindAll = async (
+export type chatControllerIssueTokenResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type chatControllerIssueTokenResponse503 = {
+  data: void;
+  status: 503;
+};
+
+export type chatControllerIssueTokenResponseSuccess = chatControllerIssueTokenResponse200 & {
+  headers: Headers;
+};
+export type chatControllerIssueTokenResponseError = (
+  | chatControllerIssueTokenResponse401
+  | chatControllerIssueTokenResponse403
+  | chatControllerIssueTokenResponse503
+) & {
+  headers: Headers;
+};
+
+export const getChatControllerIssueTokenUrl = () => {
+  return `/api/chat/token`;
+};
+
+export const chatControllerIssueToken = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<sectorControllerFindAllResponseSuccess> => {
-  return customFetch<sectorControllerFindAllResponseSuccess>(getSectorControllerFindAllUrl(), {
+): Promise<chatControllerIssueTokenResponseSuccess> => {
+  return customFetch<chatControllerIssueTokenResponseSuccess>(getChatControllerIssueTokenUrl(), {
     ...options,
-    method: 'GET',
+    method: 'POST',
   });
+};
+
+export type chatControllerOpenMatchChannelResponse200 = {
+  data: MatchChannelDto;
+  status: 200;
+};
+
+export type chatControllerOpenMatchChannelResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type chatControllerOpenMatchChannelResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type chatControllerOpenMatchChannelResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type chatControllerOpenMatchChannelResponse503 = {
+  data: void;
+  status: 503;
+};
+
+export type chatControllerOpenMatchChannelResponseSuccess =
+  chatControllerOpenMatchChannelResponse200 & {
+    headers: Headers;
+  };
+export type chatControllerOpenMatchChannelResponseError = (
+  | chatControllerOpenMatchChannelResponse401
+  | chatControllerOpenMatchChannelResponse403
+  | chatControllerOpenMatchChannelResponse404
+  | chatControllerOpenMatchChannelResponse503
+) & {
+  headers: Headers;
+};
+
+export const getChatControllerOpenMatchChannelUrl = (id: number) => {
+  return `/api/matches/${id}/chat`;
+};
+
+export const chatControllerOpenMatchChannel = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<chatControllerOpenMatchChannelResponseSuccess> => {
+  return customFetch<chatControllerOpenMatchChannelResponseSuccess>(
+    getChatControllerOpenMatchChannelUrl(id),
+    {
+      ...options,
+      method: 'POST',
+    },
+  );
 };
 
 export type matchControllerFindMineResponse200 = {
@@ -1837,9 +2258,25 @@ export type matchControllerFindMineResponse200 = {
   status: 200;
 };
 
+export type matchControllerFindMineResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type matchControllerFindMineResponse403 = {
+  data: void;
+  status: 403;
+};
+
 export type matchControllerFindMineResponseSuccess = matchControllerFindMineResponse200 & {
   headers: Headers;
 };
+export type matchControllerFindMineResponseError = (
+  matchControllerFindMineResponse401 | matchControllerFindMineResponse403
+) & {
+  headers: Headers;
+};
+
 export const getMatchControllerFindMineUrl = (params?: MatchControllerFindMineParams) => {
   const normalizedParams = new URLSearchParams();
 
@@ -1865,4 +2302,242 @@ export const matchControllerFindMine = async (
       method: 'GET',
     },
   );
+};
+
+export type matchControllerUnmatchResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type matchControllerUnmatchResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type matchControllerUnmatchResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type matchControllerUnmatchResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type matchControllerUnmatchResponseSuccess = matchControllerUnmatchResponse204 & {
+  headers: Headers;
+};
+export type matchControllerUnmatchResponseError = (
+  | matchControllerUnmatchResponse401
+  | matchControllerUnmatchResponse403
+  | matchControllerUnmatchResponse404
+) & {
+  headers: Headers;
+};
+
+export const getMatchControllerUnmatchUrl = (id: number) => {
+  return `/api/matches/${id}`;
+};
+
+export const matchControllerUnmatch = async (
+  id: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<matchControllerUnmatchResponseSuccess> => {
+  return customFetch<matchControllerUnmatchResponseSuccess>(getMatchControllerUnmatchUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type sectorControllerFindAllResponse200 = {
+  data: SectorDto[];
+  status: 200;
+};
+
+export type sectorControllerFindAllResponseSuccess = sectorControllerFindAllResponse200 & {
+  headers: Headers;
+};
+export const getSectorControllerFindAllUrl = () => {
+  return `/api/sectors`;
+};
+
+export const sectorControllerFindAll = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<sectorControllerFindAllResponseSuccess> => {
+  return customFetch<sectorControllerFindAllResponseSuccess>(getSectorControllerFindAllUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type likeControllerFindSentResponse200 = {
+  data: LikeListItemDto[];
+  status: 200;
+};
+
+export type likeControllerFindSentResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type likeControllerFindSentResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type likeControllerFindSentResponseSuccess = likeControllerFindSentResponse200 & {
+  headers: Headers;
+};
+export type likeControllerFindSentResponseError = (
+  likeControllerFindSentResponse401 | likeControllerFindSentResponse403
+) & {
+  headers: Headers;
+};
+
+export const getLikeControllerFindSentUrl = (params?: LikeControllerFindSentParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/likes/sent?${stringifiedParams}` : `/api/likes/sent`;
+};
+
+export const likeControllerFindSent = async (
+  params?: LikeControllerFindSentParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<likeControllerFindSentResponseSuccess> => {
+  return customFetch<likeControllerFindSentResponseSuccess>(getLikeControllerFindSentUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type likeControllerFindReceivedResponse200 = {
+  data: LikeListItemDto[];
+  status: 200;
+};
+
+export type likeControllerFindReceivedResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type likeControllerFindReceivedResponse403 = {
+  data: void;
+  status: 403;
+};
+
+export type likeControllerFindReceivedResponse404 = {
+  data: void;
+  status: 404;
+};
+
+export type likeControllerFindReceivedResponseSuccess = likeControllerFindReceivedResponse200 & {
+  headers: Headers;
+};
+export type likeControllerFindReceivedResponseError = (
+  | likeControllerFindReceivedResponse401
+  | likeControllerFindReceivedResponse403
+  | likeControllerFindReceivedResponse404
+) & {
+  headers: Headers;
+};
+
+export const getLikeControllerFindReceivedUrl = (params?: LikeControllerFindReceivedParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/likes/received?${stringifiedParams}`
+    : `/api/likes/received`;
+};
+
+export const likeControllerFindReceived = async (
+  params?: LikeControllerFindReceivedParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<likeControllerFindReceivedResponseSuccess> => {
+  return customFetch<likeControllerFindReceivedResponseSuccess>(
+    getLikeControllerFindReceivedUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type accountControllerDeleteResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type accountControllerDeleteResponseSuccess = accountControllerDeleteResponse204 & {
+  headers: Headers;
+};
+export const getAccountControllerDeleteUrl = () => {
+  return `/api/account`;
+};
+
+export const accountControllerDelete = async (
+  deleteAccountDto: DeleteAccountDto,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<accountControllerDeleteResponseSuccess> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<accountControllerDeleteResponseSuccess>(getAccountControllerDeleteUrl(), {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(deleteAccountDto),
+  });
+};
+
+export type accountControllerExportResponse200 = {
+  data: AccountControllerExport200;
+  status: 200;
+};
+
+export type accountControllerExportResponseSuccess = accountControllerExportResponse200 & {
+  headers: Headers;
+};
+export const getAccountControllerExportUrl = () => {
+  return `/api/account/export`;
+};
+
+export const accountControllerExport = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<accountControllerExportResponseSuccess> => {
+  return customFetch<accountControllerExportResponseSuccess>(getAccountControllerExportUrl(), {
+    ...options,
+    method: 'GET',
+  });
 };

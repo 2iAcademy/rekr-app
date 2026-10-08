@@ -21,6 +21,7 @@ export type CandidateProfilePayload = {
   postalCode?: string;
   desiredJobTitle?: string;
   contractTypes?: ContractType[];
+  jobFamilyIds?: number[];
   experienceLevel?: ExperienceLevel;
   availability?: Availability;
   availabilityDelayMonths?: number;
@@ -67,6 +68,9 @@ export const buildCandidateProfilePayload = (
     postalCode: optionalText(state.postalCode),
     desiredJobTitle: optionalText(state.desiredJobTitle),
     contractTypes: optionalList(state.contractTypes),
+    // Sent as numbers: the state holds them as strings because that is what a
+    // chip value is, the API keys them on the reference table's ids.
+    jobFamilyIds: optionalList(state.jobFamilyIds.map(Number)),
     experienceLevel: optionalEnum(state.experienceLevel),
     availability: optionalEnum(state.availability),
     availabilityDelayMonths: availabilityDelay(state),

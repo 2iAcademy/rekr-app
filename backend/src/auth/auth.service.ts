@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '../../generated/prisma/client';
+import { PRIVACY_POLICY_VERSION } from '../account/privacy-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { hashPassword, verifyPassword } from './password-hash';
@@ -62,6 +63,9 @@ export class AuthService {
           email: signupDto.email,
           passwordHash,
           userType: signupDto.userType,
+          termsAcceptedAt: new Date(),
+          termsVersion: PRIVACY_POLICY_VERSION,
+          lastActiveAt: new Date(),
         },
       });
     } catch (error: unknown) {
@@ -105,6 +109,8 @@ export class AuthService {
     if (!user.isActive) {
       throw new ForbiddenException('This account is inactive.');
     }
+
+    await this.markActive(user.id);
 
     return this.buildSession(user, context);
   }
@@ -163,6 +169,8 @@ export class AuthService {
       return this.rejectAsReuse(stored.familyId);
     }
 
+    await this.markActive(user.id);
+
     return {
       accessToken: this.signAccessToken(user),
       user: this.toPublicUser(user),
@@ -206,6 +214,16 @@ export class AuthService {
     }
 
     return this.toPublicUser(user);
+  }
+
+  /**
+   * Raw SQL on purpose: a Prisma `update` would also stamp `updatedAt`, and a
+   * reopened tab is not a change to the account. The refresh runs on every
+   * boot of the client, so this is also the cheapest write available.
+   */
+  private async markActive(userId: number): Promise<void> {
+    await this.prismaService
+      .$executeRaw`UPDATE "user" SET last_active_at = now() WHERE id = ${userId}`;
   }
 
   private async buildSession(

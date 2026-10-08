@@ -3,32 +3,31 @@ import { useLocation, useNavigate } from 'react-router';
 import { homePathFor } from '@/domain/homeRoute';
 import { RouteGuard } from '@/features/auth/RouteGuard';
 import { MatchPage } from '@/features/matches/pages/MatchPage';
+import type { MatchedProfile } from '@/features/matches/likeResult';
+import { conversationPath } from '@/features/matches/paths';
 
 /**
- * Candidate-only: a match is born of a reciprocal like on one given offer, so a
- * recruiter reads it on the offer concerned rather than in a list spanning every
- * post of their company.
+ * Open to both roles: the screen now also holds the likes left unanswered, and
+ * those only exist on one side each — the offers a candidate liked without a
+ * match, the candidates who liked a recruiter's offers without a reply. The
+ * page picks its tabs from the session's role.
  */
 export function MatchesRoute() {
   return (
-    <RouteGuard allowedUserTypes={['candidate']}>
+    <RouteGuard>
       <MatchesPage />
     </RouteGuard>
   );
 }
 
 interface MatchRouteState {
-  matchedProfile?: {
-    name: string;
-    avatarUrl: string | null;
-  };
+  matchedProfile?: MatchedProfile;
 }
 
 export function MatchRoute() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { matchedProfile = { name: 'Votre match', avatarUrl: null } } =
-    (location.state as MatchRouteState | null) ?? {};
+  const { matchedProfile } = (location.state as MatchRouteState | null) ?? {};
 
   return (
     <RouteGuard>
@@ -38,9 +37,13 @@ export function MatchRoute() {
         return (
           <MatchPage
             currentUser={{ name: currentUserName }}
-            matchedProfile={matchedProfile}
+            matchedProfile={matchedProfile ?? { name: 'Votre match', avatarUrl: null }}
             onContinue={() => navigate(homePathFor(user))}
-            onWriteMessage={() => navigate(homePathFor(user))}
+            // The state does not survive a reload; the list of matches is then
+            // the nearest place the conversation can be opened from.
+            onWriteMessage={() =>
+              navigate(matchedProfile ? conversationPath(matchedProfile.matchId) : '/matches')
+            }
           />
         );
       }}

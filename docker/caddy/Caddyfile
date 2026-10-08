@@ -1,0 +1,41 @@
+# Production entry point, and the only service published on the host.
+#
+# Caddy obtains and renews the Let's Encrypt certificate for {$DOMAIN} on its
+# own, and redirects HTTP to HTTPS. It needs ports 80 and 443 open and the DNS
+# records of the domain pointing at the server before the first start.
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# The API keeps its /api prefix (app.setGlobalPrefix in setup-app.ts), so
+	# the path is forwarded as is. Caddy appends X-Forwarded-For, which is the
+	# single hop TRUST_PROXY_HOPS=1 tells Express to trust.
+	handle /api/* {
+		reverse_proxy backend:3001
+	}
+
+	# The SPA. Any path that is not a built file falls back to index.html, so
+	# React Router can resolve deep links on a full reload.
+	handle {
+		root * /srv
+
+		# Vite fingerprints every file under /assets: a new build ships new
+		# names, so these can be cached for good. index.html is not.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		header {
+			Strict-Transport-Security "max-age=31536000"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			-Server
+		}
+
+		try_files {path} /index.html
+		file_server
+	}
+}

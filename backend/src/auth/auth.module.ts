@@ -7,6 +7,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { resolveJwtSecret } from './jwt-secret';
 import { PasswordResetService } from './password-reset.service';
 import { RefreshTokenService } from './refresh-token.service';
 
@@ -17,17 +18,10 @@ import { RefreshTokenService } from './refresh-token.service';
     PrismaModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const jwtSecret = configService.get<string>('JWT_SECRET');
-        if (!jwtSecret) {
-          throw new Error('JWT_SECRET is required to start the API.');
-        }
-
-        return {
-          secret: jwtSecret,
-          signOptions: { expiresIn: '15m' },
-        };
-      },
+      useFactory: (configService: ConfigService) => ({
+        secret: resolveJwtSecret(configService),
+        signOptions: { expiresIn: '15m' },
+      }),
     }),
   ],
   controllers: [AuthController],

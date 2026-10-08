@@ -9,11 +9,20 @@ import { stubCityReference } from './city-reference';
 import { resetDb } from './reset-db';
 import { resetCityCache } from './city-cache-reset';
 import { resetThrottler } from './throttler-reset';
+import {
+  DEFAULT_JOB_FAMILY,
+  OTHER_JOB_FAMILY,
+  jobFamilyIdFor,
+} from './job-family-reference';
 
 describe('CandidateProfile (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let fetchMock: jest.Mock;
+  // The trades every fixture profile is looking for. Required at creation
+  // since job families landed, and read once because the reference rows
+  // outlive `resetDb`.
+  let jobFamilyIds: number[];
 
   const createUser = (userType: 'candidate' | 'recruiter' = 'candidate') =>
     prisma.user.create({
@@ -31,9 +40,10 @@ describe('CandidateProfile (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     configureApp(app);
-    await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = app.get(PrismaService);
+    jobFamilyIds = [await jobFamilyIdFor(prisma)];
   });
 
   beforeEach(async () => {
@@ -51,7 +61,7 @@ describe('CandidateProfile (e2e)', () => {
   it('rejects an unauthenticated create with 401', async () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
-      .send({ firstName: 'Ada', lastName: 'Lovelace' })
+      .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
       .expect(401);
   });
 
@@ -61,7 +71,7 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, recruiter.id, 'recruiter'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace' })
+      .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
       .expect(403);
   });
 
@@ -71,6 +81,7 @@ describe('CandidateProfile (e2e)', () => {
     const payload = {
       firstName: 'Ada',
       lastName: 'Lovelace',
+      jobFamilyIds,
       bio: 'Pionnière du calcul.',
       city: 'Lyon',
       postalCode: '69001',
@@ -124,7 +135,7 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace' })
+      .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
       .expect(201);
 
     await httpRequest(app)
@@ -170,7 +181,7 @@ describe('CandidateProfile (e2e)', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'A', lastName: 'B', bio: 'origine' })
+        .send({ jobFamilyIds, firstName: 'A', lastName: 'B', bio: 'origine' })
         .expect(201);
     }
 
@@ -192,7 +203,7 @@ describe('CandidateProfile (e2e)', () => {
       httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'Ada', lastName: 'Lovelace' });
+        .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' });
 
     await create().expect(201);
     await create().expect(409);
@@ -206,7 +217,7 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace' })
+      .send({ jobFamilyIds, firstName: 'Ada', lastName: 'Lovelace' })
       .expect(201);
 
     fetchMock.mockResolvedValue(
@@ -220,6 +231,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         city: 'Atlantide',
@@ -237,7 +249,12 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace', skills: ['Anglais'] })
+      .send({
+        jobFamilyIds,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        skills: ['Anglais'],
+      })
       .expect(201);
 
     await httpRequest(app)
@@ -273,6 +290,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         experienceLevel: 'NOT_A_LEVEL',
@@ -293,6 +311,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         city: 'Wakanda',
@@ -312,7 +331,12 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace', city: 'Marseille' })
+      .send({
+        jobFamilyIds,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        city: 'Marseille',
+      })
       .expect(400);
   });
 
@@ -329,6 +353,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         city: 'Brest',
@@ -344,6 +369,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         skills: ['React', 'TypeScript', 'Node.js'],
@@ -369,6 +395,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         skills: ['React'],
@@ -400,6 +427,7 @@ describe('CandidateProfile (e2e)', () => {
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
       .send({
+        jobFamilyIds,
         firstName: 'Ada',
         lastName: 'Lovelace',
         languages: ['x'.repeat(101)],
@@ -415,7 +443,12 @@ describe('CandidateProfile (e2e)', () => {
       await httpRequest(app)
         .post('/api/candidate-profiles')
         .set('Authorization', bearerFor(app, user.id, 'candidate'))
-        .send({ firstName: 'A', lastName: 'B', skills: ['React'] })
+        .send({
+          jobFamilyIds,
+          firstName: 'A',
+          lastName: 'B',
+          skills: ['React'],
+        })
         .expect(201);
     }
 
@@ -429,7 +462,12 @@ describe('CandidateProfile (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', bearerFor(app, user.id, 'candidate'))
-      .send({ firstName: 'Ada', lastName: 'Lovelace', hacker: 'x' })
+      .send({
+        jobFamilyIds,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        hacker: 'x',
+      })
       .expect(400);
   });
 
@@ -470,6 +508,232 @@ describe('CandidateProfile (e2e)', () => {
           .expect(404);
       },
     );
+  });
+
+  describe('the trades a candidate looks for', () => {
+    let first: number;
+    let second: number;
+    let third: number;
+    let fourth: number;
+
+    beforeAll(async () => {
+      first = await jobFamilyIdFor(prisma, OTHER_JOB_FAMILY);
+      second = await jobFamilyIdFor(prisma, DEFAULT_JOB_FAMILY);
+      [third, fourth] = (
+        await prisma.jobFamily.findMany({
+          where: { id: { notIn: [first, second] } },
+          orderBy: { id: 'asc' },
+          take: 2,
+        })
+      ).map(({ id }) => id);
+    });
+
+    const signUp = async (families: number[]) => {
+      const user = await createUser('candidate');
+      await httpRequest(app)
+        .post('/api/candidate-profiles')
+        .set('Authorization', bearerFor(app, user.id, 'candidate'))
+        .send({
+          jobFamilyIds: families,
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+        })
+        .expect(201);
+      return user;
+    };
+
+    const patch = (userId: number, body: object) =>
+      httpRequest(app)
+        .patch('/api/candidate-profiles/me')
+        .set('Authorization', bearerFor(app, userId, 'candidate'))
+        .send(body);
+
+    const readTrades = async (userId: number): Promise<number[]> => {
+      const res = await httpRequest(app)
+        .get('/api/candidate-profiles/me')
+        .set('Authorization', bearerFor(app, userId, 'candidate'))
+        .expect(200);
+      return (res.body as { jobFamilyIds: number[] }).jobFamilyIds;
+    };
+
+    // Without them the account screen cannot show what the onboarding chose,
+    // and a candidate who picked the wrong trade had no way to see it.
+    it('reads back the trades chosen at sign-up', async () => {
+      const user = await signUp([second]);
+
+      expect(await readTrades(user.id)).toEqual([second]);
+    });
+
+    // The order is the preference: the first trade is the primary one, so it
+    // must survive the round trip rather than come back sorted by id.
+    it('keeps the order the candidate gave, primary first', async () => {
+      const user = await signUp([second, first]);
+
+      expect(await readTrades(user.id)).toEqual([second, first]);
+
+      const stored = await prisma.candidateJobFamily.findMany({
+        where: { candidateUserId: user.id },
+        orderBy: { rank: 'asc' },
+        select: { jobFamilyId: true, rank: true },
+      });
+      expect(stored).toEqual([
+        { jobFamilyId: second, rank: 0 },
+        { jobFamilyId: first, rank: 1 },
+      ]);
+    });
+
+    const readPrimary = async (userId: number): Promise<number | null> => {
+      const res = await httpRequest(app)
+        .get('/api/candidate-profiles/me')
+        .set('Authorization', bearerFor(app, userId, 'candidate'))
+        .expect(200);
+      return (res.body as { primaryJobFamilyId: number | null })
+        .primaryJobFamilyId;
+    };
+
+    it('names the primary trade the candidate ranked first', async () => {
+      const user = await signUp([second, first]);
+
+      expect(await readPrimary(user.id)).toBe(second);
+    });
+
+    // Nothing to prefer a single trade over: the form shows no star for it.
+    it('names no primary for a single trade', async () => {
+      const user = await signUp([second]);
+
+      expect(await readPrimary(user.id)).toBeNull();
+    });
+
+    /**
+     * The rows written before the rank existed all read 0. The list still
+     * comes back in some order, and the form must not mistake its first entry
+     * for a choice the candidate made — the null is what tells it apart.
+     */
+    it('names no primary for trades written before the rank', async () => {
+      const user = await signUp([second]);
+      await prisma.candidateJobFamily.deleteMany({
+        where: { candidateUserId: user.id },
+      });
+      await prisma.candidateJobFamily.createMany({
+        data: [first, second].map((jobFamilyId) => ({
+          candidateUserId: user.id,
+          jobFamilyId,
+          rank: 0,
+        })),
+      });
+
+      expect(await readPrimary(user.id)).toBeNull();
+    });
+
+    it('lets the candidate change their trades and their primary', async () => {
+      const user = await signUp([second, first]);
+
+      await patch(user.id, { jobFamilyIds: [third, second] }).expect(200);
+
+      expect(await readTrades(user.id)).toEqual([third, second]);
+    });
+
+    it('leaves the trades alone when a patch does not mention them', async () => {
+      const user = await signUp([second, first]);
+
+      await patch(user.id, { bio: 'Nouvelle bio' }).expect(200);
+
+      expect(await readTrades(user.id)).toEqual([second, first]);
+    });
+
+    /**
+     * An empty list is the state every account created before job families
+     * lived in, and it serves them every trade. Refusing it here would make
+     * that state unreachable the moment someone picks a trade.
+     */
+    it('accepts an empty list on update, which reopens every trade', async () => {
+      const user = await signUp([second]);
+
+      await patch(user.id, { jobFamilyIds: [] }).expect(200);
+
+      expect(await readTrades(user.id)).toEqual([]);
+    });
+
+    // The sign-up still requires one: a new profile without a trade is the
+    // bucket the field was added to close.
+    it('still requires a trade at sign-up', async () => {
+      const user = await createUser('candidate');
+
+      await httpRequest(app)
+        .post('/api/candidate-profiles')
+        .set('Authorization', bearerFor(app, user.id, 'candidate'))
+        .send({ jobFamilyIds: [], firstName: 'Ada', lastName: 'Lovelace' })
+        .expect(400);
+    });
+
+    it('refuses more trades than the cap on update', async () => {
+      const user = await signUp([second]);
+
+      await patch(user.id, {
+        jobFamilyIds: [first, second, third, fourth],
+      }).expect(400);
+      expect(await readTrades(user.id)).toEqual([second]);
+    });
+
+    // A trade listed twice holds two ranks at once, and the composite key
+    // would silently keep whichever came first.
+    it('refuses a trade listed twice', async () => {
+      const user = await signUp([second]);
+
+      await patch(user.id, { jobFamilyIds: [first, first] }).expect(400);
+    });
+
+    it('refuses a trade listed twice at sign-up', async () => {
+      const user = await createUser('candidate');
+
+      await httpRequest(app)
+        .post('/api/candidate-profiles')
+        .set('Authorization', bearerFor(app, user.id, 'candidate'))
+        .send({
+          jobFamilyIds: [first, first],
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+        })
+        .expect(400);
+    });
+
+    /**
+     * Two tabs, or an API client saving twice at once. A patch carrying only
+     * the trades updates no profile column, so nothing locked the row and both
+     * wipe-and-rewrites kept their union: six trades, every rank twice.
+     * Repeated because a single pair often serialises on its own.
+     */
+    it('keeps one of two concurrent trade lists, never their union', async () => {
+      const families = (
+        await prisma.jobFamily.findMany({ orderBy: { id: 'asc' }, take: 6 })
+      ).map(({ id }) => id);
+
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const user = await signUp([second]);
+
+        await Promise.all([
+          patch(user.id, { jobFamilyIds: families.slice(0, 3) }).expect(200),
+          patch(user.id, { jobFamilyIds: families.slice(3, 6) }).expect(200),
+        ]);
+
+        const stored = await prisma.candidateJobFamily.findMany({
+          where: { candidateUserId: user.id },
+          orderBy: [{ rank: 'asc' }, { jobFamilyId: 'asc' }],
+          select: { jobFamilyId: true, rank: true },
+        });
+        expect(stored.map(({ rank }) => rank)).toEqual([0, 1, 2]);
+        expect([families.slice(0, 3), families.slice(3, 6)]).toContainEqual(
+          stored.map(({ jobFamilyId }) => jobFamilyId),
+        );
+      }
+    });
+
+    it('refuses an unknown trade on update', async () => {
+      const user = await signUp([second]);
+
+      await patch(user.id, { jobFamilyIds: [2_000_000_000] }).expect(400);
+      expect(await readTrades(user.id)).toEqual([second]);
+    });
   });
 
   describe('GET /api/candidate-profiles/me', () => {
@@ -588,6 +852,8 @@ describe('CandidateProfile (e2e)', () => {
         cvUrl: 'candidates/1/cv/ada.pdf',
         skills: ['React'],
         languages: ['Anglais'],
+        jobFamilyIds: [],
+        primaryJobFamilyId: null,
         createdAt: expect.any(String) as string,
         updatedAt: expect.any(String) as string,
       });
@@ -695,6 +961,8 @@ describe('CandidateProfile (e2e)', () => {
         cvUrl: null,
         skills: [],
         languages: [],
+        jobFamilyIds: [],
+        primaryJobFamilyId: null,
         createdAt: expect.any(String) as string,
         updatedAt: expect.any(String) as string,
       });

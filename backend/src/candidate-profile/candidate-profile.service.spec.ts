@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import { Prisma } from '../../generated/prisma/client';
 import { CandidateProfileService } from './candidate-profile.service';
 import { CityService } from '../city/city.service';
+import { JobFamilyService } from '../job-family/job-family.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type PrismaMock = {
@@ -17,7 +18,9 @@ type PrismaMock = {
   };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
   candidateTag: { deleteMany: jest.Mock; createMany: jest.Mock };
+  candidateJobFamily: { deleteMany: jest.Mock; createMany: jest.Mock };
   $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
 };
 
 const buildPrismaMock = (): PrismaMock => {
@@ -29,7 +32,10 @@ const buildPrismaMock = (): PrismaMock => {
     },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     candidateTag: { deleteMany: jest.fn(), createMany: jest.fn() },
+    candidateJobFamily: { deleteMany: jest.fn(), createMany: jest.fn() },
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
+    // The row lock `update` takes before rewriting the trades.
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
   return mock;
 };
@@ -38,16 +44,19 @@ describe('CandidateProfileService', () => {
   let service: CandidateProfileService;
   let prisma: PrismaMock;
   let cities: { assertKnown: jest.Mock };
+  let jobFamilies: { assertKnown: jest.Mock };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
     cities = { assertKnown: jest.fn().mockResolvedValue(undefined) };
+    jobFamilies = { assertKnown: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         CandidateProfileService,
         { provide: PrismaService, useValue: prisma },
         { provide: CityService, useValue: cities },
+        { provide: JobFamilyService, useValue: jobFamilies },
       ],
     }).compile();
 
@@ -56,7 +65,11 @@ describe('CandidateProfileService', () => {
 
   describe('create', () => {
     it('persists a new profile linked to the given user', async () => {
-      const dto = { firstName: 'Ada', lastName: 'Lovelace' };
+      const dto = {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        jobFamilyIds: [13],
+      };
       prisma.candidateProfile.findUnique.mockResolvedValue(null);
       prisma.candidateProfile.create.mockResolvedValue({
         id: 1,
@@ -81,7 +94,11 @@ describe('CandidateProfileService', () => {
     // unknown fields upstream: the identity key depends on a pipe option set in
     // another file. Spreading first makes the ownership structural instead.
     it('ignores a userId smuggled in the payload and keeps the caller as owner', async () => {
-      const dto = { firstName: 'Mallory', lastName: 'Smith' };
+      const dto = {
+        firstName: 'Mallory',
+        lastName: 'Smith',
+        jobFamilyIds: [13],
+      };
       prisma.candidateProfile.findUnique.mockResolvedValue(null);
       prisma.candidateProfile.create.mockResolvedValue({ id: 2, userId: 42 });
 
@@ -102,6 +119,7 @@ describe('CandidateProfileService', () => {
       await service.create(42, {
         firstName: 'Ada',
         lastName: 'Lovelace',
+        jobFamilyIds: [13],
         skills: ['React'],
         languages: ['Anglais'],
       });
@@ -130,6 +148,7 @@ describe('CandidateProfileService', () => {
       await service.create(42, {
         firstName: 'Ada',
         lastName: 'Lovelace',
+        jobFamilyIds: [13],
         city: 'Lyon',
         postalCode: '69001',
       });
@@ -149,6 +168,7 @@ describe('CandidateProfileService', () => {
         service.create(42, {
           firstName: 'Ada',
           lastName: 'Lovelace',
+          jobFamilyIds: [13],
           city: 'Wakanda',
           postalCode: '99999',
         }),
@@ -164,7 +184,11 @@ describe('CandidateProfileService', () => {
       });
 
       await expect(
-        service.create(42, { firstName: 'Ada', lastName: 'Lovelace' }),
+        service.create(42, {
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          jobFamilyIds: [13],
+        }),
       ).rejects.toBeInstanceOf(ConflictException);
 
       expect(prisma.candidateProfile.create).not.toHaveBeenCalled();
@@ -293,7 +317,10 @@ describe('CandidateProfileService', () => {
       lastName: 'Lovelace',
       latitude: null,
       longitude: null,
-      user: { candidateTags: [] as unknown[] },
+      user: {
+        candidateTags: [] as unknown[],
+        candidateJobFamilies: [] as unknown[],
+      },
       ...overrides,
     });
 
@@ -310,7 +337,7 @@ describe('CandidateProfileService', () => {
      * caller, and the only thing read off the `user` relation is the tag links —
      * `passwordHash` lives on that same row.
      */
-    it('keys the read on the caller and reads nothing off the account but its tags', async () => {
+    it('keys the read on the caller and reads nothing off the account but its tags and trades', async () => {
       prisma.candidateProfile.findUnique.mockResolvedValue(profileRow());
 
       await service.findMine(42);
@@ -325,6 +352,10 @@ describe('CandidateProfileService', () => {
                   orderBy: { tag: { label: 'asc' } },
                   select: { tag: { select: { label: true, category: true } } },
                 },
+                candidateJobFamilies: {
+                  orderBy: [{ rank: 'asc' }, { jobFamilyId: 'asc' }],
+                  select: { jobFamilyId: true, rank: true },
+                },
               },
             },
           }) as object,
@@ -336,6 +367,7 @@ describe('CandidateProfileService', () => {
       prisma.candidateProfile.findUnique.mockResolvedValue(
         profileRow({
           user: {
+            candidateJobFamilies: [],
             candidateTags: [
               { tag: { label: 'Anglais', category: 'language' } },
               { tag: { label: 'React', category: 'skill' } },
@@ -358,6 +390,7 @@ describe('CandidateProfileService', () => {
       prisma.candidateProfile.findUnique.mockResolvedValue(
         profileRow({
           user: {
+            candidateJobFamilies: [],
             candidateTags: [{ tag: { label: 'Docker', category: 'tech' } }],
           },
         }),

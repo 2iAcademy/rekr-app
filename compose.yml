@@ -4,13 +4,18 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: dev
-    command: npm run start:dev
+    # Migrations run once per container start; `nest start --watch` reloads
+    # inside the same process, so a code change does not replay them.
+    command: sh -c "npx prisma migrate deploy && npm run start:dev"
     environment:
       NODE_ENV: development
       PORT: ${PORT:-3001}
-      DATABASE_URL: ${DATABASE_URL:-}
+      # Development-only defaults, so that a fresh clone starts with no `.env`.
+      # The JWT secret is public on purpose: the API refuses any `dev-only-`
+      # value once NODE_ENV=production.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-postgres}}
       SENTRY_DSN: ${SENTRY_DSN:-}
-      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-jwt-secret-for-local-compose}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-}
       THROTTLE_TTL_SECONDS: ${THROTTLE_TTL_SECONDS:-}
       THROTTLE_DEFAULT_LIMIT: ${THROTTLE_DEFAULT_LIMIT:-}
@@ -19,6 +24,8 @@ services:
       THROTTLE_LOGS_LIMIT: ${THROTTLE_LOGS_LIMIT:-}
       THROTTLE_PASSWORD_FORGOT_LIMIT: ${THROTTLE_PASSWORD_FORGOT_LIMIT:-}
       THROTTLE_PASSWORD_RESET_LIMIT: ${THROTTLE_PASSWORD_RESET_LIMIT:-}
+      THROTTLE_ACCOUNT_DELETE_LIMIT: ${THROTTLE_ACCOUNT_DELETE_LIMIT:-}
+      ACCOUNT_PURGE_INTERVAL_HOURS: ${ACCOUNT_PURGE_INTERVAL_HOURS:-}
       PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-}
       APP_URL: ${APP_URL:-}
       SMTP_HOST: ${SMTP_HOST:-}
@@ -28,6 +35,11 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
       UPLOADS_DIR: ${UPLOADS_DIR:-/var/lib/rekr/uploads}
+      ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-true}
+      ELASTICSEARCH_NODE: ${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
+      ELASTICSEARCH_REINDEX_ON_STARTUP: ${ELASTICSEARCH_REINDEX_ON_STARTUP:-false}
+      STREAM_API_KEY: ${STREAM_API_KEY:-}
+      STREAM_API_SECRET: ${STREAM_API_SECRET:-}
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -44,6 +56,31 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      elasticsearch:
+        condition: service_started
+
+  # Local development only. Production must use TLS, credentials, and a managed
+  # or separately secured cluster; disabling Elastic security here keeps the
+  # developer stack self-contained rather than defining a production posture.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:9200/_cluster/health?wait_for_status=yellow >/dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
 
   frontend:
     build:
@@ -107,3 +144,4 @@ volumes:
   pg18_data:
   frontend_node_modules:
   backend_uploads:
+  elasticsearch_data:

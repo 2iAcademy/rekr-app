@@ -7,7 +7,10 @@ export function CandidateFeedRoute() {
 
   return (
     <RouteGuard allowedUserTypes={['candidate']}>
-      <CandidateFeedPage onOpenOffer={(id) => navigate(`/offres/${id}`)} />
+      <CandidateFeedPage
+        onOpenOffer={(id) => navigate(`/offres/${id}`)}
+        onMatch={(matchedProfile) => navigate('/match', { state: { matchedProfile } })}
+      />
     </RouteGuard>
   );
 }

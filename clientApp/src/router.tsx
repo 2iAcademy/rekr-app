@@ -5,6 +5,7 @@ import { HomeRedirect } from '@/features/auth/HomeRedirect';
 import { RouteGuard } from '@/features/auth/RouteGuard';
 import { CandidateOnboardingRoute } from '@/features/candidate-onboarding/routes';
 import { CandidateFeedRoute } from '@/features/candidate-feed/routes';
+import { ConversationRoute } from '@/features/conversation/routes';
 import { MatchRoute, MatchesRoute } from '@/features/matches/routes';
 import {
   ForgotPasswordRoute,
@@ -13,6 +14,7 @@ import {
   SignupRoute,
   SplashRoute,
 } from '@/features/onboarding/routes';
+import { LegalNoticeRoute, PrivacyPolicyRoute } from '@/features/legal/routes';
 import { OfferDetailRoute } from '@/features/offers/routes';
 import { ProfileRoute } from '@/features/profile/routes';
 import { OfferApplicantsRoute } from '@/features/recruiter-candidates/routes';
@@ -31,6 +33,10 @@ export const routes = [
     ],
   },
 
+  // Under neither guard: read before an account exists, and reread after.
+  { path: '/confidentialite', element: <PrivacyPolicyRoute /> },
+  { path: '/mentions-legales', element: <LegalNoticeRoute /> },
+
   { path: '/candidat/onboarding', element: <CandidateOnboardingRoute /> },
   { path: '/recruteur/onboarding', element: <RecruiterOnboardingRoute /> },
   {
@@ -38,6 +44,9 @@ export const routes = [
     children: [
       { path: '/offres/:id', element: <OfferDetailRoute /> },
       { path: '/match', element: <MatchRoute /> },
+      // Full screen, outside the shell: the thread and its composer need the
+      // whole height, the bottom navigation would sit on the composer.
+      { path: '/matches/:matchId/conversation', element: <ConversationRoute /> },
       {
         element: <AppShell />,
         children: [

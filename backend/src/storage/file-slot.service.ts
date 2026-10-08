@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { FILE_STORAGE, type FileStorage } from './file-storage.interface';
-import { FILE_KINDS, FileKind } from './file-kind';
+import { FILE_KINDS, FileKind, FileScope } from './file-kind';
 import { buildStorageKey, isStorageKey } from './storage-key';
 import { UploadedFile } from './uploaded-file.interface';
 import { validateUploadedFile } from './upload-validation';
@@ -71,6 +71,24 @@ export class FileSlotService {
     await this.deleteQuietly(previousKey, null);
 
     return persisted;
+  }
+
+  /**
+   * Drop every file of an owner whose rows are already gone — the tail of an
+   * account deletion. By directory rather than by the keys the rows held, so
+   * that a file no row points at any more (a failed unlink, an upload racing
+   * the deletion) goes too. Best-effort, like the last step of `replace`: the
+   * erasure is committed by then, and a leftover costs disk, not data.
+   */
+  async discardOwner(scope: FileScope, ownerId: number): Promise<void> {
+    try {
+      await this.storage.deleteOwner(scope, ownerId);
+    } catch (error) {
+      this.logger.error(
+        `Orphan files left behind: could not delete "${scope}/${ownerId}/".`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   async read(key: string | null): Promise<Buffer> {

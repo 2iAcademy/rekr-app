@@ -7,15 +7,17 @@ import { CandidateAvatar } from '../components/CandidateAvatar';
 import { ChipList } from '@/components/feed/ChipList';
 import { contractLabel, metaLine } from '@/components/feed/labels';
 import { availabilityLabel, experienceLabel, remoteLabel } from '../labels';
+import type { ApplicantDecision } from '../useApplicants';
 
 interface CandidateDetailPageProps {
   candidate: OfferApplicantDto;
-  /** Whether this recruiter has already answered this candidate. */
-  liked?: boolean;
-  /** The like is in flight. */
+  /** Saved recruiter decision for this candidate, if any. */
+  decision: ApplicantDecision;
+  /** A decision write is in flight. */
   pending?: boolean;
   onBack: () => void;
   onLike: () => void;
+  onPass: () => void;
 }
 
 const SECTION_TITLE = 'text-xs font-semibold tracking-wider text-ink-muted uppercase';
@@ -59,12 +61,16 @@ function TagSection({
  */
 export function CandidateDetailPage({
   candidate,
-  liked = false,
+  decision,
   pending = false,
   onBack,
   onLike,
+  onPass,
 }: CandidateDetailPageProps) {
   const { firstName } = candidate;
+  const isDecided = decision !== null;
+  const decisionText =
+    decision?.kind === 'liked' ? 'Intérêt déjà enregistré' : 'Candidat déjà passé';
 
   // Names the landmark that takes the focus below, so opening the screen
   // announces whose profile it is and not just « region ».
@@ -162,17 +168,37 @@ export function CandidateDetailPage({
         )}
       </div>
 
-      <div className="sticky bottom-0 z-10 flex bg-gradient-to-t from-background from-40% via-background/85 to-transparent px-5 pt-8 pb-4 sm:px-8">
+      {decision !== null && (
+        <p
+          role="status"
+          title={`Décision enregistrée le ${decision.at}`}
+          className="px-5 text-center text-sm font-medium text-ink-muted sm:px-8"
+        >
+          {decisionText}
+        </p>
+      )}
+
+      <div className="sticky bottom-0 z-10 flex gap-3 bg-gradient-to-t from-background from-40% via-background/85 to-transparent px-5 pt-8 pb-4 sm:px-8">
         <Button
           type="button"
-          variant={liked ? 'outline' : 'role'}
+          variant="outline"
           size="xl"
-          disabled={liked || pending}
+          disabled={isDecided || pending}
+          className="flex-1 rounded-full"
+          onClick={onPass}
+        >
+          Passer
+        </Button>
+        <Button
+          type="button"
+          variant="role"
+          size="xl"
+          disabled={isDecided || pending}
           className="flex-1 rounded-full"
           onClick={onLike}
         >
           <Heart aria-hidden="true" className="size-5 fill-current" />
-          {liked ? 'Intérêt enregistré' : 'Liker'}
+          Liker
         </Button>
       </div>
     </section>

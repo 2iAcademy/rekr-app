@@ -9,6 +9,11 @@ import { OptionCards, type Option } from '@/components/form/OptionCards';
 import type { RoleTheme } from '@/lib/roleTheme';
 import { SIGNUP_SUCCESS, signupBusiness } from '@/features/auth/authFeedback';
 import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
+import {
+  PASSWORD_RULE_HINT,
+  passwordProblem,
+  passwordRefusalMessage,
+} from '@/features/auth/passwordRule';
 
 // Typed as `RoleTheme`: the selected value is fed straight to `data-role`, so a
 // value without a matching palette scope must not compile.
@@ -25,6 +30,24 @@ interface SignupPageProps {
   onSubmit?: (data: { role: Role; email: string; password: string }) => void;
 }
 
+/**
+ * A new tab, so that reading the policy does not throw away a half-filled form.
+ * A plain anchor rather than a router `Link`: the page renders outside any
+ * router in its own tests, and a new tab reloads the app anyway.
+ */
+function LegalLink({ href, children }: { href: string; children: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-medium text-role-strong underline-offset-2 hover:underline"
+    >
+      {children}
+    </a>
+  );
+}
+
 export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
   const { signup } = useAuth();
   const [role, setRole] = useState<Role>(roleOptions[0].value);
@@ -33,11 +56,21 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which of the messages `error` holds is the password's own, so the field
+  // can point at it.
+  const [passwordRefused, setPasswordRefused] = useState(false);
 
   const passwordsMatch = password === confirmPassword;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    const problem = passwordProblem(password, email);
+    if (problem) {
+      setError(problem);
+      setPasswordRefused(true);
+      return;
+    }
 
     if (!passwordsMatch) {
       setError('Les mots de passe ne correspondent pas.');
@@ -54,7 +87,10 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
       notifySuccess(SIGNUP_SUCCESS);
       onSubmit?.({ role, email, password });
     } catch (caught) {
-      notifyFailure(caught, signupBusiness);
+      // The form already holds the rule, so a refusal only reaches here if
+      // the two copies drift apart: the toast still says what is missing.
+      const refusal = passwordRefusalMessage(caught);
+      notifyFailure(caught, refusal ? { ...signupBusiness, 400: refusal } : signupBusiness);
     }
   };
 
@@ -116,9 +152,17 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
             onChange={(event) => {
               setPassword(event.target.value);
               setError(null);
+              setPasswordRefused(false);
             }}
             placeholder="8 caractères min."
+            aria-invalid={passwordRefused}
+            aria-describedby={
+              passwordRefused ? 'signup-password-hint signup-error' : 'signup-password-hint'
+            }
           />
+          <p id="signup-password-hint" className="text-xs text-ink-muted">
+            {PASSWORD_RULE_HINT}
+          </p>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -160,7 +204,8 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
             />
           </span>
           <span className="text-xs leading-snug text-ink-muted">
-            J'accepte les CGU et la politique de confidentialité.
+            J'accepte les <LegalLink href="/mentions-legales">CGU</LegalLink> et la{' '}
+            <LegalLink href="/confidentialite">politique de confidentialité</LegalLink>.
           </span>
         </label>
 

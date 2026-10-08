@@ -6,6 +6,9 @@ import { AuthProvider } from '@/features/auth/AuthProvider';
 import { routes } from '@/router';
 
 vi.mock('@/api/generated', () => ({
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
   authControllerLogin: vi.fn(),
   authControllerLogout: vi.fn(),
   authControllerSignup: vi.fn(),
@@ -14,7 +17,10 @@ vi.mock('@/api/generated', () => ({
   companyControllerCreate: vi.fn(),
   companyControllerUpdateMine: vi.fn(),
   offerControllerCreate: vi.fn(),
+  offerControllerFindFeed: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerFindMine: vi.fn(),
+  offerControllerLike: vi.fn(),
+  offerControllerPass: vi.fn(),
   offerControllerFindOneById: vi.fn(),
   offerControllerUpdate: vi.fn(),
   sectorControllerFindAll: vi.fn(),
@@ -167,6 +173,8 @@ describe('routes des offres recruteur', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Modifier l’offre' }),
     ).toBeInTheDocument();
-    expect(findOneById).toHaveBeenCalledWith(12);
+    // The title paints before the fetch effect runs: RouterProvider renders in a
+    // transition, so under load the effect can land after the heading is found.
+    await waitFor(() => expect(findOneById).toHaveBeenCalledWith(12));
   });
 });

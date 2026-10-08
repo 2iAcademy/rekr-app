@@ -11,6 +11,7 @@ import {
 import { configureApp } from '../src/setup-app';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
+import { WEAK_PASSWORD_MESSAGES } from '../src/common/validation/password-strength';
 
 const PASSWORD = 'Sup3rSecret!';
 const NEW_PASSWORD = 'Nouveau-Mot2Passe!';
@@ -30,9 +31,12 @@ describe('Auth password reset (e2e)', () => {
   };
 
   const signup = (email: string) =>
-    httpRequest(app)
-      .post('/api/auth/signup')
-      .send({ email, password: PASSWORD, userType: 'candidate' });
+    httpRequest(app).post('/api/auth/signup').send({
+      email,
+      password: PASSWORD,
+      userType: 'candidate',
+      acceptTerms: true,
+    });
 
   const forgot = (email: string) =>
     httpRequest(app).post('/api/auth/password/forgot').send({ email });
@@ -85,7 +89,7 @@ describe('Auth password reset (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     configureApp(app);
-    await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = app.get(PrismaService);
   });
@@ -237,6 +241,27 @@ describe('Auth password reset (e2e)', () => {
     await reset(token, 'court').expect(400);
     await login('candidate@test.dev', PASSWORD).expect(200);
   });
+
+  it.each([
+    ['aaaaaaaa', WEAK_PASSWORD_MESSAGES.distinct],
+    ['Motdepasse1!', WEAK_PASSWORD_MESSAGES.common],
+    ['12345678!', WEAK_PASSWORD_MESSAGES.walk],
+    ['P@ssw0rd', WEAK_PASSWORD_MESSAGES.common],
+    ['candidate@test.dev', WEAK_PASSWORD_MESSAGES.email],
+    ['CANDIDATE@TEST.DEV', WEAK_PASSWORD_MESSAGES.email],
+  ])(
+    'rejects %s like signup does, and leaves the link usable',
+    async (weak, reason) => {
+      await signup('candidate@test.dev').expect(201);
+      const token = await requestLink('candidate@test.dev');
+
+      const res = await reset(token, weak).expect(400);
+
+      expect((res.body as { message: string[] }).message).toEqual([reason]);
+      await login('candidate@test.dev', PASSWORD).expect(200);
+      await reset(token, NEW_PASSWORD).expect(204);
+    },
+  );
 });
 
 /** Everything a client could read off the response except what necessarily

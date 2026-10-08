@@ -2,6 +2,7 @@ import type { OfferFormValue } from './offerPayload';
 
 export type OfferField =
   | 'title'
+  | 'jobFamilyId'
   | 'description'
   | 'skills'
   | 'city'
@@ -27,7 +28,7 @@ const filled =
     value[field].trim() !== '';
 
 const chosen =
-  (field: 'contractType' | 'minExperienceLevel' | 'remotePolicy') =>
+  (field: 'jobFamilyId' | 'contractType' | 'minExperienceLevel' | 'remotePolicy') =>
   (value: OfferFormValue): boolean =>
     value[field] !== '';
 
@@ -75,6 +76,14 @@ const RULES: readonly Rule[] = [
     // together, so a half-filled pair means the field was edited after a
     // selection — and the API refuses a lone city anyway.
     isSatisfied: (value) => filled('city')(value) && filled('postalCode')(value),
+  },
+  {
+    field: 'jobFamilyId',
+    // Refused here and not only server-side: an offer published without a
+    // family reaches no candidate feed at all, which is a silent failure the
+    // recruiter would have no way of diagnosing.
+    message: 'Choisissez le domaine du poste.',
+    isSatisfied: chosen('jobFamilyId'),
   },
   {
     field: 'contractType',

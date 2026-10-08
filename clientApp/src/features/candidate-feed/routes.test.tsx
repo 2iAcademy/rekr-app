@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
+import userEvent from '@testing-library/user-event';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { anOffer } from './fixtures';
 import { routes } from '@/router';
 
 vi.mock('@/api/generated', () => ({
@@ -94,5 +96,51 @@ describe('navigation vers le feed candidat', () => {
 
     expect(feedHeading()).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Se connecter' })).not.toBeInTheDocument();
+  });
+
+  it('redirige vers la célébration quand un like du deck crée un match', async () => {
+    const user = userEvent.setup();
+    const router = createMemoryRouter(routes, { initialEntries: ['/candidat/offres'] });
+    authenticateAs('candidate');
+
+    const api = await import('@/api/generated');
+    vi.mocked(api.offerControllerFindFeed).mockResolvedValue({
+      data: [anOffer],
+      status: 200,
+      headers: new Headers(),
+    } as Awaited<ReturnType<typeof api.offerControllerFindFeed>>);
+    vi.mocked(api.offerControllerLike).mockResolvedValue({
+      data: {
+        likeCreated: true,
+        matchCreated: true,
+        match: {
+          id: 9,
+          matchedAt: '2026-09-17T09:30:00.000Z',
+          offer: { id: anOffer.id, title: anOffer.title },
+          counterpart: {
+            kind: 'company',
+            id: anOffer.company.id,
+            name: anOffer.company.name,
+            avatarUrl: null,
+            headline: anOffer.title,
+          },
+        },
+      },
+      status: 201,
+      headers: new Headers(),
+    } as Awaited<ReturnType<typeof api.offerControllerLike>>);
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Liker' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/match'));
+    expect(
+      await screen.findByLabelText('Match entre vous et ' + anOffer.company.name),
+    ).toBeInTheDocument();
   });
 });

@@ -57,22 +57,33 @@ describe('SignupPage', () => {
     renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
     expect(signupRequest).toHaveBeenCalledWith({
       email: 'candidat@rekr.fr',
-      password: 'motdepasse1',
+      password: 'Tr0mbone-Vert',
       userType: 'candidate',
+      acceptTerms: true,
     });
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith({
       role: 'candidate',
       email: 'candidat@rekr.fr',
-      password: 'motdepasse1',
+      password: 'Tr0mbone-Vert',
     });
+  });
+
+  it('donne accès à la politique de confidentialité et aux mentions légales depuis la case à cocher', () => {
+    renderSignup();
+
+    expect(screen.getByRole('link', { name: 'politique de confidentialité' })).toHaveAttribute(
+      'href',
+      '/confidentialite',
+    );
+    expect(screen.getByRole('link', { name: 'CGU' })).toHaveAttribute('href', '/mentions-legales');
   });
 
   it('transmet le rôle recruteur quand il est sélectionné', async () => {
@@ -82,8 +93,8 @@ describe('SignupPage', () => {
 
     await user.click(screen.getByRole('radio', { name: /recruteur/i }));
     await user.type(screen.getByLabelText('Email'), 'recruteur@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
@@ -127,8 +138,8 @@ describe('SignupPage', () => {
     renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse2');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Bleu');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
@@ -140,14 +151,61 @@ describe('SignupPage', () => {
     expect(confirm).toHaveAttribute('aria-describedby', 'signup-error');
   });
 
+  it('explique la règle du mot de passe avant tout envoi', () => {
+    renderSignup();
+
+    expect(screen.getByLabelText('Mot de passe')).toHaveAccessibleDescription(
+      /8 caractères minimum\. Évitez les mots de passe courants/,
+    );
+  });
+
+  it.each([
+    ['aaaaaaaa', 'Utilisez au moins 5 caractères différents.'],
+    ['12345678', 'Évitez les suites comme 123456 ou azerty.'],
+    ['Motdepasse1!', 'Ce mot de passe est trop courant.'],
+    ['candidat@rekr.fr', 'Le mot de passe ne doit pas reprendre votre email.'],
+  ])('refuse %s sans appeler le serveur et dit ce qui manque', async (weak, message) => {
+    const user = userEvent.setup();
+    // Les appels des tests précédents ne sont pas remis à zéro dans ce fichier.
+    signupRequest.mockClear();
+    renderSignup({ onSubmit: vi.fn() });
+
+    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), weak);
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), weak);
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    expect(signupRequest).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByLabelText('Mot de passe')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('porte dans un toast le motif du refus renvoyé par le serveur', async () => {
+    const user = userEvent.setup();
+    signupRequest.mockRejectedValue(
+      apiError(400, { statusCode: 400, message: ['password is a common password'] }),
+    );
+    renderSignup({ onSubmit: vi.fn() });
+
+    await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
+
+    const toast = await screen.findByText('Ce mot de passe est trop courant.');
+    expect(toast.closest('[data-sonner-toast]')).toHaveAttribute('data-type', 'error');
+  });
+
   it('bloque la soumission et affiche une erreur quand les CGU ne sont pas acceptées', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
     expect(onSubmit).not.toHaveBeenCalled();
@@ -166,8 +224,8 @@ describe('SignupPage', () => {
     renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse2');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Bleu');
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
     expect(onSubmit).not.toHaveBeenCalled();
@@ -181,22 +239,22 @@ describe('SignupPage', () => {
 
     const confirm = screen.getByLabelText('Confirmer le mot de passe');
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(confirm, 'motdepasse2');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(confirm, 'Tr0mbone-Bleu');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toBeInTheDocument();
 
     await user.clear(confirm);
-    await user.type(confirm, 'motdepasse1');
+    await user.type(confirm, 'Tr0mbone-Vert');
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith({
       role: 'candidate',
       email: 'candidat@rekr.fr',
-      password: 'motdepasse1',
+      password: 'Tr0mbone-Vert',
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -207,8 +265,8 @@ describe('SignupPage', () => {
     renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
@@ -227,8 +285,8 @@ describe('SignupPage', () => {
     renderSignup({ onSubmit });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
@@ -248,8 +306,8 @@ describe('SignupPage', () => {
     renderSignup();
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
@@ -269,8 +327,8 @@ describe('SignupPage', () => {
     renderSignup();
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
@@ -286,8 +344,8 @@ describe('SignupPage', () => {
     renderSignup();
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
@@ -303,8 +361,8 @@ describe('SignupPage', () => {
     renderSignup({ onSubmit: vi.fn() });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse2');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Bleu');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 
@@ -317,8 +375,8 @@ describe('SignupPage', () => {
     renderSignup({ onSubmit: vi.fn() });
 
     await user.type(screen.getByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse2');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Bleu');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
     expect(screen.getByRole('alert')).toBeInTheDocument();

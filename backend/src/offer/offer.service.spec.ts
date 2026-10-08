@@ -2,9 +2,13 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
+import { ChatService } from '../chat/chat.service';
+import { OfferSearchService } from '../search/offer-search.service';
 import { OfferService } from './offer.service';
 import { CityService } from '../city/city.service';
+import { JobFamilyService } from '../job-family/job-family.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MatchService } from '../match/match.service';
 import { OfferListQueryDto } from './dto/offer-list-query.dto';
 
 type PrismaMock = {
@@ -17,6 +21,10 @@ type PrismaMock = {
   };
   recruiterProfile: { findUnique: jest.Mock };
   candidateProfile: { findUnique: jest.Mock };
+  candidateLikesOffer: { findUnique: jest.Mock };
+  candidatePassesOffer: { findUnique: jest.Mock };
+  match: { findUnique: jest.Mock };
+  candidateJobFamily: { findMany: jest.Mock };
   offerTag: { deleteMany: jest.Mock; createMany: jest.Mock };
   tag: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
@@ -33,6 +41,10 @@ const buildPrismaMock = (): PrismaMock => {
     },
     recruiterProfile: { findUnique: jest.fn() },
     candidateProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+    candidateLikesOffer: { findUnique: jest.fn().mockResolvedValue(null) },
+    candidatePassesOffer: { findUnique: jest.fn().mockResolvedValue(null) },
+    match: { findUnique: jest.fn().mockResolvedValue(null) },
+    candidateJobFamily: { findMany: jest.fn().mockResolvedValue([]) },
     offerTag: { deleteMany: jest.fn(), createMany: jest.fn() },
     tag: { createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((cb: (tx: PrismaMock) => unknown) => cb(mock)),
@@ -86,15 +98,21 @@ describe('OfferService', () => {
   let service: OfferService;
   let prisma: ReturnType<typeof buildPrismaMock>;
   let cities: { assertKnown: jest.Mock };
+  let matches: { tryCreateReciprocalMatch: jest.Mock };
+  let jobFamilies: { assertKnown: jest.Mock };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
     cities = { assertKnown: jest.fn().mockResolvedValue(undefined) };
+    matches = { tryCreateReciprocalMatch: jest.fn() };
+    jobFamilies = { assertKnown: jest.fn().mockResolvedValue(undefined) };
     const moduleRef = await Test.createTestingModule({
       providers: [
         OfferService,
         { provide: PrismaService, useValue: prisma },
         { provide: CityService, useValue: cities },
+        { provide: MatchService, useValue: matches },
+        { provide: JobFamilyService, useValue: jobFamilies },
       ],
     }).compile();
     service = moduleRef.get(OfferService);
@@ -107,6 +125,7 @@ describe('OfferService', () => {
 
       await service.create(7, {
         title: 'Dev',
+        jobFamilyId: 13,
         city: 'Lyon',
         postalCode: '69001',
       });
@@ -122,6 +141,7 @@ describe('OfferService', () => {
       await expect(
         service.create(7, {
           title: 'Dev',
+          jobFamilyId: 13,
           city: 'Wakanda',
           postalCode: '99999',
         }),
@@ -203,12 +223,14 @@ describe('OfferService', () => {
 
       const result = await service.create(7, {
         title: 'Dev Front',
+        jobFamilyId: 13,
         contractType: 'CDI',
       });
 
       expect(prisma.offer.create).toHaveBeenCalledWith({
         data: {
           title: 'Dev Front',
+          jobFamilyId: 13,
           contractType: 'CDI',
           companyId: 10,
           createdById: 7,
@@ -221,7 +243,7 @@ describe('OfferService', () => {
       prisma.recruiterProfile.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.create(7, { title: 'Dev Front' }),
+        service.create(7, { title: 'Dev Front', jobFamilyId: 13 }),
       ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(prisma.offer.create).not.toHaveBeenCalled();
@@ -273,6 +295,50 @@ describe('OfferService', () => {
 
       expect(prisma.offer.update).not.toHaveBeenCalled();
     });
+
+    describe('conversations', () => {
+      const chat = { syncOfferStatus: jest.fn() };
+
+      const serviceWithChat = async () => {
+        const moduleRef = await Test.createTestingModule({
+          providers: [
+            OfferService,
+            { provide: PrismaService, useValue: prisma },
+            { provide: CityService, useValue: cities },
+            { provide: MatchService, useValue: matches },
+            { provide: JobFamilyService, useValue: jobFamilies },
+            { provide: ChatService, useValue: chat },
+          ],
+        }).compile();
+        return moduleRef.get(OfferService);
+      };
+
+      beforeEach(() => {
+        chat.syncOfferStatus.mockReset();
+        prisma.offer.findUnique.mockResolvedValue({
+          id: 50,
+          companyId: 10,
+          status: 'open',
+        });
+        prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      });
+
+      it('freezes them once the status change is committed', async () => {
+        prisma.offer.update.mockResolvedValue({ id: 50, status: 'filled' });
+
+        await (await serviceWithChat()).update(7, 50, { status: 'filled' });
+
+        expect(chat.syncOfferStatus).toHaveBeenCalledWith(50, 'filled');
+      });
+
+      it('leaves them alone when the status does not change', async () => {
+        prisma.offer.update.mockResolvedValue({ id: 50, status: 'open' });
+
+        await (await serviceWithChat()).update(7, 50, { title: 'Dev' });
+
+        expect(chat.syncOfferStatus).not.toHaveBeenCalled();
+      });
+    });
   });
 
   /**
@@ -293,7 +359,11 @@ describe('OfferService', () => {
       prisma.offer.create.mockResolvedValue({ id: 50, companyId: 10 });
       prisma.tag.findMany.mockResolvedValue([{ id: 3 }]);
 
-      await service.create(7, { title: 'Dev', benefits: ['Mutuelle'] });
+      await service.create(7, {
+        title: 'Dev',
+        jobFamilyId: 13,
+        benefits: ['Mutuelle'],
+      });
 
       expect(prisma.tag.createMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -494,6 +564,76 @@ describe('OfferService', () => {
       });
     });
 
+    const withFamilies = (ids: number[]): void => {
+      prisma.candidateJobFamily.findMany.mockResolvedValue(
+        ids.map((jobFamilyId) => ({ jobFamilyId })),
+      );
+    };
+
+    /**
+     * The trade is the one criterion that excludes rather than ranks: nobody
+     * changes career because an unrelated post pays well, so there is no rank
+     * low enough at which a bakery belongs in a developer's deck.
+     */
+    it('keeps only the trades the candidate named', async () => {
+      withFamilies([13, 5]);
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf()).toMatchObject({ jobFamilyId: { in: [13, 5] } });
+    });
+
+    // The accounts created before job families existed carry none. Filtering
+    // them on an empty list would serve them an empty deck rather than the
+    // unfiltered one they have today.
+    it('narrows nothing when the candidate named no trade', async () => {
+      withFamilies([]);
+
+      await service.findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(whereOf()).not.toHaveProperty('jobFamilyId');
+    });
+
+    /**
+     * The trades are read in the order the candidate ranked them: the feed
+     * sends the first one to the ranking as the primary, and an unordered read
+     * would elect whichever row Postgres returned first.
+     */
+    it('ranks the primary trade the candidate chose', async () => {
+      const search = { rankOfferIds: jest.fn().mockResolvedValue([]) };
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          OfferService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: CityService, useValue: cities },
+          { provide: MatchService, useValue: matches },
+          { provide: JobFamilyService, useValue: jobFamilies },
+          { provide: OfferSearchService, useValue: search },
+        ],
+      }).compile();
+      prisma.candidateJobFamily.findMany.mockResolvedValue([
+        { jobFamilyId: 13, rank: 0 },
+        { jobFamilyId: 5, rank: 1 },
+      ]);
+
+      await moduleRef
+        .get(OfferService)
+        .findFeed(candidate, new OfferFeedQueryDto());
+
+      expect(prisma.candidateJobFamily.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ rank: 'asc' }, { jobFamilyId: 'asc' }],
+        }),
+      );
+      expect(search.rankOfferIds).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobFamilyIds: [13, 5],
+          primaryJobFamilyId: 13,
+        }),
+        expect.any(Number),
+      );
+    });
+
     it('leaves out every filter the query does not carry', async () => {
       await service.findFeed(candidate, new OfferFeedQueryDto());
 
@@ -623,6 +763,14 @@ describe('OfferService', () => {
       ],
     };
 
+    // What the candidate reads on top: their own answer on this offer.
+    const EXPECTED_CANDIDATE_PAYLOAD = {
+      ...EXPECTED_PAYLOAD,
+      liked: false,
+      passed: false,
+      matched: false,
+    };
+
     const EXPECTED_SELECT = {
       id: true,
       title: true,
@@ -653,6 +801,9 @@ describe('OfferService', () => {
       ...EXPECTED_SELECT,
       postalCode: true,
       status: true,
+      // Read by the edit form to preselect the trade, withheld from everyone
+      // else along with the postcode and the status.
+      jobFamilyId: true,
     };
 
     const serveRow = (row: Record<string, unknown> | null): void => {
@@ -685,7 +836,90 @@ describe('OfferService', () => {
 
       const result = await service.findOneById(candidate, 50);
 
-      expect(result).toEqual(EXPECTED_PAYLOAD);
+      expect(result).toEqual(EXPECTED_CANDIDATE_PAYLOAD);
+    });
+
+    /**
+     * The detail screen is reachable from the likes list, not only from the
+     * deck, so the offer it opens may already carry an answer. Without these
+     * two the screen offers « Passer / Liker » on an offer already liked.
+     */
+    it('tells a candidate the answer they already gave on the offer', async () => {
+      prisma.candidateLikesOffer.findUnique.mockResolvedValue({ offerId: 50 });
+      serveRow(offerRow());
+
+      const result = await service.findOneById(candidate, 50);
+
+      expect(result).toEqual({
+        ...EXPECTED_CANDIDATE_PAYLOAD,
+        liked: true,
+        passed: false,
+        matched: false,
+      });
+      expect(prisma.candidateLikesOffer.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            candidateUserId_offerId: { candidateUserId: 7, offerId: 50 },
+          },
+        }),
+      );
+    });
+
+    /**
+     * A match leaves the like in place, so without this key a matched offer
+     * reads as a plain like and the screen offers to withdraw it — which the
+     * like endpoint then refuses with a 409.
+     */
+    it('tells a candidate the offer has become a match', async () => {
+      prisma.candidateLikesOffer.findUnique.mockResolvedValue({ offerId: 50 });
+      prisma.match.findUnique.mockResolvedValue({ offerId: 50 });
+      serveRow(offerRow());
+
+      const result = await service.findOneById(candidate, 50);
+
+      expect(result).toEqual({
+        ...EXPECTED_CANDIDATE_PAYLOAD,
+        liked: true,
+        matched: true,
+      });
+      expect(prisma.match.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            candidateUserId_offerId: { candidateUserId: 7, offerId: 50 },
+          },
+        }),
+      );
+    });
+
+    it('reports a passed offer to the candidate who passed it', async () => {
+      prisma.candidatePassesOffer.findUnique.mockResolvedValue({ offerId: 50 });
+      serveRow(offerRow());
+
+      const result = await service.findOneById(candidate, 50);
+
+      expect(result).toEqual({
+        ...EXPECTED_CANDIDATE_PAYLOAD,
+        passed: true,
+      });
+    });
+
+    /**
+     * Absent, not false: a recruiter has no answer to give on an offer, and
+     * the key would read as « not liked yet » — the same convention as
+     * `postalCode` and `status`.
+     */
+    it('leaves liked, passed and matched out of every recruiter payload', async () => {
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      serveRow(offerRow({ status: 'draft' }));
+
+      const result = await service.findOneById(recruiter, 50);
+
+      expect(result).not.toHaveProperty('liked');
+      expect(result).not.toHaveProperty('passed');
+      expect(result).not.toHaveProperty('matched');
+      expect(prisma.candidateLikesOffer.findUnique).not.toHaveBeenCalled();
+      expect(prisma.candidatePassesOffer.findUnique).not.toHaveBeenCalled();
+      expect(prisma.match.findUnique).not.toHaveBeenCalled();
     });
 
     /**

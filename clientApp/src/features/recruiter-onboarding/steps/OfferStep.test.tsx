@@ -5,7 +5,12 @@ import { cityControllerSearch } from '@/api/generated';
 import { OfferStep } from './OfferStep';
 import { emptyRecruiterOnboarding } from '../state';
 
-vi.mock('@/api/generated', () => ({ cityControllerSearch: vi.fn() }));
+vi.mock('@/api/generated', () => ({
+  cityControllerSearch: vi.fn(),
+  jobFamilyControllerFindAll: vi.fn(() =>
+    Promise.resolve({ data: [{ id: 13, label: 'Informatique' }] }),
+  ),
+}));
 
 const searchCities = vi.mocked(cityControllerSearch);
 

@@ -34,9 +34,10 @@ export function homePathFor(user: AuthenticatedUser | null): string {
    * complete would bounce it forever against that wizard's own role guard, so
    * it lands on the one screen open to every session instead.
    *
-   * `/profil` and not `/matches`: the match list is a candidate route now, and
-   * its guard sends a refused visitor back to `homePathFor` — which would send
-   * an admin straight back to it, forever.
+   * `/profil` and not `/matches`: the match list takes both roles now, so its
+   * guard no longer refuses an admin — it would simply serve them a list the
+   * API has nothing to answer for. `/profil` stays the one screen that says
+   * something true of every session.
    */
   return '/profil';
 }

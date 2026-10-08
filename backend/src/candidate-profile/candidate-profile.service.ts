@@ -6,6 +6,8 @@ import {
 import { Prisma, TagCategory } from '../../generated/prisma/client';
 import { CityService, type Coordinates } from '../city/city.service';
 import { resolveTagIds } from '../common/tags/tag-sync';
+import { JobFamilyService } from '../job-family/job-family.service';
+import { primaryJobFamilyOf } from '../search/ranking/offer-ranking';
 import { PrismaService } from '../prisma/prisma.service';
 import { CandidateProfileResponseDto } from './dto/candidate-profile-response.dto';
 import { CreateCandidateProfileDto } from './dto/create-candidate-profile.dto';
@@ -16,10 +18,11 @@ export class CandidateProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cities: CityService,
+    private readonly jobFamilies: JobFamilyService,
   ) {}
 
   async create(userId: number, dto: CreateCandidateProfileDto) {
-    const { skills, languages, ...profileData } = dto;
+    const { skills, languages, jobFamilyIds, ...profileData } = dto;
 
     // Conflict first: a caller who already has a profile deserves the 409, not
     // a complaint about the commune they sent. The transaction below repeats
@@ -33,6 +36,7 @@ export class CandidateProfileService {
       throw new ConflictException('Candidate profile already exists');
     }
 
+    await this.jobFamilies.assertKnown(jobFamilyIds ?? []);
     const coordinates = await this.cities.assertKnown(dto);
 
     return this.prisma.$transaction(async (tx) => {
@@ -49,6 +53,10 @@ export class CandidateProfileService {
 
       if (skills || languages) {
         await this.syncTags(tx, userId, skills, languages);
+      }
+
+      if (jobFamilyIds) {
+        await this.syncJobFamilies(tx, userId, jobFamilyIds);
       }
 
       return profile;
@@ -102,6 +110,12 @@ export class CandidateProfileService {
               orderBy: { tag: { label: 'asc' } },
               select: { tag: { select: { label: true, category: true } } },
             },
+            // Primary first: the rank is the candidate's preference, and the
+            // form reads the first trade as the one they ranked highest.
+            candidateJobFamilies: {
+              orderBy: [{ rank: 'asc' }, { jobFamilyId: 'asc' }],
+              select: { jobFamilyId: true, rank: true },
+            },
           },
         },
       },
@@ -123,11 +137,17 @@ export class CandidateProfileService {
       longitude: longitude?.toString() ?? null,
       skills: labelsOf('skill'),
       languages: labelsOf('language'),
+      jobFamilyIds: user.candidateJobFamilies.map((link) => link.jobFamilyId),
+      primaryJobFamilyId: primaryJobFamilyOf(user.candidateJobFamilies),
     };
   }
 
   async update(userId: number, dto: UpdateCandidateProfileDto) {
-    const { skills, languages, ...profileData } = dto;
+    const { skills, languages, jobFamilyIds, ...profileData } = dto;
+
+    if (jobFamilyIds) {
+      await this.jobFamilies.assertKnown(jobFamilyIds);
+    }
     let coordinates: Coordinates | null = null;
 
     if (dto.city !== undefined || dto.postalCode !== undefined) {
@@ -145,6 +165,9 @@ export class CandidateProfileService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // Two saves of one account wait for each other: a patch carrying only the
+      // trades takes no row lock, and both wipe-and-rewrites kept their union.
+      await tx.$queryRaw`SELECT 1 FROM candidate_profile WHERE fk_user = ${userId} FOR UPDATE`;
       const existing = await tx.candidateProfile.findUnique({
         where: { userId },
       });
@@ -159,6 +182,10 @@ export class CandidateProfileService {
 
       if (skills || languages) {
         await this.syncTags(tx, userId, skills, languages);
+      }
+
+      if (jobFamilyIds) {
+        await this.syncJobFamilies(tx, userId, jobFamilyIds);
       }
 
       return profile;
@@ -191,6 +218,39 @@ export class CandidateProfileService {
 
     await tx.candidateTag.createMany({
       data: tagIds.map((tagId) => ({ candidateUserId: userId, tagId })),
+      skipDuplicates: true,
+    });
+  }
+
+  /**
+   * Replaces the trades the candidate is looking for.
+   *
+   * Same wipe-and-rewrite shape as `syncTags`, for the same reason: these rows
+   * are written nowhere else, so the payload is the whole truth. An empty list
+   * clears the filter rather than leaving the previous trades in place, which
+   * is what lets someone widen their search back to everything.
+   *
+   * The position in the list is persisted as the rank, 0 being the primary:
+   * the array is the only place the candidate's preference is expressed.
+   */
+  private async syncJobFamilies(
+    tx: Prisma.TransactionClient,
+    userId: number,
+    jobFamilyIds: number[],
+  ): Promise<void> {
+    await tx.candidateJobFamily.deleteMany({
+      where: { candidateUserId: userId },
+    });
+    if (jobFamilyIds.length === 0) {
+      return;
+    }
+
+    await tx.candidateJobFamily.createMany({
+      data: jobFamilyIds.map((jobFamilyId, rank) => ({
+        candidateUserId: userId,
+        jobFamilyId,
+        rank,
+      })),
       skipDuplicates: true,
     });
   }

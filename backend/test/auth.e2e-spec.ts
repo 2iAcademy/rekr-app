@@ -5,18 +5,29 @@ import { httpRequest } from './http-client';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RefreshTokenService } from '../src/auth/refresh-token.service';
+import { hashPassword } from '../src/auth/password-hash';
 import { configureApp } from '../src/setup-app';
 import { resetDb } from './reset-db';
 import { resetThrottler } from './throttler-reset';
+import { jobFamilyIdFor } from './job-family-reference';
+import { PRIVACY_POLICY_VERSION } from '../src/account/privacy-policy';
+import { WEAK_PASSWORD_MESSAGES } from '../src/common/validation/password-strength';
+
+/** Repeated to reach a byte length, since a run of one letter is refused. */
+const PASSPHRASE = 'Tr0mbone-Vert-';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  // The trades every fixture profile is looking for. Required at creation
+  // since job families landed, and read once because the reference rows
+  // outlive `resetDb`.
+  let jobFamilyIds: number[];
 
   const signup = (email: string, userType: 'candidate' | 'recruiter') =>
     httpRequest(app)
       .post('/api/auth/signup')
-      .send({ email, password: 'Sup3rSecret!', userType });
+      .send({ email, password: 'Sup3rSecret!', userType, acceptTerms: true });
 
   const tokenOf = (res: request.Response): string =>
     (res.body as { accessToken: string }).accessToken;
@@ -40,9 +51,10 @@ describe('Auth (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     configureApp(app);
-    await app.init();
+    await app.listen(0, '127.0.0.1');
 
     prisma = app.get(PrismaService);
+    jobFamilyIds = [await jobFamilyIdFor(prisma)];
   });
 
   beforeEach(async () => {
@@ -54,6 +66,77 @@ describe('Auth (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  describe('consent and activity', () => {
+    it.each([
+      ['without the consent field', {}],
+      ['with consent refused', { acceptTerms: false }],
+      ['with a truthy string instead of true', { acceptTerms: 'true' }],
+    ])('refuses a sign-up %s (400)', async (_case, consent) => {
+      await httpRequest(app)
+        .post('/api/auth/signup')
+        .send({
+          email: 'no-consent@test.dev',
+          password: 'Sup3rSecret!',
+          userType: 'candidate',
+          ...consent,
+        })
+        .expect(400);
+
+      expect(
+        await prisma.user.count({ where: { email: 'no-consent@test.dev' } }),
+      ).toBe(0);
+    });
+
+    it('records when and which version of the policy was accepted', async () => {
+      const before = Date.now();
+      await signup('consent@test.dev', 'candidate').expect(201);
+
+      const user = await prisma.user.findUniqueOrThrow({
+        where: { email: 'consent@test.dev' },
+      });
+      expect(user.termsVersion).toBe(PRIVACY_POLICY_VERSION);
+      expect(user.termsAcceptedAt?.getTime()).toBeGreaterThanOrEqual(
+        before - 1000,
+      );
+      expect(user.lastActiveAt?.getTime()).toBeGreaterThanOrEqual(
+        before - 1000,
+      );
+    });
+
+    it('moves the activity clock on login and refresh, and leaves updatedAt alone', async () => {
+      const created = await signup('active@test.dev', 'candidate');
+      const stale = new Date('2020-01-01T00:00:00Z');
+      await prisma.$executeRaw`UPDATE "user" SET last_active_at = ${stale} WHERE email = 'active@test.dev'`;
+      const { updatedAt } = await prisma.user.findUniqueOrThrow({
+        where: { email: 'active@test.dev' },
+      });
+
+      await httpRequest(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', refreshCookieOf(created))
+        .expect(200);
+
+      const refreshed = await prisma.user.findUniqueOrThrow({
+        where: { email: 'active@test.dev' },
+      });
+      expect(refreshed.lastActiveAt!.getTime()).toBeGreaterThan(
+        stale.getTime(),
+      );
+      expect(refreshed.updatedAt).toEqual(updatedAt);
+
+      await prisma.$executeRaw`UPDATE "user" SET last_active_at = ${stale} WHERE email = 'active@test.dev'`;
+      await httpRequest(app)
+        .post('/api/auth/login')
+        .send({ email: 'active@test.dev', password: 'Sup3rSecret!' })
+        .expect(200);
+
+      const loggedIn = await prisma.user.findUniqueOrThrow({
+        where: { email: 'active@test.dev' },
+      });
+      expect(loggedIn.lastActiveAt!.getTime()).toBeGreaterThan(stale.getTime());
+    });
   });
 
   it('rejects /auth/me without a token', async () => {
@@ -172,7 +255,7 @@ describe('Auth (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', `Bearer ${token}`)
-      .send({ firstName: 'Ghost', lastName: 'User' })
+      .send({ jobFamilyIds, firstName: 'Ghost', lastName: 'User' })
       .expect(401);
   });
 
@@ -183,7 +266,7 @@ describe('Auth (e2e)', () => {
     await httpRequest(app)
       .post('/api/candidate-profiles')
       .set('Authorization', `Bearer ${tokenOf(created)}`)
-      .send({ firstName: 'Frozen', lastName: 'User' })
+      .send({ jobFamilyIds, firstName: 'Frozen', lastName: 'User' })
       .expect(403);
   });
 
@@ -210,10 +293,15 @@ describe('Auth (e2e)', () => {
   // test that proves the SHA-256 pre-hash is actually wired in: it fails the
   // moment someone passes the raw password to bcrypt again.
   it('does not let a password sharing the first 72 bytes open the account', async () => {
-    const password = 'a'.repeat(72);
+    const password = PASSPHRASE.repeat(6).slice(0, 72);
     await httpRequest(app)
       .post('/api/auth/signup')
-      .send({ email: 'prefix@test.dev', password, userType: 'candidate' })
+      .send({
+        email: 'prefix@test.dev',
+        password,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
       .expect(201);
 
     await httpRequest(app)
@@ -233,10 +321,15 @@ describe('Auth (e2e)', () => {
   // Pre-hashing removes the 72-byte ceiling instead of making the user carry
   // it: a long passphrase is accepted in full and remains usable at login.
   it('accepts a password well beyond 72 bytes and keeps it usable', async () => {
-    const password = `${'a'.repeat(200)}-tail`;
+    const password = `${PASSPHRASE.repeat(15).slice(0, 200)}-tail`;
     await httpRequest(app)
       .post('/api/auth/signup')
-      .send({ email: 'long@test.dev', password, userType: 'candidate' })
+      .send({
+        email: 'long@test.dev',
+        password,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
       .expect(201);
 
     await httpRequest(app)
@@ -248,15 +341,85 @@ describe('Auth (e2e)', () => {
   // 40 accented characters are 80 bytes in UTF-8 — truncated before, accepted
   // whole now.
   it('accepts a multi-byte password whose byte length exceeds 72', async () => {
-    const password = 'é'.repeat(40);
+    const password = 'éàüçô'.repeat(8);
     await httpRequest(app)
       .post('/api/auth/signup')
-      .send({ email: 'multibyte@test.dev', password, userType: 'candidate' })
+      .send({
+        email: 'multibyte@test.dev',
+        password,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
       .expect(201);
 
     await httpRequest(app)
       .post('/api/auth/login')
       .send({ email: 'multibyte@test.dev', password })
+      .expect(200);
+  });
+
+  // Length alone used to let "aaaaaaaa" open an account. The 400 is the
+  // rule's own, not the length floor's, and no account is left behind.
+  it.each([
+    ['aaaaaaaa', WEAK_PASSWORD_MESSAGES.distinct],
+    ['12345678', WEAK_PASSWORD_MESSAGES.walk],
+    ['12345678!', WEAK_PASSWORD_MESSAGES.walk],
+    ['Motdepasse1!', WEAK_PASSWORD_MESSAGES.common],
+    ['$oleil2024', WEAK_PASSWORD_MESSAGES.common],
+    ['weak@test.dev', WEAK_PASSWORD_MESSAGES.email],
+  ])('refuses %s and says why', async (password, reason) => {
+    const res = await httpRequest(app)
+      .post('/api/auth/signup')
+      .send({
+        email: 'weak@test.dev',
+        password,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
+      .expect(400);
+
+    expect((res.body as { message: string[] }).message).toEqual([reason]);
+    await expect(
+      prisma.user.count({ where: { email: 'weak@test.dev' } }),
+    ).resolves.toBe(0);
+  });
+
+  // A payload built to make the rule backtrack: refused by the length bound
+  // alone, and quickly, since the rule does not look past it. It used to hold
+  // the event loop for about ten seconds.
+  it('refuses an oversized password without stalling', async () => {
+    const started = Date.now();
+
+    const res = await httpRequest(app)
+      .post('/api/auth/signup')
+      .send({
+        email: 'huge@test.dev',
+        password: `a${'1234 '.repeat(19_000)}a`,
+        userType: 'candidate',
+        acceptTerms: true,
+      })
+      .expect(400);
+
+    expect((res.body as { message: string[] }).message).toEqual([
+      'password must be shorter than or equal to 512 characters',
+    ]);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  // The rule guards new passwords only: an account created before it keeps
+  // signing in with the one it has.
+  it('still lets in an account whose password predates the rule', async () => {
+    await prisma.user.create({
+      data: {
+        email: 'legacy@test.dev',
+        passwordHash: await hashPassword('aaaaaaaa'),
+        userType: 'candidate',
+      },
+    });
+
+    await httpRequest(app)
+      .post('/api/auth/login')
+      .send({ email: 'legacy@test.dev', password: 'aaaaaaaa' })
       .expect(200);
   });
 
@@ -267,8 +430,9 @@ describe('Auth (e2e)', () => {
       .post('/api/auth/signup')
       .send({
         email: 'absurd@test.dev',
-        password: 'a'.repeat(5000),
+        password: PASSPHRASE.repeat(400),
         userType: 'candidate',
+        acceptTerms: true,
       })
       .expect(400);
   });

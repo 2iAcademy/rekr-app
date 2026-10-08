@@ -1,5 +1,6 @@
 import { OptionCards } from '@/components/form/OptionCards';
 import { OptionChips } from '@/components/form/OptionChips';
+import { JobFamilyChips } from '@/features/job-families/JobFamilyChips';
 import { TextField } from '@/components/form/TextField';
 import { markGroupIfInvalid, markIfInvalid } from '@/components/wizard/wizardError';
 import {
@@ -21,6 +22,12 @@ export function ProjectStep({ state, onChange, invalidField }: StepProps) {
         value={state.desiredJobTitle}
         onChange={(event) => onChange({ desiredJobTitle: event.target.value })}
         placeholder="Développeuse Front React"
+      />
+
+      <JobFamilyChips
+        values={state.jobFamilyIds}
+        onChange={(jobFamilyIds) => onChange({ jobFamilyIds })}
+        {...markGroupIfInvalid(invalidField, 'jobFamilyIds')}
       />
 
       <OptionChips

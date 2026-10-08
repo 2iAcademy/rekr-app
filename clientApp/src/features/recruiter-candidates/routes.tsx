@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate, useParams, useSearchParams } from 'react-router';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { RouteGuard } from '@/features/auth/RouteGuard';
 import { OfferApplicantsPage } from './pages/OfferApplicantsPage';
 
@@ -35,6 +35,7 @@ export function OfferApplicantsRoute() {
 }
 
 function OfferApplicants() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -106,6 +107,7 @@ function OfferApplicants() {
       openApplicantId={openApplicantId}
       onOpenProfile={openProfile}
       onCloseProfile={closeProfile}
+      onMatch={(matchedProfile) => navigate('/match', { state: { matchedProfile } })}
     />
   );
 }
