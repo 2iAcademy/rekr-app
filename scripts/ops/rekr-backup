@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Nightly backup of the production data, installed by an administrator as
+# /usr/local/bin/rekr-backup (owned by root) and run by /etc/cron.d/rekr-backup
+# (see scripts/ops/rekr-backup.cron and docs/deploiement-vps.md).
+#
+# Two files per run, always together: a PostgreSQL dump and an archive of the
+# uploaded files (CVs, photos, logos). One without the other leaves rows that
+# point to missing files. Elasticsearch is not backed up: its index is rebuilt
+# from PostgreSQL.
+#
+# pg_dump asks PostgreSQL itself for a consistent snapshot, while the
+# application keeps running. A copy of the server disk taken at the same time
+# may catch the database halfway through a write.
+#
+# Each file is written next to its final name, checked, then renamed: a run cut
+# short never leaves a half-written backup that looks complete. Backups older
+# than KEEP_DAYS are deleted.
+set -euo pipefail
+
+APP_DIR="${REKR_APP_DIR:-/opt/rekr}"
+BACKUP_DIR="${REKR_BACKUP_DIR:-/var/backups/rekr}"
+UPLOADS_VOLUME="${REKR_UPLOADS_VOLUME:-rekr_backend_uploads}"
+KEEP_DAYS="${REKR_BACKUP_KEEP_DAYS:-7}"
+ARCHIVER_IMAGE=alpine:3.20
+umask 077
+
+log() { echo "$(date -u +%FT%TZ) rekr-backup: $*"; }
+fail() {
+  log "FAILED: $*" >&2
+  exit 1
+}
+
+install -d -m 700 "$BACKUP_DIR"
+stamp="$(date -u +%Y%m%d-%H%M%S)"
+dump="$BACKUP_DIR/db-$stamp.dump"
+uploads="$BACKUP_DIR/uploads-$stamp.tar.gz"
+trap 'rm -f "$dump.part" "$uploads.part"' EXIT
+
+cd "$APP_DIR"
+compose=(docker compose -f compose.prod.yml)
+
+# The credentials are read inside the container, from its own environment:
+# they never appear on this host's command line.
+# shellcheck disable=SC2016
+"${compose[@]}" exec -T postgres \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' >"$dump.part" ||
+  fail "pg_dump"
+# A dump PostgreSQL cannot list is not a backup.
+"${compose[@]}" exec -T postgres pg_restore --list <"$dump.part" |
+  grep -q 'TABLE DATA public user ' || fail "the dump has no data for the user table"
+
+docker run --rm -v "$UPLOADS_VOLUME":/data:ro "$ARCHIVER_IMAGE" \
+  tar czf - -C /data . >"$uploads.part" || fail "archive of $UPLOADS_VOLUME"
+tar -tzf "$uploads.part" >/dev/null || fail "the uploads archive is unreadable"
+
+mv "$dump.part" "$dump"
+mv "$uploads.part" "$uploads"
+trap - EXIT
+
+find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'db-*.dump' -o -name 'uploads-*.tar.gz' \) \
+  -mtime +"$KEEP_DAYS" -delete
+
+log "ok $(basename "$dump") $(du -h "$dump" | cut -f1), $(basename "$uploads") $(du -h "$uploads" | cut -f1)"

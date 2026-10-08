@@ -368,9 +368,16 @@ Vérifié avec `ALTER USER ... WITH PASSWORD` puis le nouveau mot de passe dans 
 
 ## 11. Restaurer une sauvegarde
 
-La sauvegarde, c'est **toujours deux fichiers** : le dump PostgreSQL et l'archive du volume `backend_uploads`
-(commandes dans [deploiement-vps.md](../deploiement-vps.md#sauvegarder)). L'un sans l'autre laisse des lignes
-qui pointent vers des fichiers absents.
+La sauvegarde, c'est **toujours deux fichiers** : le dump PostgreSQL et l'archive du volume `backend_uploads`,
+faits chaque nuit par `rekr-backup` dans `/var/backups/rekr/` (voir [deploiement-vps.md](../deploiement-vps.md#sauvegarder)).
+L'un sans l'autre laisse des lignes qui pointent vers des fichiers absents.
+
+**Avant de restaurer**, vérifier que la sauvegarde choisie se restaure, sans toucher à la production :
+
+```bash
+sudo ls /var/backups/rekr/                 # choisir l'horodatage, par exemple 20261009-031500
+sudo rekr-restore-test 20261009-031500
+```
 
 Procédure vérifiée sur la pile locale : base supprimée puis restaurée, compte de test retrouvé et connexion en
 `200`, archive des uploads extraite et lisible (✅). L'extraction a été testée dans un dossier temporaire, pas
@@ -380,16 +387,17 @@ dans le volume `backend_uploads` lui-même :
 dc stop backend caddy                                     # plus personne n'écrit
 dc exec -T postgres sh -c \
   'dropdb -U "$POSTGRES_USER" --force "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
-dc exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner' < rekr-AAAA-MM-JJ.dump
-docker run --rm -v rekr_backend_uploads:/data -v "$PWD":/in:ro alpine \
-  tar xzf /in/uploads-AAAA-MM-JJ.tar.gz -C /data
+sudo cat /var/backups/rekr/db-<horodatage>.dump | \
+  dc exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner'
+sudo cat /var/backups/rekr/uploads-<horodatage>.tar.gz | \
+  docker run --rm -i -v rekr_backend_uploads:/data alpine tar xzf - -C /data
 dc up -d
 ```
 
 Puis reconstruire l'index Elasticsearch (fiche 5) : il reflète la base d'avant la restauration.
 
-**Pas encore fait en production.** Tant que la ligne 10 de l'audit n'a pas de date, ce runbook ne prouve pas
-qu'une sauvegarde réelle se restaure. ⚠️
+`rekr-restore-test` prouve qu'une sauvegarde réelle se restaure dans une base jetable. La restauration complète
+ci-dessus, qui remplace la base de production, n'a été jouée que sur la pile locale. ⚠️
 
 **Vérification** : nombre de lignes de `"user"` et `offer` conforme à la date du dump, connexion d'un compte
 connu, un CV s'ouvre.
