@@ -50,7 +50,7 @@ jobs:
         run: |
           if [ -z "$SONAR_TOKEN" ] || [ -z "$SONAR_HOST_URL" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::SONAR_TOKEN ou SONAR_HOST_URL absent — analyse ignoree."
+            echo "::warning::SONAR_TOKEN ou SONAR_HOST_URL absent — analyse ignoree."
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
