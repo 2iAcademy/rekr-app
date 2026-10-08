@@ -1,0 +1,28 @@
+/*
+ * Stream's stylesheet in a layer of its own, and our overrides in the next one:
+ * a later layer wins whatever the specificity, so the variables below apply
+ * without fighting the SDK's selectors. Loaded with the conversation screen
+ * only, which is lazy, so no other page pays for it.
+ */
+@layer stream, stream-overrides;
+
+@import 'stream-chat-react/css/index.css' layer(stream);
+
+@layer stream-overrides {
+  .str-chat {
+    --str-chat__font-family: var(--font-sans);
+    --str-chat__accent-primary: var(--brand);
+    --str-chat__text-on-accent: #ffffff;
+    --str-chat__chat-bg-outgoing: var(--brand-tint);
+    --str-chat__background-core-surface-default: var(--background);
+    --str-chat__text-primary: var(--ink);
+    --str-chat__text-secondary: var(--ink-soft);
+    --str-chat__text-tertiary: var(--ink-muted);
+  }
+
+  /* The screen sizes the conversation; the SDK would otherwise take 100vh. */
+  .rekr-conversation .str-chat,
+  .rekr-conversation .str-chat__channel {
+    height: 100%;
+  }
+}

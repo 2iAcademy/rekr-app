@@ -39,15 +39,17 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
           </li>
           <li>Profil recruteur : nom, prénom, fonction, et la fiche de votre entreprise.</li>
           <li>Activité : likes, passages et matchs, dates de connexion.</li>
+          <li>Messagerie : les messages échangés après un match.</li>
         </ul>
       </LegalSection>
 
       <LegalSection title="Finalités et base légale">
         <p>
           Ces données servent à faire se rencontrer candidats et recruteurs : afficher les offres et
-          les profils pertinents, et créer un match quand l’intérêt est réciproque. Le traitement
-          repose sur votre consentement, recueilli à l’inscription, et sur l’exécution du service
-          que vous demandez en créant un compte.
+          les profils pertinents, créer un match quand l’intérêt est réciproque, puis vous permettre
+          d’échanger par messagerie avec votre match. Le traitement repose sur votre consentement,
+          recueilli à l’inscription, et sur l’exécution du service que vous demandez en créant un
+          compte.
         </p>
       </LegalSection>
 
@@ -59,8 +61,14 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
           </li>
           <li>Les candidats voient les offres et la fiche des entreprises.</li>
           <li>
-            Sous-traitants techniques : l’hébergeur de l’application, et Sentry pour le suivi des
-            erreurs. Aucune donnée n’est vendue ni cédée.
+            Après un match, la conversation réunit le candidat et les recruteurs de l’entreprise qui
+            publie l’offre. Chaque message porte le nom de son auteur : prénom et nom du candidat,
+            ou prénom, nom et entreprise du recruteur.
+          </li>
+          <li>
+            Sous-traitants techniques : l’hébergeur de l’application, Sentry pour le suivi des
+            erreurs, et Stream (getstream.io) qui héberge la messagerie, c’est-à-dire les messages
+            et le nom affiché de chaque participant. Aucune donnée n’est vendue ni cédée.
           </li>
         </ul>
       </LegalSection>
@@ -76,7 +84,8 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
       <LegalSection title="Suppression du compte">
         <p>
           La suppression est immédiate et définitive. Elle efface votre compte, votre profil, vos CV
-          et photo, vos likes, passages et matchs, ainsi que vos sessions ouvertes.
+          et photo, vos likes, passages et matchs, vos conversations et les messages que vous avez
+          écrits, ainsi que vos sessions ouvertes. Annuler un match supprime aussi sa conversation.
         </p>
         <p>
           Pour un recruteur, si vous êtes le dernier membre de votre entreprise, la fiche de
@@ -90,7 +99,8 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
         <p>
           Vous disposez d’un droit d’accès, de rectification, d’effacement, de portabilité et
           d’opposition. Depuis l’écran Mon compte, vous pouvez à tout moment modifier votre profil,
-          télécharger une copie de vos données au format JSON, et supprimer votre compte.
+          télécharger une copie de vos données au format JSON, et supprimer votre compte. Cette
+          copie ne contient pas encore vos messages : pour les obtenir, écrivez à dpo@rekr.example.
         </p>
         <p>
           Si vous estimez que vos droits ne sont pas respectés, vous pouvez adresser une réclamation

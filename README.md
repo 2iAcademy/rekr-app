@@ -17,22 +17,29 @@ Monorepo : `backend/` (NestJS + Prisma + PostgreSQL) + `clientApp/` (React + Vit
 - Docker + Docker Compose
 - Node.js 20+ (pour lancer les commandes Prisma depuis l'hôte)
 
-### 1. Variables d'environnement
-
-```bash
-cp .env.example .env                  # creds PostgreSQL (racine → utilisés par docker-compose)
-cp backend/.env.example backend/.env  # DATABASE_URL + PORT (utilisés par NestJS / Prisma)
-```
-
-⚠️ Les identifiants Postgres de `.env` (racine) et le `DATABASE_URL` de `backend/.env` doivent être cohérents.
-
-### 2. Lancer la stack
+### 1. Lancer la stack
 
 ```bash
 docker compose up -d
 ```
 
-Démarre `postgres` (5432), `kafka` (29092), `kafka-ui` (8085), `backend` (3001), `logs-sink` et `frontend` (8080).
+Aucun `.env` n'est nécessaire : `compose.yml` fournit des valeurs de dev par défaut (base, `JWT_SECRET` jetable) et
+le backend applique les migrations Prisma à chaque démarrage du conteneur.
+
+Démarre `postgres` (5432), `elasticsearch` (9200), `backend` (3001) et `frontend` (8080). L'API répond sur
+`http://localhost:3001/api`, Swagger sur `http://localhost:3001/api/docs`.
+
+### 2. Personnaliser (facultatif)
+
+```bash
+cp .env.example .env                  # surcharge les valeurs de compose.yml (ports, SMTP, Sentry...)
+cp backend/.env.example backend/.env  # pour les commandes lancées depuis l'hôte (CLI Prisma, Prisma Studio)
+```
+
+⚠️ Les identifiants Postgres de `.env` (racine) et le `DATABASE_URL` de `backend/.env` doivent être cohérents.
+
+Le `JWT_SECRET` de dev est public : l'API refuse de démarrer avec lui, ou avec un secret de moins de 32 caractères,
+quand `NODE_ENV=production`.
 
 ### Kafka / logs
 
@@ -118,6 +125,27 @@ Payloads:
 - `login`: `{ "email": "user@mail.com", "password": "min8chars" }`
 
 La réponse contient `accessToken` + un objet `user` (sans mot de passe).
+
+## Messagerie — Stream Chat
+
+Les messages entre un candidat et son match sont stockés chez [Stream](https://getstream.io/chat/). L'API décide de l'accès : `POST /api/chat/token` signe un jeton Stream d'une heure, `POST /api/matches/:id/chat` ouvre la conversation du match une fois l'appelant reconnu (le candidat, ou un recruteur de l'entreprise de l'offre). Chaque ouverture remet le channel en ordre : créé par l'utilisateur système `rekr-system`, sans membre étranger au match, gelé si l'offre n'est plus publiée.
+
+Variables (racine `.env` pour docker compose, `backend/.env` hors Docker) :
+
+```bash
+STREAM_API_KEY=""     # dashboard.getstream.io > <app> > Overview > App Access Keys
+STREAM_API_SECRET=""  # idem ; reste côté backend, jamais dans une variable VITE_
+```
+
+Sans ces clés l'API démarre, et seules les routes de messagerie répondent 503.
+
+Réglages attendus dans le dashboard de l'app Stream, à reporter sur chaque environnement. Le code ne dépend pas d'eux pour décider qui entre dans une conversation, mais ils ferment ce qu'un jeton client pourrait faire en appelant Stream directement :
+
+- type de channel `messaging`, rôle `user` et `channel_member` : pas de création de channel, pas de modification des membres, pas de mise à jour du channel (donc pas de dégel) ;
+- type de channel `messaging` : uploads désactivés ;
+- réglages de l'app : recherche d'utilisateurs interdite au rôle `user` (`user_search_disallowed_roles`) ;
+- rôle `user` : pas de modification de son propre profil (le nom affiché vient de l'API) ;
+- région de stockage : UE.
 
 ## Base de données — Prisma
 

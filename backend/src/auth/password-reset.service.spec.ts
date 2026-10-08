@@ -69,7 +69,10 @@ describe('PasswordResetService', () => {
 
       return Promise.resolve({
         ...row,
-        user: { isActive: owner?.isActive ?? false },
+        user: {
+          isActive: owner?.isActive ?? false,
+          email: owner?.email ?? '',
+        },
       });
     }),
     updateMany: jest.fn(
@@ -324,6 +327,17 @@ describe('PasswordResetService', () => {
       await expect(
         verifyPassword('Nouveau-Mot2Passe!', users[0].passwordHash),
       ).resolves.toBe(true);
+    });
+
+    it('refuses the account address as the new password and keeps the link', async () => {
+      const token = await issue();
+
+      await expect(service.reset(token, 'Candidate@test.dev')).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(resetRows[0].usedAt).toBeNull();
+      expect(users[0].passwordHash).toBe('stored-hash');
     });
 
     it('burns the token it consumed', async () => {

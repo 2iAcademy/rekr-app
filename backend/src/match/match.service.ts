@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { lockAnswer } from '../common/answers/answer-lock';
+import { ChatService } from '../chat/chat.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MatchListQueryDto } from './dto/match-list-query.dto';
+import { findMatchInScope } from './match-scope';
 
 export interface MatchListItem {
   id: number;
@@ -53,7 +55,10 @@ type Viewer = 'candidate' | 'recruiter';
 
 @Injectable()
 export class MatchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly chat?: ChatService,
+  ) {}
 
   async tryCreateReciprocalMatch(
     tx: Prisma.TransactionClient,
@@ -161,34 +166,7 @@ export class MatchService {
       // comes before the lock on purpose: holding the pair of a match that is
       // none of the caller's business would let a stranger serialise the writes
       // of the two people it belongs to.
-      const scope = await tx.match.findUnique({
-        where: { id },
-        select: {
-          candidateUserId: true,
-          offerId: true,
-          offer: { select: { companyId: true } },
-        },
-      });
-      if (!scope) throw new NotFoundException('Match not found');
-      const { candidateUserId, offerId } = scope;
-
-      // Same scope rule as `findMine` and `assertOwnedOffer`: the company, not
-      // whoever concluded the match — a recruiter acts on what their matches
-      // tab shows them, colleague's match or not. And one single answer for
-      // "no such match" and "not yours", because a 403 on someone else's match
-      // confirms the id exists, which is the whole of what an enumeration
-      // needs.
-      if (user.userType === 'candidate') {
-        if (candidateUserId !== user.id)
-          throw new NotFoundException('Match not found');
-      } else {
-        const profile = await tx.recruiterProfile.findUnique({
-          where: { userId: user.id },
-          select: { companyId: true },
-        });
-        if (!profile || profile.companyId !== scope.offer.companyId)
-          throw new NotFoundException('Match not found');
-      }
+      const { candidateUserId, offerId } = await findMatchInScope(tx, user, id);
 
       await lockAnswer(tx, candidateUserId, offerId);
 
@@ -219,6 +197,9 @@ export class MatchService {
         skipDuplicates: true,
       });
     });
+    // After the commit, never inside it: a slow or failing chat provider must
+    // not hold the pair's lock, nor roll back a teardown the user asked for.
+    await this.chat?.deleteMatchChannels([id]);
   }
 
   private toListItem(match: MatchRow, viewer: Viewer): MatchListItem {

@@ -126,6 +126,27 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Whether ranked feeds can be served right now. `disabled` is a deliberate
+   * configuration, not an outage: the feeds then use PostgreSQL ordering.
+   */
+  async availability(): Promise<'disabled' | 'available' | 'unavailable'> {
+    if (!this.client) return 'disabled';
+
+    try {
+      const exists = await this.client.indices.exists(
+        { index: OFFERS_INDEX },
+        { requestTimeout: 2000, maxRetries: 0 },
+      );
+      return exists ? 'available' : 'unavailable';
+    } catch (cause) {
+      this.logger.warn(
+        `Elasticsearch health check failed. ${this.reasonOf(cause)}`,
+      );
+      return 'unavailable';
+    }
+  }
+
   /** Makes an offer searchable after its PostgreSQL transaction has committed. */
   async syncOffer(offerId: number): Promise<void> {
     if (!this.client) return;

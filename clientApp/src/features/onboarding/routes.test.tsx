@@ -138,14 +138,14 @@ describe('navigation onboarding', () => {
     } as unknown as Awaited<ReturnType<typeof authControllerResetPassword>>);
     renderAt('/reinitialiser-mot-de-passe?token=jeton-de-lurl');
 
-    await user.type(await screen.findByLabelText('Nouveau mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(await screen.findByLabelText('Nouveau mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
 
     await waitFor(() =>
       expect(resetRequest).toHaveBeenCalledWith({
         token: 'jeton-de-lurl',
-        password: 'motdepasse1',
+        password: 'Tr0mbone-Vert',
       }),
     );
 
@@ -169,8 +169,8 @@ describe('navigation onboarding', () => {
     renderAt('/inscription');
 
     await user.type(await screen.findByLabelText('Email'), 'candidat@rekr.fr');
-    await user.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
-    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'motdepasse1');
+    await user.type(screen.getByLabelText('Mot de passe'), 'Tr0mbone-Vert');
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'Tr0mbone-Vert');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Créer mon compte' }));
 

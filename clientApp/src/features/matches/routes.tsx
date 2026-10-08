@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router';
 import { homePathFor } from '@/domain/homeRoute';
 import { RouteGuard } from '@/features/auth/RouteGuard';
 import { MatchPage } from '@/features/matches/pages/MatchPage';
+import type { MatchedProfile } from '@/features/matches/likeResult';
+import { conversationPath } from '@/features/matches/paths';
 
 /**
  * Open to both roles: the screen now also holds the likes left unanswered, and
@@ -19,17 +21,13 @@ export function MatchesRoute() {
 }
 
 interface MatchRouteState {
-  matchedProfile?: {
-    name: string;
-    avatarUrl: string | null;
-  };
+  matchedProfile?: MatchedProfile;
 }
 
 export function MatchRoute() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { matchedProfile = { name: 'Votre match', avatarUrl: null } } =
-    (location.state as MatchRouteState | null) ?? {};
+  const { matchedProfile } = (location.state as MatchRouteState | null) ?? {};
 
   return (
     <RouteGuard>
@@ -39,9 +37,13 @@ export function MatchRoute() {
         return (
           <MatchPage
             currentUser={{ name: currentUserName }}
-            matchedProfile={matchedProfile}
+            matchedProfile={matchedProfile ?? { name: 'Votre match', avatarUrl: null }}
             onContinue={() => navigate(homePathFor(user))}
-            onWriteMessage={() => navigate(homePathFor(user))}
+            // The state does not survive a reload; the list of matches is then
+            // the nearest place the conversation can be opened from.
+            onWriteMessage={() =>
+              navigate(matchedProfile ? conversationPath(matchedProfile.matchId) : '/matches')
+            }
           />
         );
       }}

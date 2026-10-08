@@ -5,6 +5,7 @@ import { HomeRedirect } from '@/features/auth/HomeRedirect';
 import { RouteGuard } from '@/features/auth/RouteGuard';
 import { CandidateOnboardingRoute } from '@/features/candidate-onboarding/routes';
 import { CandidateFeedRoute } from '@/features/candidate-feed/routes';
+import { ConversationRoute } from '@/features/conversation/routes';
 import { MatchRoute, MatchesRoute } from '@/features/matches/routes';
 import {
   ForgotPasswordRoute,
@@ -43,6 +44,9 @@ export const routes = [
     children: [
       { path: '/offres/:id', element: <OfferDetailRoute /> },
       { path: '/match', element: <MatchRoute /> },
+      // Full screen, outside the shell: the thread and its composer need the
+      // whole height, the bottom navigation would sit on the composer.
+      { path: '/matches/:matchId/conversation', element: <ConversationRoute /> },
       {
         element: <AppShell />,
         children: [

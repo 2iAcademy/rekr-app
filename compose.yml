@@ -4,13 +4,18 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: dev
-    command: npm run start:dev
+    # Migrations run once per container start; `nest start --watch` reloads
+    # inside the same process, so a code change does not replay them.
+    command: sh -c "npx prisma migrate deploy && npm run start:dev"
     environment:
       NODE_ENV: development
       PORT: ${PORT:-3001}
-      DATABASE_URL: ${DATABASE_URL:-}
+      # Development-only defaults, so that a fresh clone starts with no `.env`.
+      # The JWT secret is public on purpose: the API refuses any `dev-only-`
+      # value once NODE_ENV=production.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-postgres}}
       SENTRY_DSN: ${SENTRY_DSN:-}
-      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-jwt-secret-for-local-compose}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-}
       THROTTLE_TTL_SECONDS: ${THROTTLE_TTL_SECONDS:-}
       THROTTLE_DEFAULT_LIMIT: ${THROTTLE_DEFAULT_LIMIT:-}
@@ -33,6 +38,8 @@ services:
       ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-true}
       ELASTICSEARCH_NODE: ${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
       ELASTICSEARCH_REINDEX_ON_STARTUP: ${ELASTICSEARCH_REINDEX_ON_STARTUP:-false}
+      STREAM_API_KEY: ${STREAM_API_KEY:-}
+      STREAM_API_SECRET: ${STREAM_API_SECRET:-}
     volumes:
       - ./backend:/app
       - /app/node_modules

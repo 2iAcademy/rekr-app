@@ -20,6 +20,9 @@ vi.mock('@/api/generated', () => ({
   offerControllerFindFeed: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerLike: vi.fn(),
+  // Never answers: these tests stop at the URL the conversation opens on.
+  chatControllerIssueToken: vi.fn(() => new Promise(() => {})),
+  chatControllerOpenMatchChannel: vi.fn(() => new Promise(() => {})),
   sectorControllerFindAll: vi.fn(),
 }));
 
@@ -41,8 +44,8 @@ const authenticateAs = (userType: 'candidate' | 'recruiter', hasProfile = true) 
   } as unknown as Response);
 };
 
-const renderAt = (path: string) => {
-  const router = createMemoryRouter(routes, { initialEntries: [path] });
+const renderAt = (path: string, state?: unknown) => {
+  const router = createMemoryRouter(routes, { initialEntries: [{ pathname: path, state }] });
   render(
     <AuthProvider>
       <RouterProvider router={router} />
@@ -148,14 +151,27 @@ describe('navigation vers le match', () => {
     expect(screen.queryByRole('button', { name: 'Se connecter' })).not.toBeInTheDocument();
   });
 
-  it('revient au feed après avoir choisi d’écrire un message', async () => {
+  it('ouvre la conversation du match en choisissant d’écrire un message', async () => {
+    const user = userEvent.setup();
+    authenticateAs('candidate');
+    const router = renderAt('/match', {
+      matchedProfile: { matchId: 12, name: 'Acme', avatarUrl: null },
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Écrire un message' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/matches/12/conversation'));
+  });
+
+  /** Un rechargement perd l'état de navigation, donc l'id du match. */
+  it('se rabat sur la liste des matches quand le match est inconnu', async () => {
     const user = userEvent.setup();
     authenticateAs('candidate');
     renderAt('/match');
 
     await user.click(await screen.findByRole('button', { name: 'Écrire un message' }));
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Offres' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Matches' })).toBeInTheDocument();
   });
 
   it('revient au feed après avoir choisi de continuer à swiper', async () => {

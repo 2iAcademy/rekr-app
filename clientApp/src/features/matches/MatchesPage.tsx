@@ -15,6 +15,7 @@ import { isCandidate, isRecruiter } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
 import type { BusinessMessages } from '@/lib/feedback/failureMessage';
 import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
+import { applicantsPath, conversationPath } from '@/features/matches/paths';
 import { fileUrl } from '@/lib/fileUrl';
 import { cn, timeSince } from '@/lib/utils';
 
@@ -72,21 +73,12 @@ const initial = (name: string) => name.charAt(0).toUpperCase();
 const offerLine = (counterpart: MatchCounterpartDto, offer: MatchOfferDto): string | undefined =>
   counterpart.kind === 'candidate' ? `Offre : ${offer.title}` : undefined;
 
-/**
- * There is no standalone candidate screen: the applicants of the offer are
- * where a recruiter answers them.
- */
-const applicantsPath = (offerId: number) => `/recruteur/offres/${offerId}/candidats`;
-
 function matchRow(match: MatchListItemDto): ListRow {
   const age = Date.now() - new Date(match.matchedAt).getTime();
 
   return {
     key: `match-${match.id}`,
-    to:
-      match.counterpart.kind === 'candidate'
-        ? applicantsPath(match.offer.id)
-        : `/offres/${match.offer.id}`,
+    to: conversationPath(match.id),
     name: match.counterpart.name,
     role: match.counterpart.headline ?? match.offer.title,
     offer: offerLine(match.counterpart, match.offer),

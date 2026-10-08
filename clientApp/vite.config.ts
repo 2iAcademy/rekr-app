@@ -31,6 +31,10 @@ export default defineConfig({
       // local build path — not worth publishing either.
       workbox: {
         sourcemap: false,
+        // The Stream SDK, loaded with the conversation screen only: about 2 MB
+        // every install would download for a screen that needs the network
+        // anyway. The browser fetches it the first time a conversation opens.
+        globIgnores: ['**/ConversationPage-*', '**/ReactPlayerWrapper-*'],
       },
       manifest: {
         name: 'Rekr',

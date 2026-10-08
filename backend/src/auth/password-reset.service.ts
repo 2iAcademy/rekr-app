@@ -12,6 +12,10 @@ import { buildPasswordResetEmail } from './password-reset-email';
 import { hashPassword } from './password-hash';
 import { RefreshTokenService } from './refresh-token.service';
 import { hashToken } from './token-hash';
+import {
+  passwordWeakness,
+  WEAK_PASSWORD_MESSAGES,
+} from '../common/validation/password-strength';
 
 const TOKEN_BYTES = 32;
 const DEFAULT_TTL_MINUTES = 60;
@@ -93,7 +97,7 @@ export class PasswordResetService {
       // issued before that through would answer 204 for a password login then
       // refuses anyway. Joined onto the lookup already being made rather than
       // asked in a second query, and refused like the other three cases.
-      include: { user: { select: { isActive: true } } },
+      include: { user: { select: { isActive: true, email: true } } },
     });
 
     if (
@@ -103,6 +107,13 @@ export class PasswordResetService {
       !row.user.isActive
     ) {
       throw new BadRequestException(INVALID_LINK);
+    }
+
+    // The DTO has already applied the rest of the rule; only the account's
+    // own address was out of its reach. Worded like the pipe's refusal, so the
+    // client tells it from a dead link the same way.
+    if (passwordWeakness(password, row.user.email) === 'email') {
+      throw new BadRequestException([WEAK_PASSWORD_MESSAGES.email]);
     }
 
     const passwordHash = await hashPassword(password);

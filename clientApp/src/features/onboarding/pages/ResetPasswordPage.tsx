@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { PasswordInput } from '@/components/form/PasswordInput';
 import { authControllerResetPassword } from '@/api/generated';
 import { ApiError } from '@/api/customFetch';
+import { PASSWORD_RESET_SUCCESS, passwordResetBusiness } from '@/features/auth/authFeedback';
 import {
-  PASSWORD_MIN_LENGTH,
-  PASSWORD_RESET_SUCCESS,
-  passwordResetBusiness,
-} from '@/features/auth/authFeedback';
+  PASSWORD_RULE_HINT,
+  passwordProblem,
+  passwordRefusalMessage,
+} from '@/features/auth/passwordRule';
 import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
 
 interface ResetPasswordPageProps {
@@ -70,8 +71,10 @@ export function ResetPasswordPage({
       return;
     }
 
-    if (password.length < PASSWORD_MIN_LENGTH) {
-      setError(`Le mot de passe doit contenir au moins ${PASSWORD_MIN_LENGTH} caractères.`);
+    // The account's address is not known here; the server checks that part.
+    const problem = passwordProblem(password);
+    if (problem) {
+      setError(problem);
       return;
     }
 
@@ -88,9 +91,17 @@ export function ResetPasswordPage({
       // way back in is the login screen.
       onSuccess?.();
     } catch (caught) {
-      // A 400 is the server's verdict on the link itself, not on what was
-      // typed: the form has nothing left to offer, so the screen switches to
-      // the dead-end and its way out.
+      // The one 400 about what was typed: the password matched the account's
+      // own address, which only the server knows. The link is still good.
+      const refusal = passwordRefusalMessage(caught);
+      if (refusal) {
+        notifyFailure(caught, { ...passwordResetBusiness, 400: refusal });
+        return;
+      }
+
+      // Any other 400 is the server's verdict on the link itself: the form has
+      // nothing left to offer, so the screen switches to the dead-end and its
+      // way out.
       if (caught instanceof ApiError && caught.status === 400) {
         setRejectedLink('refused');
         return;
@@ -160,8 +171,13 @@ export function ResetPasswordPage({
                 }}
                 placeholder="8 caractères min."
                 aria-invalid={error !== null}
-                aria-describedby={error !== null ? 'reset-error' : undefined}
+                aria-describedby={
+                  error !== null ? 'reset-password-hint reset-error' : 'reset-password-hint'
+                }
               />
+              <p id="reset-password-hint" className="text-xs text-ink-muted">
+                {PASSWORD_RULE_HINT}
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">

@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { ChatService } from '../chat/chat.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MatchService } from './match.service';
 
@@ -48,6 +49,7 @@ const unmatchRow = {
   candidateUserId: 7,
   offerId: 4,
   recruiterUserId: 3,
+  candidate: { isActive: true },
   offer: { companyId: 8 },
 };
 
@@ -415,6 +417,56 @@ describe('MatchService', () => {
       expect(prisma.match.findUnique).toHaveBeenCalledTimes(2);
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
       expect(prisma.match.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('unmatch and the conversation', () => {
+    const chat = { deleteMatchChannels: jest.fn() };
+
+    beforeEach(async () => {
+      chat.deleteMatchChannels.mockReset();
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          MatchService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: ChatService, useValue: chat },
+        ],
+      }).compile();
+      service = moduleRef.get(MatchService);
+    });
+
+    it('deletes the conversation once the teardown is committed', async () => {
+      prisma.match.findUnique.mockResolvedValue(unmatchRow);
+      prisma.match.delete.mockResolvedValue(unmatchRow);
+
+      await service.unmatch({ id: 7, userType: 'candidate' }, 11);
+
+      expect(chat.deleteMatchChannels).toHaveBeenCalledWith([11]);
+    });
+
+    it('answers 404 to a recruiter once the candidate is deactivated', async () => {
+      prisma.match.findUnique.mockResolvedValue({
+        ...unmatchRow,
+        candidate: { isActive: false },
+      });
+      prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 8 });
+
+      await expect(
+        service.unmatch({ id: 3, userType: 'recruiter' }, 11),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(prisma.match.delete).not.toHaveBeenCalled();
+      expect(chat.deleteMatchChannels).not.toHaveBeenCalled();
+    });
+
+    it('keeps it when the caller has no business with the match', async () => {
+      prisma.match.findUnique.mockResolvedValue(unmatchRow);
+
+      await expect(
+        service.unmatch({ id: 99, userType: 'candidate' }, 11),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(chat.deleteMatchChannels).not.toHaveBeenCalled();
     });
   });
 });

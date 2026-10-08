@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { OfferFeedQueryDto } from './dto/offer-feed-query.dto';
+import { ChatService } from '../chat/chat.service';
 import { OfferSearchService } from '../search/offer-search.service';
 import { OfferService } from './offer.service';
 import { CityService } from '../city/city.service';
@@ -293,6 +294,50 @@ describe('OfferService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(prisma.offer.update).not.toHaveBeenCalled();
+    });
+
+    describe('conversations', () => {
+      const chat = { syncOfferStatus: jest.fn() };
+
+      const serviceWithChat = async () => {
+        const moduleRef = await Test.createTestingModule({
+          providers: [
+            OfferService,
+            { provide: PrismaService, useValue: prisma },
+            { provide: CityService, useValue: cities },
+            { provide: MatchService, useValue: matches },
+            { provide: JobFamilyService, useValue: jobFamilies },
+            { provide: ChatService, useValue: chat },
+          ],
+        }).compile();
+        return moduleRef.get(OfferService);
+      };
+
+      beforeEach(() => {
+        chat.syncOfferStatus.mockReset();
+        prisma.offer.findUnique.mockResolvedValue({
+          id: 50,
+          companyId: 10,
+          status: 'open',
+        });
+        prisma.recruiterProfile.findUnique.mockResolvedValue({ companyId: 10 });
+      });
+
+      it('freezes them once the status change is committed', async () => {
+        prisma.offer.update.mockResolvedValue({ id: 50, status: 'filled' });
+
+        await (await serviceWithChat()).update(7, 50, { status: 'filled' });
+
+        expect(chat.syncOfferStatus).toHaveBeenCalledWith(50, 'filled');
+      });
+
+      it('leaves them alone when the status does not change', async () => {
+        prisma.offer.update.mockResolvedValue({ id: 50, status: 'open' });
+
+        await (await serviceWithChat()).update(7, 50, { title: 'Dev' });
+
+        expect(chat.syncOfferStatus).not.toHaveBeenCalled();
+      });
     });
   });
 

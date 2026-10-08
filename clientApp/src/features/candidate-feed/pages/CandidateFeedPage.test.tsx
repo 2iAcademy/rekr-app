@@ -239,6 +239,7 @@ describe('CandidateFeedPage', () => {
 
     await waitFor(() =>
       expect(onMatch).toHaveBeenCalledWith({
+        matchId: 9,
         name: anOffer.company.name,
         avatarUrl: null,
       }),

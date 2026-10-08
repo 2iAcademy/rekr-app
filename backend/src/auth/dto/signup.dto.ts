@@ -9,6 +9,10 @@ import {
 } from 'class-validator';
 import { normalizeEmail } from 'src/common/transforms/emails.transforms';
 import { MAX_PASSWORD_LENGTH } from 'src/common/validation/password-bounds';
+import {
+  IsStrongPassword,
+  MIN_PASSWORD_LENGTH,
+} from 'src/common/validation/password-strength';
 import { ApiProperty } from '@nestjs/swagger';
 
 const allowedUserTypes = ['candidate', 'recruiter'] as const;
@@ -41,12 +45,16 @@ export class SignupDto {
 
   @ApiProperty({
     example: 'correct-horse-battery-staple',
-    minLength: 8,
+    minLength: MIN_PASSWORD_LENGTH,
     maxLength: MAX_PASSWORD_LENGTH,
+    description:
+      'Refused when made of fewer than 5 distinct characters, when it is a ' +
+      'keyboard or alphabet walk, a common password, or the account address.',
   })
   @IsString()
-  @MinLength(8)
+  @MinLength(MIN_PASSWORD_LENGTH)
   @MaxLength(MAX_PASSWORD_LENGTH)
+  @IsStrongPassword()
   password!: string;
 
   @ApiProperty({

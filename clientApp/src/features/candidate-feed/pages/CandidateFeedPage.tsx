@@ -19,13 +19,13 @@ import type { OfferFeedItemDto } from '@/api/generated';
 import { likedOfferCountLabel } from '../labels';
 import { useOfferFeed } from '../useOfferFeed';
 import { OfferCard } from '../components/OfferCard';
-import { matchedCompany } from '@/features/matches/likeResult';
+import { matchedCompany, type MatchedProfile } from '@/features/matches/likeResult';
 
 const SWIPE_THRESHOLD = 120;
 
 interface CandidateFeedPageProps {
   onOpenOffer: (id: number) => void;
-  onMatch: (matchedProfile: { name: string; avatarUrl: string | null }) => void;
+  onMatch: (matchedProfile: MatchedProfile) => void;
 }
 
 export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPageProps) {
@@ -76,8 +76,8 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
       if (decision === 'liked') {
         void offerControllerLike(offer.id)
           .then((response) => {
-            const counterpart = matchedCompany(response.data);
-            if (counterpart) onMatch({ name: counterpart.name, avatarUrl: counterpart.avatarUrl });
+            const matched = matchedCompany(response.data);
+            if (matched) onMatch(matched);
           })
           .catch((cause: unknown) => notifyFailure(cause, likeFailureBusiness));
       }
