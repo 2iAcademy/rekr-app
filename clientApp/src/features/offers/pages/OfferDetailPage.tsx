@@ -72,7 +72,7 @@ function TopBar({ onBack }: { onBack?: () => void }) {
         type="button"
         onClick={onBack}
         aria-label="Fermer"
-        className="flex size-11 cursor-pointer items-center justify-center rounded-xl text-ink transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
+        className="flex size-11 items-center justify-center rounded-xl text-ink transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
       >
         <ArrowLeft aria-hidden="true" className="size-5" />
       </button>

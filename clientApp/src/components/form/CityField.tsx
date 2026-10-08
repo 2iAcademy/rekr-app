@@ -202,7 +202,7 @@ export function CityField({
               choose(city);
             }}
             className={cn(
-              'cursor-pointer px-4 py-3 text-sm text-ink',
+              'px-4 py-3 text-sm text-ink',
               index === activeIndex ? 'bg-brand-tint text-brand-strong' : 'hover:bg-surface',
             )}
           >

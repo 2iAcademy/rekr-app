@@ -61,7 +61,7 @@ export function ApplicantRow({
           type="button"
           onClick={onOpen}
           aria-label={`Voir le profil de ${firstName}`}
-          className="cursor-pointer self-start rounded-md text-left text-[0.9375rem] font-bold break-words text-ink outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:ring-3 focus-visible:ring-brand/30"
+          className="self-start rounded-md text-left text-[0.9375rem] font-bold break-words text-ink outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:ring-3 focus-visible:ring-brand/30"
         >
           {firstName}
         </button>

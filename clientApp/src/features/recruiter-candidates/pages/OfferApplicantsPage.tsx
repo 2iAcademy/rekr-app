@@ -109,7 +109,7 @@ export function OfferApplicantsPage({
           <button
             type="button"
             onClick={reload}
-            className="cursor-pointer font-semibold underline underline-offset-4"
+            className="font-semibold underline underline-offset-4"
           >
             Réessayer
           </button>

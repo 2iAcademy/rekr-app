@@ -55,7 +55,7 @@ export function OptionChips<T extends string>({
             <label
               key={option.value}
               className={cn(
-                'flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-center text-sm transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand/30',
+                'flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2.5 text-center text-sm transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand/30',
                 selected
                   ? 'border-brand bg-brand-tint font-semibold text-brand-strong'
                   : 'border-line bg-card text-ink hover:border-ink-faint/40',

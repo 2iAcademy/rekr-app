@@ -59,7 +59,7 @@ export function OptionCards<T extends string>({
             <label
               key={option.value}
               className={cn(
-                'relative flex cursor-pointer rounded-xl border transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand/30',
+                'relative flex rounded-xl border transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand/30',
                 stacked
                   ? 'min-h-18 items-center gap-3 py-3.5 pr-8 pl-4'
                   : 'min-h-11 items-center justify-center gap-1.5 px-2.5 py-2.5 text-center text-sm',
