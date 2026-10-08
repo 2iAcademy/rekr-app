@@ -267,6 +267,16 @@ dc up -d --no-build
 `compose.prod.yml` reste celui de la version fautive. S'il a changé entre les deux versions, le reprendre aussi :
 `sudo -u deploy git -C repo.git show <hash>:compose.prod.yml | sudo -u deploy tee compose.prod.yml >/dev/null`.
 
+Les images de moins d'une semaine sont encore sur le serveur. Une plus ancienne doit être retéléchargée, et les
+images sont privées : se connecter d'abord avec un jeton GitHub personnel (classic, droit `read:packages`
+seulement), puis se déconnecter.
+
+```bash
+docker login ghcr.io -u <login GitHub>   # coller le jeton
+dc pull && dc up -d --no-build
+docker logout ghcr.io
+```
+
 **Ce retour ne touche que le code.** Si la version fautive a appliqué une migration, la base reste dans son
 nouvel état. Ça marche si la migration ne fait qu'ajouter (colonne, table) : l'ancien code l'ignore. Si elle
 renomme ou supprime, l'ancien code plante, et il faut soit écrire une migration inverse, soit restaurer la

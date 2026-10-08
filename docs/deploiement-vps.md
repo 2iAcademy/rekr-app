@@ -72,12 +72,21 @@ Sur le serveur, `rekr-deploy` :
 - vérifie que le commit est sur `main` ;
 - prend `compose.prod.yml` dans ce commit ;
 - écrit le `.env` reçu, en fixant lui-même `IMAGE_TAG` au hash du commit ;
-- tire les images ;
+- tire les images, avec le jeton du job Deploy (voir ci-dessous) ;
 - seulement si toutes sont là, remplace les fichiers et lance
   `docker compose up -d --no-build`.
 
 Le serveur ne construit rien et n'a pas le code source. Une clé de
 déploiement volée ne peut donc relancer que du code relu et mergé.
+
+**Les images sont privées.** Le serveur ne garde aucun identifiant GHCR. Le
+job Deploy envoie, à la suite du `.env`, le jeton que GitHub crée pour ce job
+(`GITHUB_TOKEN`). Ce jeton ne peut que lire les paquets et expire à la fin du
+job. `rekr-deploy` s'en sert le temps du téléchargement, dans une
+configuration Docker temporaire, puis l'efface ; il n'est jamais écrit dans le
+`.env`. Le dépôt `rekr-app` doit donc garder son accès aux trois paquets
+(paquet > Package settings > Manage Actions access, rôle **Write** au moins :
+le job Images y pousse aussi).
 
 Les scripts `scripts/ci/*.sh` et `scripts/deploy/rekr-deploy` ne dépendent pas
 de GitHub : seul le fichier du workflow serait à réécrire pour une autre CI.
@@ -196,12 +205,6 @@ inscrit dans l'image au build, et le job qui construit les images n'a pas
 d'environnement : il n'attend aucune approbation. Ce DSN est public par
 nature, il finit dans le JavaScript servi aux navigateurs.
 
-**Images** : après le premier passage sur `main`, rendre publics les trois
-paquets `rekr-backend`, `rekr-migrate` et `rekr-web` (organisation 2iAcademy >
-Packages > paquet > Package settings > Change visibility). Le dépôt est déjà
-public et aucun secret n'est dans une image ; sans ça, le serveur devrait
-s'authentifier sur GHCR pour les tirer.
-
 Une valeur ne doit contenir ni apostrophe ni retour à la ligne : le workflow la
 refuse plutôt que de produire un `.env` faux. `.env.prod.example` reste la
 liste de référence des variables.
@@ -216,9 +219,8 @@ rm ~/.ssh/rekr_deploy
 ## Premier déploiement
 
 1. Merger `preprod` dans `main`. Le workflow CI/CD passe la CI, pousse les
-   images, puis s'arrête sur le job Deploy. Si le serveur doit les tirer sans
-   authentification, rendre les paquets publics maintenant (voir plus haut),
-   puis approuver le déploiement dans l'onglet Actions.
+   images, puis s'arrête sur le job Deploy. Approuver le déploiement dans
+   l'onglet Actions.
 
    Au premier démarrage, Caddy obtient le certificat HTTPS de `rekr.tech` ; le
    backend démarre sans clé Elasticsearch et bascule sur le tri PostgreSQL :
