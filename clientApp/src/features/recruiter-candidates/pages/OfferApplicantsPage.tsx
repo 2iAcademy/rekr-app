@@ -3,6 +3,7 @@ import { ArrowLeft, Users } from 'lucide-react';
 import { notifyFailure } from '@/lib/feedback/notify';
 import { applicantLikeBusiness } from '../applicantFeedback';
 import { offerTitleFrom } from '../offerContext';
+import { useOfferTitle } from '../useOfferTitle';
 import { matchedCandidate, type MatchedProfile } from '@/features/matches/likeResult';
 import { ApplicantRow } from '../components/ApplicantRow';
 import { CandidateDetailPage } from './CandidateDetailPage';
@@ -35,7 +36,7 @@ export function OfferApplicantsPage({
 }: OfferApplicantsPageProps) {
   const { applicants, status, truncated, pendingId, reload, like, pass, decisionFor } =
     useApplicants(offerId);
-  const offerTitle = offerTitleFrom(useLocation().state);
+  const offerTitle = useOfferTitle(offerId, offerTitleFrom(useLocation().state));
 
   const answer = (candidateUserId: number): void => {
     void like(candidateUserId)
@@ -62,6 +63,7 @@ export function OfferApplicantsPage({
         candidate={open}
         decision={decisionFor(open.userId)}
         pending={pendingId === open.userId}
+        offerTitle={offerTitle}
         onBack={onCloseProfile}
         onLike={() => answer(open.userId)}
         onPass={() => passApplicant(open.userId)}

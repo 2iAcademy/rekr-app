@@ -17,6 +17,8 @@ interface CandidateDetailPageProps {
   decision: ApplicantDecision;
   /** A decision write is in flight. */
   pending?: boolean;
+  /** The offer the recruiter came from, when known. */
+  offerTitle?: string | null;
   onBack: () => void;
   onLike: () => void;
   onPass: () => void;
@@ -71,6 +73,7 @@ export function CandidateDetailPage({
   candidate,
   decision,
   pending = false,
+  offerTitle = null,
   onBack,
   onLike,
   onPass,
@@ -131,7 +134,14 @@ export function CandidateDetailPage({
         >
           <ArrowLeft aria-hidden="true" className="size-5" />
         </Button>
-        <p className="text-base font-bold text-ink">Profil</p>
+        <div className="flex min-w-0 flex-col">
+          <p className="text-base font-bold text-ink">Profil</p>
+          {/* A recruiter with several offers opens this screen from one of them:
+              without the reminder, they would have to go back to tell which. */}
+          {offerTitle !== null && (
+            <p className="truncate text-sm text-ink-muted">{`Offre : ${offerTitle}`}</p>
+          )}
+        </div>
       </div>
 
       {/* One card for the whole profile — identity, facts, then the sections —

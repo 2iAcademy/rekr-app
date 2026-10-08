@@ -15,6 +15,7 @@ import { OfferApplicantsPage } from './OfferApplicantsPage';
 
 vi.mock('@/api/generated', () => ({
   offerControllerFindApplicants: vi.fn(),
+  offerControllerFindOneById: vi.fn().mockResolvedValue({ data: { id: 12, title: 'Dev' } }),
   offerControllerLikeApplicant: vi.fn(),
   offerControllerPassApplicant: vi.fn(),
 }));
