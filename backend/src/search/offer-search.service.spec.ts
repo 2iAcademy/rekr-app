@@ -215,4 +215,41 @@ describe('OfferSearchService', () => {
     });
     expect(elastic.index).not.toHaveBeenCalled();
   });
+
+  describe('availability', () => {
+    it('is disabled when Elasticsearch is switched off', async () => {
+      process.env.ELASTICSEARCH_ENABLED = 'false';
+      const service = new OfferSearchService(prisma as never);
+
+      await expect(service.availability()).resolves.toBe('disabled');
+      expect(elastic.indices.exists).not.toHaveBeenCalled();
+    });
+
+    it('is available when the offers index exists', async () => {
+      elastic.indices.exists.mockResolvedValue(true);
+      const service = new OfferSearchService(prisma as never);
+
+      await expect(service.availability()).resolves.toBe('available');
+      expect(elastic.indices.exists).toHaveBeenCalledWith(
+        { index: 'rekr-offers-v2' },
+        { requestTimeout: 2000, maxRetries: 0 },
+      );
+    });
+
+    it('is unavailable when the offers index is missing', async () => {
+      elastic.indices.exists.mockResolvedValue(false);
+      const service = new OfferSearchService(prisma as never);
+
+      await expect(service.availability()).resolves.toBe('unavailable');
+    });
+
+    it('is unavailable when Elasticsearch does not answer', async () => {
+      elastic.indices.exists.mockRejectedValue(
+        new Error('connect ECONNREFUSED'),
+      );
+      const service = new OfferSearchService(prisma as never);
+
+      await expect(service.availability()).resolves.toBe('unavailable');
+    });
+  });
 });

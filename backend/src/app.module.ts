@@ -22,6 +22,7 @@ import { StorageModule } from './storage/storage.module';
 import { LikeModule } from './like/like.module';
 import { MatchModule } from './match/match.module';
 import { ChatModule } from './chat/chat.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ChatModule } from './chat/chat.module';
     LikeModule,
     ChatModule,
     AccountModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
