@@ -8,8 +8,8 @@ const itemFor = (isRecruiter: boolean, label: string) =>
 
 describe('navigationItems', () => {
   it('rend les entrées principales dans l’ordre d’affichage', () => {
-    expect(labels(true)).toEqual(['Mes offres', 'Matchs', 'Profil']);
-    expect(labels(false)).toEqual(['Offres', 'Matchs', 'Profil']);
+    expect(labels(true)).toEqual(['Mes offres', 'Activité', 'Profil']);
+    expect(labels(false)).toEqual(['Offres', 'Activité', 'Profil']);
   });
 
   // Un recruteur ne parcourt pas un paquet de candidats : il publie une annonce
@@ -42,8 +42,8 @@ describe('navigationItems', () => {
   // L'écran sert les deux rôles : le candidat y suit ses matchs et les offres
   // qu'il a likées, le recruteur ses matchs et les candidats qui l'ont liké.
   it('ouvre les matchs aux deux rôles, à la même destination', () => {
-    expect(itemFor(false, 'Matchs')).toEqual({ label: 'Matchs', to: '/matches' });
-    expect(itemFor(true, 'Matchs')).toEqual({ label: 'Matchs', to: '/matches' });
+    expect(itemFor(false, 'Activité')).toEqual({ label: 'Activité', to: '/matches' });
+    expect(itemFor(true, 'Activité')).toEqual({ label: 'Activité', to: '/matches' });
   });
 
   // Every chrome (sidebar, header, bottom tab bar) calls this on each render and

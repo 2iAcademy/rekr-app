@@ -642,7 +642,7 @@ export function MatchesPage() {
 
       <div
         role="tablist"
-        aria-label="Filtrer les matchs"
+        aria-label="Filtrer l’activité"
         className="mt-5 inline-flex rounded-xl bg-surface p-1"
       >
         {tabs.map((item) => {
