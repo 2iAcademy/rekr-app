@@ -58,15 +58,19 @@ describe('likeResult', () => {
     expect(matchedCandidate(result)).toBeNull();
   });
 
-  it('returns a company counterpart only for the company helper', () => {
+  it('returns the company and its match only for the company helper', () => {
     expect(matchedCounterpart(companyMatch)).toEqual(companyMatch.match?.counterpart);
-    expect(matchedCompany(companyMatch)).toEqual(companyMatch.match?.counterpart);
+    expect(matchedCompany(companyMatch)).toEqual({ matchId: 1, name: 'Acme', avatarUrl: null });
     expect(matchedCandidate(companyMatch)).toBeNull();
   });
 
-  it('returns a candidate counterpart only for the candidate helper', () => {
+  it('returns the candidate and their match only for the candidate helper', () => {
     expect(matchedCounterpart(candidateMatch)).toEqual(candidateMatch.match?.counterpart);
-    expect(matchedCandidate(candidateMatch)).toEqual(candidateMatch.match?.counterpart);
+    expect(matchedCandidate(candidateMatch)).toEqual({
+      matchId: 2,
+      name: 'Camille Martin',
+      avatarUrl: '/candidate.png',
+    });
     expect(matchedCompany(candidateMatch)).toBeNull();
   });
 });

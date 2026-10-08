@@ -358,27 +358,27 @@ describe('MatchesPage', () => {
     expect(screen.getByText('Offre : Développeur Back-End')).toBeInTheDocument();
   });
 
-  it('mène du match aux candidats de l’offre côté recruteur', async () => {
+  /**
+   * Un match sert à se parler : la ligne ouvre la conversation, et c'est son
+   * en-tête qui mène à la candidature ou à l'offre.
+   */
+  it('ouvre la conversation du match côté recruteur', async () => {
     authenticateAs('recruiter');
     getMatches.mockResolvedValue(matches([aRecruiterMatch]));
     renderPage();
 
     expect(await screen.findByRole('link', { name: /Camille Durand/ })).toHaveAttribute(
       'href',
-      '/recruteur/offres/41/candidats',
+      '/matches/21/conversation',
     );
   });
 
-  /**
-   * Le détail de l'offre connaît désormais l'état matché : il n'y propose plus
-   * le retrait de like qui répondait 409, et la ligne peut y mener.
-   */
-  it('mène du match au détail de l’offre côté candidat', async () => {
+  it('ouvre la conversation du match côté candidat', async () => {
     renderPage();
 
     expect(await screen.findByRole('link', { name: /Acme Corp/ })).toHaveAttribute(
       'href',
-      '/offres/4',
+      '/matches/12/conversation',
     );
   });
 

@@ -14,7 +14,7 @@ import { ApiError } from '@/api/customFetch';
 import { notifyFailure } from '@/lib/feedback/notify';
 import type { BusinessMessages } from '@/lib/feedback/failureMessage';
 import { likeFailureBusiness } from '@/features/candidate-feed/likeFeedback';
-import { matchedCompany } from '@/features/matches/likeResult';
+import { matchedCompany, type MatchedProfile } from '@/features/matches/likeResult';
 import type { OfferDetailDto, TagCategory } from '@/api/generated';
 import { fileUrl } from '@/lib/fileUrl';
 import { useParams } from 'react-router';
@@ -41,11 +41,6 @@ const serverMessage = (cause: unknown): string | undefined => {
 const unlikeFailure = (cause: unknown): BusinessMessages => ({
   409: serverMessage(cause) ?? UNLIKE_CONFLICT,
 });
-
-interface MatchedProfile {
-  name: string;
-  avatarUrl: string | null;
-}
 
 interface OfferDetailPageProps {
   onBack?: () => void;
@@ -110,8 +105,8 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
     setIsLiking(true);
     try {
       const response = await offerControllerLike(offer.id);
-      const counterpart = matchedCompany(response.data);
-      if (counterpart) onMatch?.({ name: counterpart.name, avatarUrl: counterpart.avatarUrl });
+      const matched = matchedCompany(response.data);
+      if (matched) onMatch?.(matched);
     } catch (cause) {
       notifyFailure(cause, likeFailureBusiness);
     } finally {

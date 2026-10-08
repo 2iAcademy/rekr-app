@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { ChatModule } from '../chat/chat.module';
 import { CityModule } from '../city/city.module';
 import { JobFamilyModule } from '../job-family/job-family.module';
 import { MatchModule } from '../match/match.module';
@@ -8,7 +9,14 @@ import { OfferController } from './offer.controller';
 import { OfferService } from './offer.service';
 
 @Module({
-  imports: [AuthModule, CityModule, JobFamilyModule, MatchModule, SearchModule],
+  imports: [
+    AuthModule,
+    ChatModule,
+    CityModule,
+    JobFamilyModule,
+    MatchModule,
+    SearchModule,
+  ],
   controllers: [OfferController],
   providers: [OfferService],
 })

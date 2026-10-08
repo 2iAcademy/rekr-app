@@ -221,6 +221,7 @@ describe('OfferDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Liker' }));
     await waitFor(() =>
       expect(onMatch).toHaveBeenCalledExactlyOnceWith({
+        matchId: 1,
         name: mockOffer.company.name,
         avatarUrl: '/api/files/companies/1/logo/acme.png',
       }),

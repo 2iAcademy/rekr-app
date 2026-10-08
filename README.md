@@ -119,6 +119,27 @@ Payloads:
 
 La réponse contient `accessToken` + un objet `user` (sans mot de passe).
 
+## Messagerie — Stream Chat
+
+Les messages entre un candidat et son match sont stockés chez [Stream](https://getstream.io/chat/). L'API décide de l'accès : `POST /api/chat/token` signe un jeton Stream d'une heure, `POST /api/matches/:id/chat` ouvre la conversation du match une fois l'appelant reconnu (le candidat, ou un recruteur de l'entreprise de l'offre). Chaque ouverture remet le channel en ordre : créé par l'utilisateur système `rekr-system`, sans membre étranger au match, gelé si l'offre n'est plus publiée.
+
+Variables (racine `.env` pour docker compose, `backend/.env` hors Docker) :
+
+```bash
+STREAM_API_KEY=""     # dashboard.getstream.io > <app> > Overview > App Access Keys
+STREAM_API_SECRET=""  # idem ; reste côté backend, jamais dans une variable VITE_
+```
+
+Sans ces clés l'API démarre, et seules les routes de messagerie répondent 503.
+
+Réglages attendus dans le dashboard de l'app Stream, à reporter sur chaque environnement. Le code ne dépend pas d'eux pour décider qui entre dans une conversation, mais ils ferment ce qu'un jeton client pourrait faire en appelant Stream directement :
+
+- type de channel `messaging`, rôle `user` et `channel_member` : pas de création de channel, pas de modification des membres, pas de mise à jour du channel (donc pas de dégel) ;
+- type de channel `messaging` : uploads désactivés ;
+- réglages de l'app : recherche d'utilisateurs interdite au rôle `user` (`user_search_disallowed_roles`) ;
+- rôle `user` : pas de modification de son propre profil (le nom affiché vient de l'API) ;
+- région de stockage : UE.
+
 ## Base de données — Prisma
 
 Le schéma vit dans `backend/prisma/schema.prisma`. Toutes les commandes se lancent depuis `backend/`.

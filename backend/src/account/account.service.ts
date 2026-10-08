@@ -1,9 +1,11 @@
 import {
   ForbiddenException,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { verifyPassword } from '../auth/password-hash';
+import { ChatService } from '../chat/chat.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileSlotService } from '../storage/file-slot.service';
 
@@ -36,6 +38,7 @@ export class AccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FileSlotService,
+    @Optional() private readonly chat?: ChatService,
   ) {}
 
   /**
@@ -72,6 +75,7 @@ export class AccountService {
    * things.
    */
   async erase(userId: number): Promise<void> {
+    const conversations = await this.conversationsAtStake(userId);
     const erasedCompanyId = await this.prisma.$transaction(async (tx) => {
       const profile = await tx.recruiterProfile.findUnique({
         where: { userId },
@@ -111,6 +115,40 @@ export class AccountService {
     if (erasedCompanyId !== null) {
       await this.files.discardOwner('companies', erasedCompanyId);
     }
+
+    // The cascade removed the matches without going through `unmatch`, so
+    // their conversations have to be removed here — the ones that are gone,
+    // since a recruiter who leaves colleagues behind leaves the company's
+    // matches standing.
+    const surviving = await this.prisma.match.findMany({
+      where: { id: { in: conversations } },
+      select: { id: true },
+    });
+    const kept = new Set(surviving.map(({ id }) => id));
+    await this.chat?.deleteMatchChannels(
+      conversations.filter((id) => !kept.has(id)),
+    );
+    await this.chat?.eraseUser(userId);
+  }
+
+  /**
+   * The matches the erasure may cascade into: the candidate's own, or every
+   * match of the recruiter's company, which goes with its last recruiter.
+   * Read before the transaction, because nothing is left to read after it.
+   */
+  private async conversationsAtStake(userId: number): Promise<number[]> {
+    if (!this.chat) return [];
+    const profile = await this.prisma.recruiterProfile.findUnique({
+      where: { userId },
+      select: { companyId: true },
+    });
+    const matches = await this.prisma.match.findMany({
+      where: profile
+        ? { offer: { companyId: profile.companyId } }
+        : { candidateUserId: userId },
+      select: { id: true },
+    });
+    return matches.map(({ id }) => id);
   }
 
   /**
