@@ -386,6 +386,11 @@ jobs:
     needs: images
     if: github.ref == 'refs/heads/main'
     timeout-minutes: 30
+    # The images are private: the server pulls them with this job's own token,
+    # which can only read packages and expires when the job ends.
+    permissions:
+      contents: read
+      packages: read
     # One deploy at a time, and never cancel one halfway through a migration.
     concurrency:
       group: deploy-production
@@ -421,6 +426,8 @@ jobs:
       DEPLOY_USER: ${{ vars.DEPLOY_USER }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      REGISTRY_USER: ${{ github.actor }}
+      REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
@@ -439,9 +446,13 @@ jobs:
       - name: Write the .env
         run: scripts/ci/render-env.sh "$RUNNER_TEMP/production.env"
 
+      # The registry login travels after the .env, on standard input, never
+      # on the command line; the server strips it before writing the .env.
       - name: Deploy over SSH
         run: |
           umask 077
+          printf "REGISTRY_USER='%s'\nREGISTRY_TOKEN='%s'\n" "$REGISTRY_USER" "$REGISTRY_TOKEN" \
+            >> "$RUNNER_TEMP/production.env"
           mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           # The server's own key, pinned: a host answering with another one
