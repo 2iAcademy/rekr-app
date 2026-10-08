@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { CircleAlert, RotateCcw } from 'lucide-react';
 import { offerControllerLike, offerControllerPass } from '@/api/generated';
 import { notifyFailure } from '@/lib/feedback/notify';
@@ -25,6 +25,96 @@ import { matchedCompany, type MatchedProfile } from '@/features/matches/likeResu
 
 const SWIPE_THRESHOLD = 120;
 
+// Enough to cover a fast run of answers. Under reduced motion no animation ends
+// to remove a card, so the bound is what keeps the hidden ones from piling up.
+const MAX_LEAVING_CARDS = 3;
+
+/** The last answer, as the line above the deck words it. */
+interface Outcome {
+  offerId: number;
+  title: string;
+  decision: Decision;
+  failed: boolean;
+}
+
+/** An answered card on its way out, drawn over the next one. */
+interface LeavingCard {
+  key: number;
+  offer: OfferFeedItemDto;
+  decision: Decision;
+  from: number;
+}
+
+function outcomeText({ title, decision, failed }: Outcome): string {
+  if (failed) {
+    return decision === 'liked'
+      ? `Like non enregistré : ${title}`
+      : `Passage non enregistré : ${title}`;
+  }
+
+  return decision === 'liked' ? `Liké : ${title}` : `Passé : ${title}`;
+}
+
+/**
+ * One answered card leaving the screen with its stamp, gone once its animation
+ * ends. The native `animationend` is listened to directly: React maps the prop
+ * to a vendor-prefixed name wherever `AnimationEvent` is missing, and only the
+ * card's own animation counts, not one bubbling up from inside it.
+ */
+function LeavingOfferCard({
+  card: { offer, decision, from },
+  onGone,
+}: {
+  card: LeavingCard;
+  onGone: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const side = decision === 'liked' ? 'right' : 'left';
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    const end = (event: Event): void => {
+      if (event.target === node) onGone();
+    };
+    node.addEventListener('animationend', end);
+
+    return () => node.removeEventListener('animationend', end);
+  }, [onGone]);
+
+  const style = {
+    '--leave-from': `${from}px`,
+    '--leave-tilt': `${from / 30}deg`,
+  } as CSSProperties;
+
+  return (
+    <div
+      ref={ref}
+      aria-hidden="true"
+      inert
+      data-leaving={side}
+      style={style}
+      className={cn(
+        'pointer-events-none absolute inset-x-0 top-0 motion-reduce:hidden',
+        side === 'right' ? 'animate-card-leave-right' : 'animate-card-leave-left',
+      )}
+    >
+      <OfferCard offer={offer} onViewOffer={() => undefined} />
+      <span
+        className={cn(
+          'absolute top-6 rounded-lg border-2 bg-card px-3 py-1 text-lg font-extrabold uppercase',
+          side === 'right'
+            ? 'left-6 -rotate-12 border-success text-success'
+            : 'right-6 rotate-12 border-ink-muted text-ink-muted',
+        )}
+      >
+        {decision === 'liked' ? 'Liké' : 'Passé'}
+      </span>
+    </div>
+  );
+}
+
 interface CandidateFeedPageProps {
   onOpenOffer: (id: number) => void;
   onMatch: (matchedProfile: MatchedProfile) => void;
@@ -33,6 +123,9 @@ interface CandidateFeedPageProps {
 export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPageProps) {
   const { offers, status, reload } = useOfferFeed();
   const [decisions, setDecisions] = useState(noDecisions);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [leaving, setLeaving] = useState<LeavingCard[]>([]);
+  const leavingKey = useRef(0);
   const deckRef = useRef<HTMLElement>(null);
 
   // No client-side filter left: the endpoint shapes the deck from the profile,
@@ -62,19 +155,30 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
    * endpoint is idempotent, so liking the same offer again is harmless.
    *
    * Both decisions are persisted through their idempotent endpoints.
+   *
+   * The answer is confirmed at once, on the line above the deck and by the card
+   * leaving towards its side; a failure then rewrites that line, so a like the
+   * server refused never reads as one that went through.
    */
   const decide = useCallback(
-    (decision: Decision, offer: OfferFeedItemDto | undefined = current): void => {
+    (decision: Decision, offer: OfferFeedItemDto | undefined = current, from = 0): void => {
       if (!offer) {
         return;
       }
 
       setDecisions((previous) => recordDecision(previous, offer.id, decision));
+      setOutcome({ offerId: offer.id, title: offer.title, decision, failed: false });
+      leavingKey.current += 1;
+      const card: LeavingCard = { key: leavingKey.current, offer, decision, from };
+      setLeaving((previous) => [...previous, card].slice(-MAX_LEAVING_CARDS));
+
+      const fail = (cause: unknown): void => {
+        notifyFailure(cause, likeFailureBusiness);
+        setOutcome({ offerId: offer.id, title: offer.title, decision, failed: true });
+      };
 
       if (decision === 'passed') {
-        void offerControllerPass(offer.id).catch((cause: unknown) =>
-          notifyFailure(cause, likeFailureBusiness),
-        );
+        void offerControllerPass(offer.id).catch(fail);
       }
 
       if (decision === 'liked') {
@@ -83,7 +187,7 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
             const matched = matchedCompany(response.data);
             if (matched) onMatch(matched);
           })
-          .catch((cause: unknown) => notifyFailure(cause, likeFailureBusiness));
+          .catch(fail);
       }
 
       if (deck.length === 1) {
@@ -94,8 +198,8 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
   );
 
   const swipe = useCardSwipe({
-    onSwipeRight: () => decide('liked'),
-    onSwipeLeft: () => decide('passed'),
+    onSwipeRight: (distance) => decide('liked', current, distance),
+    onSwipeLeft: (distance) => decide('passed', current, distance),
     threshold: SWIPE_THRESHOLD,
     disabled: !current,
   });
@@ -105,6 +209,19 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
     onDecision: decide,
     disabled: !current,
   });
+
+  const forget = (key: number): void =>
+    setLeaving((previous) => previous.filter((card) => card.key !== key));
+
+  const leavingCards = (
+    // Zero-height anchor: the cards on their way out sit over whatever comes
+    // next — the following card or the end of the deck — without pushing it.
+    <div className="relative z-20 h-0">
+      {leaving.map((card) => (
+        <LeavingOfferCard key={card.key} card={card} onGone={() => forget(card.key)} />
+      ))}
+    </div>
+  );
 
   return (
     <div className="mx-auto mt-5 flex w-full max-w-xl flex-col gap-4 md:mt-0">
@@ -172,11 +289,32 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
           </p>
         )}
 
+        {status === 'ready' && (
+          <div className="-mb-2 flex min-h-4 items-center justify-between gap-3">
+            {/* Visible and announced: with reduced motion there is no card
+                leaving, and this line is then the only confirmation. */}
+            <p
+              role="status"
+              data-testid="decision-outcome"
+              className={cn(
+                'min-w-0 truncate text-xs font-semibold',
+                outcome?.failed ? 'text-destructive' : 'text-ink-muted',
+              )}
+            >
+              {outcome === null ? '' : outcomeText(outcome)}
+            </p>
+            {current && (
+              <p className="tabular shrink-0 text-xs font-semibold text-ink-muted">
+                {`Offre ${position} sur ${offers.length}`}
+              </p>
+            )}
+          </div>
+        )}
+
+        {leavingCards}
+
         {current ? (
           <>
-            <p className="tabular -mb-2 self-end text-xs font-semibold text-ink-muted">
-              {`Offre ${position} sur ${offers.length}`}
-            </p>
             <div
               {...swipe.handlers}
               className={cn(

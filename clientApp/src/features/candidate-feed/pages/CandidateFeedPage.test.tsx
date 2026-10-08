@@ -55,7 +55,11 @@ describe('CandidateFeedPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findFeed.mockResolvedValue(answer([anOffer, anotherOffer]));
-    like.mockResolvedValue(undefined as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
+    like.mockResolvedValue({
+      data: { matchCreated: false, match: null },
+      status: 201,
+      headers: new Headers(),
+    } as unknown as Awaited<ReturnType<typeof offerControllerLike>>);
     pass.mockResolvedValue(undefined as unknown as Awaited<ReturnType<typeof offerControllerPass>>);
   });
 
@@ -138,6 +142,78 @@ describe('CandidateFeedPage', () => {
     await user.click(await screen.findByRole('button', { name: "Ça m'intéresse" }));
 
     expect(heading('Data Analyst')).toBeVisible();
+  });
+
+  // Le geste central du produit ne reste plus muet : chaque décision est
+  // confirmée, et un like que le serveur refuse ne se lit pas comme un succès.
+  describe('retour de décision', () => {
+    const outcome = () => screen.getByTestId('decision-outcome');
+    const leavingCard = () => document.querySelector('[data-leaving]');
+
+    it('confirme un like', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: "Ça m'intéresse" }));
+
+      expect(outcome()).toHaveTextContent('Liké : Développeur Frontend React');
+    });
+
+    it('confirme un passage', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: 'Passer' }));
+
+      expect(outcome()).toHaveTextContent('Passé : Développeur Frontend React');
+    });
+
+    it('distingue un like qui échoue d’un like réussi', async () => {
+      const user = userEvent.setup();
+      like.mockRejectedValue(new Error('réseau'));
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: "Ça m'intéresse" }));
+
+      await waitFor(() =>
+        expect(outcome()).toHaveTextContent('Like non enregistré : Développeur Frontend React'),
+      );
+    });
+
+    it('fait sortir la carte du côté de la décision, sans retenir la suivante', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: "Ça m'intéresse" }));
+
+      expect(leavingCard()).toHaveAttribute('data-leaving', 'right');
+      expect(leavingCard()).toHaveTextContent('Liké');
+      expect(heading('Data Analyst')).toBeVisible();
+
+      await user.click(button('Passer'));
+      expect(document.querySelector('[data-leaving="left"]')).toHaveTextContent('Passé');
+    });
+
+    it('retire la carte sortie une fois son animation finie', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: 'Passer' }));
+      fireEvent.animationEnd(leavingCard() as Element);
+
+      expect(leavingCard()).not.toBeInTheDocument();
+    });
+
+    // Sans mouvement, la carte sortante n'a rien à montrer : seul le message
+    // confirme la décision.
+    it('ne montre pas la carte sortante quand le mouvement est réduit', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: 'Passer' }));
+
+      expect(leavingCard()).toHaveClass('motion-reduce:hidden');
+    });
   });
 
   it('délègue l’ouverture de détail depuis la carte', async () => {
