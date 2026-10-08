@@ -6,6 +6,9 @@ jest.mock('@elastic/elasticsearch', () => ({ Client: jest.fn() }));
 
 const mockedClient = Client as jest.MockedClass<typeof Client>;
 
+/** Lets the background recovery started by `onModuleInit` run to its end. */
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
 describe('OfferSearchService', () => {
   const elastic = {
     indices: { exists: jest.fn(), create: jest.fn(), delete: jest.fn() },
@@ -186,7 +189,8 @@ describe('OfferSearchService', () => {
     elastic.indices.exists.mockResolvedValue(true);
     const service = new OfferSearchService(prisma as never);
 
-    await service.onModuleInit();
+    service.onModuleInit();
+    await settle();
 
     expect(elastic.indices.delete).toHaveBeenCalledWith({
       index: 'rekr-offers-v2',
@@ -271,6 +275,89 @@ describe('OfferSearchService', () => {
       const service = new OfferSearchService(prisma as never);
 
       await expect(service.availability()).resolves.toBe('unavailable');
+    });
+  });
+
+  describe('startup recovery', () => {
+    const connectionRefused = new Error('connect ECONNREFUSED');
+
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate'] });
+      elastic.indices.exists.mockReset();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('does not wait for Elasticsearch before the backend is up', () => {
+      elastic.indices.exists.mockReturnValue(new Promise(() => undefined));
+      const service = new OfferSearchService(prisma as never);
+
+      expect(service.onModuleInit()).toBeUndefined();
+    });
+
+    it('creates the index once Elasticsearch answers after a failed start', async () => {
+      elastic.indices.exists
+        .mockRejectedValueOnce(connectionRefused)
+        .mockResolvedValue(false);
+      const service = new OfferSearchService(prisma as never);
+
+      service.onModuleInit();
+      await settle();
+      expect(elastic.indices.create).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(5_000);
+      await settle();
+
+      expect(elastic.indices.create).toHaveBeenCalledTimes(1);
+      expect(prisma.offer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { status: 'open' } }),
+      );
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('spaces the attempts out, up to five minutes', async () => {
+      elastic.indices.exists.mockRejectedValue(connectionRefused);
+      const service = new OfferSearchService(prisma as never);
+
+      service.onModuleInit();
+      await settle();
+      for (const delayMs of [5_000, 10_000, 20_000, 40_000, 80_000, 160_000]) {
+        await jest.advanceTimersByTimeAsync(delayMs);
+        await settle();
+      }
+      const attemptsBefore = elastic.indices.exists.mock.calls.length;
+
+      await jest.advanceTimersByTimeAsync(299_999);
+      await settle();
+      expect(elastic.indices.exists).toHaveBeenCalledTimes(attemptsBefore);
+
+      await jest.advanceTimersByTimeAsync(1);
+      await settle();
+      expect(elastic.indices.exists).toHaveBeenCalledTimes(attemptsBefore + 1);
+    });
+
+    it('stops retrying once the module is destroyed', async () => {
+      elastic.indices.exists.mockRejectedValue(connectionRefused);
+      const service = new OfferSearchService(prisma as never);
+
+      service.onModuleInit();
+      await settle();
+      await service.onModuleDestroy();
+
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('never tries when Elasticsearch is switched off', async () => {
+      process.env.ELASTICSEARCH_ENABLED = 'false';
+      const service = new OfferSearchService(prisma as never);
+
+      service.onModuleInit();
+      await settle();
+
+      expect(elastic.indices.exists).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
     });
   });
 });

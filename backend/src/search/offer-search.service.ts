@@ -13,6 +13,8 @@ import {
 
 const OFFERS_INDEX = 'rekr-offers-v2';
 const REINDEX_BATCH_SIZE = 250;
+const RETRY_INITIAL_DELAY_MS = 5_000;
+const RETRY_MAX_DELAY_MS = 5 * 60_000;
 
 interface OfferSearchDocument {
   id: number;
@@ -35,6 +37,11 @@ export type CandidateFeedRankingInput = CandidateRankingProfile;
 export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OfferSearchService.name);
   private readonly client: Client | null;
+  private rebuildPending = false;
+  private recovering = false;
+  private retryTimer: NodeJS.Timeout | null = null;
+  private retryDelayMs = RETRY_INITIAL_DELAY_MS;
+  private closed = false;
 
   constructor(private readonly prisma: PrismaService) {
     const node = process.env.ELASTICSEARCH_NODE?.trim();
@@ -54,27 +61,21 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
         : null;
   }
 
-  async onModuleInit(): Promise<void> {
+  /**
+   * Never awaits Elasticsearch: the backend often starts before it answers, and
+   * the feeds work without it. Recovery runs in the background until it lands.
+   */
+  onModuleInit(): void {
     if (!this.client) return;
 
-    try {
-      const exists = await this.client.indices.exists({ index: OFFERS_INDEX });
-      const rebuild = process.env.ELASTICSEARCH_REINDEX_ON_STARTUP === 'true';
-      if (exists && rebuild) {
-        await this.client.indices.delete({ index: OFFERS_INDEX });
-      }
-      if (!exists || rebuild) {
-        await this.createIndex();
-        await this.reindexAll();
-      }
-    } catch (cause) {
-      this.logger.warn(
-        `Elasticsearch is unavailable; candidate feeds will use PostgreSQL ordering. ${this.reasonOf(cause)}`,
-      );
-    }
+    this.rebuildPending =
+      process.env.ELASTICSEARCH_REINDEX_ON_STARTUP === 'true';
+    this.requestRecovery();
   }
 
   async onModuleDestroy(): Promise<void> {
+    this.closed = true;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
     await this.client?.close();
   }
 
@@ -209,6 +210,60 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
         `Could not sync offer ${offerId} to Elasticsearch. ${this.reasonOf(cause)}`,
       );
     }
+  }
+
+  /** Starts a recovery unless one is already running or waiting to retry. */
+  private requestRecovery(): void {
+    if (this.closed || this.recovering || this.retryTimer) return;
+
+    void this.recover();
+  }
+
+  /**
+   * Makes the index usable again, then retries with a growing delay until it
+   * succeeds. Meanwhile the feeds keep their PostgreSQL ordering.
+   */
+  private async recover(): Promise<void> {
+    this.recovering = true;
+    try {
+      const created = await this.ensureIndex();
+      if (created) await this.reindexAll();
+      this.retryDelayMs = RETRY_INITIAL_DELAY_MS;
+    } catch (cause) {
+      this.scheduleRetry(cause);
+    } finally {
+      this.recovering = false;
+    }
+  }
+
+  private scheduleRetry(cause: unknown): void {
+    if (this.closed) return;
+
+    const delayMs = this.retryDelayMs;
+    this.retryDelayMs = Math.min(delayMs * 2, RETRY_MAX_DELAY_MS);
+    this.logger.warn(
+      `Elasticsearch is unavailable; candidate feeds will use PostgreSQL ordering. ` +
+        `Retrying in ${delayMs / 1000}s. ${this.reasonOf(cause)}`,
+    );
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      this.requestRecovery();
+    }, delayMs);
+    // A pending retry must never be what keeps the process alive.
+    this.retryTimer.unref();
+  }
+
+  /** Answers whether the index had to be created. */
+  private async ensureIndex(): Promise<boolean> {
+    const client = this.client!;
+    let exists = await client.indices.exists({ index: OFFERS_INDEX });
+    if (exists && this.rebuildPending) {
+      await client.indices.delete({ index: OFFERS_INDEX });
+      exists = false;
+    }
+    if (!exists) await this.createIndex();
+    this.rebuildPending = false;
+    return !exists;
   }
 
   private async createIndex(): Promise<void> {
