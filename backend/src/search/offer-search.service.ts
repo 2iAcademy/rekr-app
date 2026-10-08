@@ -39,9 +39,18 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly prisma: PrismaService) {
     const node = process.env.ELASTICSEARCH_NODE?.trim();
     const enabled = process.env.ELASTICSEARCH_ENABLED !== 'false';
+    // Production runs Elastic security and hands the backend a least-privilege
+    // API key scoped to the offers index. Left empty, the local single node
+    // keeps working without credentials.
+    const apiKey = process.env.ELASTICSEARCH_API_KEY?.trim();
     this.client =
       enabled && node
-        ? new Client({ node, requestTimeout: 2000, maxRetries: 1 })
+        ? new Client({
+            node,
+            requestTimeout: 2000,
+            maxRetries: 1,
+            ...(apiKey ? { auth: { apiKey } } : {}),
+          })
         : null;
   }
 

@@ -1,0 +1,164 @@
+# Production stack for the VPS. Not for local development: compose.yml is.
+#
+#   docker compose -f compose.prod.yml up -d --build
+#
+# Values come from a `.env` file next to this one, on the server only. It is
+# generated at every deploy by .github/workflows/deploy.yml from the GitHub
+# `production` environment (see .env.prod.example and docs/deploiement-vps.md).
+# The `:?` forms below refuse to start the stack when a required secret is
+# missing, instead of booting with an empty one.
+#
+# Caddy is the only service with published ports. PostgreSQL, Elasticsearch and
+# the API are reachable on the internal Docker network alone: the Hetzner
+# firewall blocks every other port anyway, but nothing here relies on it.
+#
+# The server has 2 GB of RAM. mem_limit keeps one runaway service from taking
+# the others down with it: the kernel kills that container, Docker restarts it.
+
+name: rekr
+
+services:
+  caddy:
+    build:
+      context: ./clientApp
+      target: prod
+      args:
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: production
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and ACME account. Losing this volume means asking Let's
+      # Encrypt for new certificates, which is rate limited.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+    mem_limit: 128m
+
+  backend:
+    build:
+      context: ./backend
+      target: runner
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      # Caddy is the single proxy in front of the API (setup-app.ts).
+      TRUST_PROXY_HOPS: 1
+      APP_URL: https://${DOMAIN}
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required in production}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:?}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?}
+      MAIL_FROM: ${MAIL_FROM:?}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: production
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-}
+      UPLOADS_DIR: /var/lib/rekr/uploads
+      ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-true}
+      ELASTICSEARCH_NODE: http://elasticsearch:9200
+      ELASTICSEARCH_API_KEY: ${ELASTICSEARCH_API_KEY:-}
+      ELASTICSEARCH_REINDEX_ON_STARTUP: ${ELASTICSEARCH_REINDEX_ON_STARTUP:-false}
+      # Messaging. The secret signs Stream user tokens and grants every right
+      # on the Stream app: backend only, never a VITE_ variable.
+      STREAM_API_KEY: ${STREAM_API_KEY:?STREAM_API_KEY is required}
+      STREAM_API_SECRET: ${STREAM_API_SECRET:?STREAM_API_SECRET is required}
+      THROTTLE_TTL_SECONDS: ${THROTTLE_TTL_SECONDS:-}
+      THROTTLE_DEFAULT_LIMIT: ${THROTTLE_DEFAULT_LIMIT:-}
+      THROTTLE_LOGIN_LIMIT: ${THROTTLE_LOGIN_LIMIT:-}
+      THROTTLE_SIGNUP_LIMIT: ${THROTTLE_SIGNUP_LIMIT:-}
+      THROTTLE_PASSWORD_FORGOT_LIMIT: ${THROTTLE_PASSWORD_FORGOT_LIMIT:-}
+      THROTTLE_PASSWORD_RESET_LIMIT: ${THROTTLE_PASSWORD_RESET_LIMIT:-}
+      THROTTLE_ACCOUNT_DELETE_LIMIT: ${THROTTLE_ACCOUNT_DELETE_LIMIT:-}
+      PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-}
+      ACCOUNT_PURGE_INTERVAL_HOURS: ${ACCOUNT_PURGE_INTERVAL_HOURS:-}
+    volumes:
+      # The uploaded CVs, photos and logos. Backing up PostgreSQL alone does
+      # not back up the application: see docs/deploiement-vps.md.
+      - backend_uploads:/var/lib/rekr/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      # Started, not healthy: the feed falls back to PostgreSQL while
+      # Elasticsearch is down, so its health must not hold the API back.
+      elasticsearch:
+        condition: service_started
+    restart: unless-stopped
+    mem_limit: 384m
+
+  # Applies pending Prisma migrations, then exits. The `runner` image ships
+  # production dependencies only and has no Prisma CLI, hence `common`.
+  migrate:
+    build:
+      context: ./backend
+      target: common
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    volumes:
+      - pg_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    mem_limit: 256m
+
+  # Single node with Elastic security on. The backend authenticates with an
+  # API key scoped to the offers index (docker/elasticsearch/create-api-key.sh),
+  # never with the `elastic` superuser. HTTP stays unencrypted because the
+  # traffic never leaves the internal Docker network; the README records it.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      xpack.security.http.ssl.enabled: "false"
+      xpack.security.transport.ssl.enabled: "false"
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?ELASTIC_PASSWORD is required}
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -u elastic:$${ELASTIC_PASSWORD} 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+    restart: unless-stopped
+    # A 512 MB heap measured at ~920 MB resident once the JVM is warm: 1 GB
+    # left no margin before the kernel kills the container.
+    mem_limit: 1200m
+
+volumes:
+  pg_data:
+  es_data:
+  backend_uploads:
+  caddy_data:
+  caddy_config:

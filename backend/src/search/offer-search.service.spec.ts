@@ -41,6 +41,27 @@ describe('OfferSearchService', () => {
     });
   });
 
+  it('authenticates with the API key when one is configured', () => {
+    process.env.ELASTICSEARCH_API_KEY = ' encoded-key ';
+
+    new OfferSearchService(prisma as never);
+
+    expect(mockedClient).toHaveBeenCalledWith({
+      node: 'http://search.test:9200',
+      requestTimeout: 2000,
+      maxRetries: 1,
+      auth: { apiKey: 'encoded-key' },
+    });
+  });
+
+  it('sends no credentials when the API key is blank', () => {
+    process.env.ELASTICSEARCH_API_KEY = '  ';
+
+    new OfferSearchService(prisma as never);
+
+    expect(mockedClient.mock.calls[0][0]).not.toHaveProperty('auth');
+  });
+
   afterAll(() => {
     process.env = originalEnvironment;
   });
