@@ -25,7 +25,10 @@ ARG VITE_SENTRY_ENVIRONMENT=""
 RUN npm run build
 
 # Production image: the static build served by Caddy, which also terminates
-# HTTPS and forwards /api to the backend (docker/caddy/Caddyfile).
+# HTTPS and forwards /api to the backend. The Caddyfile lives outside this
+# build context, in docker/caddy: it comes in as the named context
+# `rekr-caddy` (compose.prod.yml, scripts/ci/build-images.sh).
 FROM caddy:2.11-alpine AS prod
 
+COPY --from=rekr-caddy Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/dist /srv

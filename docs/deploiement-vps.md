@@ -44,22 +44,43 @@ sudo systemctl restart docker
 
 ## Comment se fait un déploiement
 
-Personne n'écrit le `.env` du serveur à la main. À chaque merge sur `main`, le
-workflow `.github/workflows/deploy.yml` :
+Un seul workflow, `.github/workflows/ci-cd.yml`, fait la CI et la CD, en une
+seule exécution :
 
-1. attend l'approbation de Julien ou de Diego (environnement GitHub
-   `production`) ;
-2. vérifie que tous les secrets obligatoires sont renseignés, avant de toucher
-   au serveur ;
-3. génère le `.env` depuis les secrets et variables de cet environnement ;
-4. l'envoie au serveur en SSH avec le compte `deploy`, qui place le dépôt sur le
-   commit mergé et lance `docker compose -f compose.prod.yml up -d --build` ;
-5. vérifie que `https://rekr.tech/api/auth/me` répond 401.
+1. **CI** (à chaque PR, sur `preprod` et sur `main`) : build, lint et tests du
+   backend et du front, puis analyse Sonar. « Backend CI » et « Frontend CI »
+   sont les contrôles obligatoires des PR.
+2. **Images** (sur `main` uniquement, une fois la CI verte) : construit trois
+   images et les pousse sur GHCR, taguées avec le hash du commit
+   (`scripts/ci/build-images.sh`) :
+   - `rekr-backend` : l'API ;
+   - `rekr-migrate` : les migrations Prisma ;
+   - `rekr-web` : Caddy, avec le front et le `Caddyfile` dedans.
+3. **Deploy** : attend l'approbation de Julien ou de Diego (environnement
+   GitHub `production`). C'est la seule étape manuelle, et elle n'est proposée
+   que si tout ce qui précède a réussi. Ensuite :
+   - vérifie que le commit est toujours le dernier de `main` : une approbation
+     tardive sur un ancien run ne remet pas une vieille version en service ;
+   - génère le `.env` depuis les secrets et variables de `production`
+     (`scripts/ci/render-env.sh`), en refusant de partir s'il en manque un ;
+   - l'envoie en SSH au compte `deploy`, dont la clé ne peut lancer que
+     `/usr/local/bin/rekr-deploy`.
+4. **Smoke test** : vérifie que `https://rekr.tech/api/health` répond 200.
 
-Le compte `deploy` n'a ni `sudo` ni shell : sa clé SSH ne peut lancer que
-`scripts/deploy/remote-deploy.sh`, qui n'accepte qu'un commit présent sur
-`origin/main`. Julien et Diego gardent leurs comptes pour l'administration et
-le dépannage.
+Sur le serveur, `rekr-deploy` :
+
+- vérifie que le commit est sur `main` ;
+- prend `compose.prod.yml` dans ce commit ;
+- écrit le `.env` reçu, en fixant lui-même `IMAGE_TAG` au hash du commit ;
+- tire les images ;
+- seulement si toutes sont là, remplace les fichiers et lance
+  `docker compose up -d --no-build`.
+
+Le serveur ne construit rien et n'a pas le code source. Une clé de
+déploiement volée ne peut donc relancer que du code relu et mergé.
+
+Les scripts `scripts/ci/*.sh` et `scripts/deploy/rekr-deploy` ne dépendent pas
+de GitHub : seul le fichier du workflow serait à réécrire pour une autre CI.
 
 ## Préparer le compte `deploy` et le dépôt
 
@@ -80,11 +101,23 @@ sudo usermod -aG docker deploy
 sudo install -d -m 700 -o deploy -g deploy /home/deploy/.ssh
 ```
 
+Installer le script de déploiement. Il appartient à `root` : le compte qu'il
+sert ne peut pas le modifier. Le lire avant de l'installer :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/2iAcademy/rekr-app/main/scripts/deploy/rekr-deploy -o /tmp/rekr-deploy
+less /tmp/rekr-deploy
+sudo install -m 755 -o root -g root /tmp/rekr-deploy /usr/local/bin/rekr-deploy
+```
+
+Le refaire à chaque modification de `scripts/deploy/rekr-deploy` : la CD ne
+met jamais à jour son propre garde-fou.
+
 Puis poser la clé publique (`~/.ssh/rekr_deploy.pub`), restreinte au script.
 Remplacer `CLE_PUBLIQUE` par le contenu du fichier, en gardant les apostrophes :
 
 ```bash
-echo 'restrict,command="/opt/rekr/scripts/deploy/remote-deploy.sh" CLE_PUBLIQUE' | sudo -u deploy tee /home/deploy/.ssh/authorized_keys
+echo 'restrict,command="/usr/local/bin/rekr-deploy" CLE_PUBLIQUE' | sudo -u deploy tee /home/deploy/.ssh/authorized_keys
 sudo chmod 600 /home/deploy/.ssh/authorized_keys
 ```
 
@@ -96,20 +129,19 @@ et pas dans `sudo` :
 id deploy
 ```
 
-Le dépôt appartient à `deploy`, dans le groupe `docker` : c'est lui qui le met
-à jour à chaque déploiement, et les administrateurs le lisent par le groupe. Le
-bit `2` de `2775` (setgid) garde tout ce qui est créé dedans dans le groupe
-`docker`.
+Créer le dossier de l'application. Il appartient à `deploy`, dans le groupe
+`docker` : les administrateurs le lisent par le groupe, et le bit `2` de `2775`
+(setgid) garde tout ce qui est créé dedans dans ce groupe.
 
 ```bash
 sudo install -d -m 2775 -o deploy -g docker /opt/rekr
-sudo -u deploy git clone https://github.com/2iAcademy/rekr-app.git /opt/rekr
 ```
 
-**Toute commande Git sur le serveur passe par `sudo -u deploy`.** Un clone ou
-un `git checkout` lancé depuis un compte administrateur créerait des fichiers
-que `deploy` ne pourrait plus remplacer, et le déploiement suivant échouerait
-sur `Permission denied`.
+Rien d'autre à y mettre : le premier déploiement y crée `repo.git`, une copie
+Git sans fichiers de travail qui sert à vérifier les commits, puis
+`compose.prod.yml` et `.env`. **Toute commande Git sur le serveur passe par
+`sudo -u deploy`** : lancée depuis un autre compte, elle créerait des fichiers
+que `deploy` ne pourrait plus remplacer.
 
 Relever enfin la clé du serveur, pour le secret `DEPLOY_KNOWN_HOSTS`, et
 comparer son empreinte avec celle lue sur le serveur lui-même :
@@ -142,21 +174,33 @@ Dépôt GitHub > Settings > Environments > New environment `production` :
 
 **Variables** de l'environnement (non secrètes) :
 
-| Variable                                       | Valeur                                 |
-| ---------------------------------------------- | -------------------------------------- |
-| `DOMAIN`                                       | `rekr.tech`                            |
-| `POSTGRES_USER`, `POSTGRES_DB`                 | `rekr`                                 |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`        | `smtp-relay.brevo.com`, `587`, `false` |
-| `MAIL_FROM`                                    | `Rekr <no-reply@rekr.tech>`            |
-| `DEPLOY_HOST`                                  | `rekr.tech`                            |
-| `DEPLOY_USER`                                  | `deploy`                               |
-| `SENTRY_TRACES_SAMPLE_RATE`, `VITE_SENTRY_DSN` | Facultatifs                            |
+| Variable                                | Valeur                                 |
+| --------------------------------------- | -------------------------------------- |
+| `DOMAIN`                                | `rekr.tech`                            |
+| `POSTGRES_USER`, `POSTGRES_DB`          | `rekr`                                 |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` | `smtp-relay.brevo.com`, `587`, `false` |
+| `MAIL_FROM`                             | `Rekr <no-reply@rekr.tech>`            |
+| `DEPLOY_HOST`                           | `rekr.tech`                            |
+| `DEPLOY_USER`                           | `deploy`                               |
+| `SENTRY_TRACES_SAMPLE_RATE`             | Facultatif                             |
 
 `DEPLOY_HOST` doit être exactement le nom passé à `ssh-keyscan` : SSH cherche
 la clé du serveur sous ce nom dans `DEPLOY_KNOWN_HOSTS`, et une adresse IP à la
 place échouerait sur `Host key verification failed`. Le pare-feu doit aussi
 laisser passer le port 22 depuis GitHub Actions, dont les adresses changent à
 chaque exécution.
+
+**Variable du dépôt** (Settings > Secrets and variables > Actions > Variables,
+pas dans l'environnement) : `VITE_SENTRY_DSN`, facultatif. Le DSN du front est
+inscrit dans l'image au build, et le job qui construit les images n'a pas
+d'environnement : il n'attend aucune approbation. Ce DSN est public par
+nature, il finit dans le JavaScript servi aux navigateurs.
+
+**Images** : après le premier passage sur `main`, rendre publics les trois
+paquets `rekr-backend`, `rekr-migrate` et `rekr-web` (organisation 2iAcademy >
+Packages > paquet > Package settings > Change visibility). Le dépôt est déjà
+public et aucun secret n'est dans une image ; sans ça, le serveur devrait
+s'authentifier sur GHCR pour les tirer.
 
 Une valeur ne doit contenir ni apostrophe ni retour à la ligne : le workflow la
 refuse plutôt que de produire un `.env` faux. `.env.prod.example` reste la
@@ -171,45 +215,44 @@ rm ~/.ssh/rekr_deploy
 
 ## Premier déploiement
 
-1. Merger `preprod` dans `main`. Avant d'approuver le déploiement, placer une
-   fois le dépôt du serveur sur `main` : le compte `deploy` ne peut lancer que
-   `scripts/deploy/remote-deploy.sh`, qui doit donc déjà s'y trouver, et un
-   clone frais est sur `preprod`.
+1. Merger `preprod` dans `main`. Le workflow CI/CD passe la CI, pousse les
+   images, puis s'arrête sur le job Deploy. Si le serveur doit les tirer sans
+   authentification, rendre les paquets publics maintenant (voir plus haut),
+   puis approuver le déploiement dans l'onglet Actions.
 
-   ```bash
-   sudo -u deploy git -C /opt/rekr fetch origin main
-   sudo -u deploy git -C /opt/rekr checkout --detach origin/main
-   ```
+   Au premier démarrage, Caddy obtient le certificat HTTPS de `rekr.tech` ; le
+   backend démarre sans clé Elasticsearch et bascule sur le tri PostgreSQL :
+   c'est attendu.
 
-   Puis approuver le déploiement dans l'onglet Actions. Au premier démarrage, Caddy obtient le certificat HTTPS de
-   `rekr.tech` ; le backend démarre sans clé Elasticsearch et bascule sur le tri
-   PostgreSQL : c'est attendu.
-
-2. Sur le serveur, créer la clé d'API du backend :
+2. Sur le serveur, créer la clé d'API du backend. Le script vient de la copie
+   Git du serveur, à la version de `main` :
 
    ```bash
    cd /opt/rekr
-   sh docker/elasticsearch/create-api-key.sh
+   sudo -u deploy git -C repo.git show main:docker/elasticsearch/create-api-key.sh | sh
    ```
 
 3. Coller la valeur affichée dans le secret `ELASTICSEARCH_API_KEY`.
-4. Actions > Deploy > Run workflow, en cochant « Reconstruire l'index
-   Elasticsearch ». Les déploiements suivants repartent sans cette case.
+4. Actions > CI/CD > Run workflow sur `main`, en cochant « Reconstruire
+   l'index Elasticsearch », puis approuver. Les déploiements suivants
+   repartent sans cette case.
 
 ## Mettre à jour
 
-Merger dans `main`, puis approuver le déploiement. Pour changer un secret : le
-modifier dans l'environnement `production`, puis Actions > Deploy > Run
-workflow. Le service `migrate` applique les nouvelles migrations avant que le
-backend ne redémarre.
+Merger dans `main`, puis approuver le job Deploy une fois la CI et les images
+passées. Pour changer un secret : le modifier dans l'environnement
+`production`, puis Actions > CI/CD > Run workflow. Le service `migrate`
+applique les nouvelles migrations avant que le backend ne redémarre.
 
-**Dépannage sans GitHub**, depuis un compte administrateur : le `.env` du
-dernier déploiement reste en place.
+**Revenir en arrière** : voir le [runbook](ops/runbook.md), fiche 7. Chaque
+version reste sur GHCR sous son hash ; remettre l'ancien dans `IMAGE_TAG`
+suffit, sans rien reconstruire.
+
+**Dépannage sans GitHub**, depuis un compte administrateur : le `.env` et le
+`compose.prod.yml` du dernier déploiement restent en place.
 
 ```bash
-sudo -u deploy git -C /opt/rekr fetch origin main
-sudo -u deploy git -C /opt/rekr checkout --detach origin/main
-cd /opt/rekr && docker compose -f compose.prod.yml up -d --build
+cd /opt/rekr && docker compose -f compose.prod.yml up -d --no-build
 ```
 
 **Changer la clé de déploiement** (fuite, départ, doute) : générer une nouvelle

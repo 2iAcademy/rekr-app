@@ -1,0 +1,486 @@
+# The whole pipeline, in one run:
+#
+#   changes ─┬─ backend build → lint → test ──┬─ Backend CI ─┐
+#            │                                ├─ Sonar ──────┼─ images → deploy → smoke
+#            └─ frontend build → lint → test ─┴─ Frontend CI ┘
+#
+# Pull requests and preprod stop after the CI. On main, the images are built
+# once, pushed to GHCR under the commit hash, and the deploy job then waits for
+# an approval (Julien or Diego, GitHub environment `production`): it is the
+# only manual step, and it is only offered once everything before it passed.
+#
+# The server never builds anything: it pulls the images of that commit. Setup
+# and rollback: docs/deploiement-vps.md.
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches:
+      - preprod
+      - main
+  workflow_dispatch:
+    inputs:
+      reindex:
+        description: Reconstruire l'index Elasticsearch depuis PostgreSQL
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its previous run. Pushes to preprod and
+# main each keep their own run: cancelling one could cut a deploy in half.
+concurrency:
+  group: ci-cd-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io/2iacademy
+
+jobs:
+  # The gates below are required checks, so this workflow runs on every pull
+  # request: a path filter on the trigger would leave them pending forever.
+  # Outside pull requests everything runs.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ github.event_name != 'pull_request' || steps.filter.outputs.backend == 'true' }}
+      frontend: ${{ github.event_name != 'pull_request' || steps.filter.outputs.frontend == 'true' }}
+
+    steps:
+      - name: Detect changes
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci-cd.yml'
+            frontend:
+              - 'clientApp/**'
+              - 'docker/caddy/**'
+              - '.github/workflows/ci-cd.yml'
+
+  backend-build:
+    name: Backend build
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build backend
+        run: docker build --target build -t rekr-backend:ci ./backend
+
+  backend-lint:
+    name: Backend lint
+    runs-on: ubuntu-latest
+    needs: backend-build
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint:check
+
+      - name: Format
+        run: npm run format:check
+
+  backend-test:
+    name: Backend test
+    runs-on: ubuntu-latest
+    needs: backend-lint
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rekr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rekr_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # `DATABASE_URL` is what `prisma migrate deploy` reads; `TEST_DATABASE_URL`
+      # is what the e2e suite runs against. The suite ignores the former on
+      # purpose, so that an ambient application URL can never be truncated.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rekr_test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rekr_test
+      JWT_SECRET: ci-test-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Unit tests
+        run: npm run test:cov
+
+      - name: E2E tests
+        run: npm run test:e2e
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage/lcov.info
+          if-no-files-found: warn
+
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    defaults:
+      run:
+        working-directory: clientApp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: clientApp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  frontend-lint:
+    name: Frontend lint
+    runs-on: ubuntu-latest
+    needs: frontend-build
+    defaults:
+      run:
+        working-directory: clientApp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: clientApp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint:check
+
+      - name: Format
+        run: npm run format:check
+
+  frontend-test:
+    name: Frontend test
+    runs-on: ubuntu-latest
+    needs: frontend-lint
+    defaults:
+      run:
+        working-directory: clientApp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: clientApp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm run test:cov
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: frontend-coverage
+          path: clientApp/coverage/lcov.info
+          if-no-files-found: warn
+
+  # Required checks. A skipped job (nothing changed on that side) passes; a
+  # failed or cancelled one blocks the merge.
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    needs: [changes, backend-build, backend-lint, backend-test]
+    if: always()
+
+    steps:
+      - name: Check job results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "changes / build / lint / test : $RESULTS"
+          case "$RESULTS" in
+            *failure*|*cancelled*)
+              echo "::error::Le pipeline backend a echoue, la PR ne peut pas etre mergee."
+              exit 1
+              ;;
+          esac
+
+  frontend-ci:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    needs: [changes, frontend-build, frontend-lint, frontend-test]
+    if: always()
+
+    steps:
+      - name: Check job results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "changes / build / lint / test : $RESULTS"
+          case "$RESULTS" in
+            *failure*|*cancelled*)
+              echo "::error::Le pipeline frontend a echoue, la PR ne peut pas etre mergee."
+              exit 1
+              ;;
+          esac
+
+  # Reuses the coverage of the test jobs instead of running the suites again.
+  sonar:
+    name: Sonar
+    runs-on: ubuntu-latest
+    needs: [changes, backend-ci, frontend-ci]
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+
+    steps:
+      - name: Check Sonar configuration
+        id: config
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ] || [ -z "$SONAR_HOST_URL" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SONAR_TOKEN ou SONAR_HOST_URL absent — analyse ignoree."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.ready == 'true'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download backend coverage
+        if: steps.config.outputs.ready == 'true' && needs.changes.outputs.backend == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: backend-coverage
+          path: backend/coverage
+
+      - name: Download frontend coverage
+        if: steps.config.outputs.ready == 'true' && needs.changes.outputs.frontend == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: frontend-coverage
+          path: clientApp/coverage
+
+      - name: SonarQube scan
+        if: steps.config.outputs.ready == 'true'
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  # Built once, from the commit that passed the CI. The server pulls these
+  # exact images, tagged with the commit hash: what was tested is what runs.
+  images:
+    name: Images
+    runs-on: ubuntu-latest
+    needs: [backend-ci, frontend-ci, sonar]
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The front DSN is public (it ships in the bundle), hence a repository
+      # variable: this job has no environment, so no approval to wait for.
+      - name: Build and push
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: scripts/ci/build-images.sh
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: images
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 30
+    # One deploy at a time, and never cancel one halfway through a migration.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://${{ vars.DOMAIN }}
+    outputs:
+      domain: ${{ vars.DOMAIN }}
+    # Values are only ever read from the environment below, never pasted into
+    # a script: an expression expanded inside `run` would put them in the
+    # command line, where a quote could break out of it.
+    env:
+      DOMAIN: ${{ vars.DOMAIN }}
+      POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      SMTP_HOST: ${{ vars.SMTP_HOST }}
+      SMTP_PORT: ${{ vars.SMTP_PORT }}
+      SMTP_SECURE: ${{ vars.SMTP_SECURE }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      MAIL_FROM: ${{ vars.MAIL_FROM }}
+      ELASTIC_PASSWORD: ${{ secrets.ELASTIC_PASSWORD }}
+      ELASTICSEARCH_API_KEY: ${{ secrets.ELASTICSEARCH_API_KEY }}
+      ELASTICSEARCH_REINDEX_ON_STARTUP: ${{ inputs.reindex == true }}
+      STREAM_API_KEY: ${{ secrets.STREAM_API_KEY }}
+      STREAM_API_SECRET: ${{ secrets.STREAM_API_SECRET }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_TRACES_SAMPLE_RATE }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # An approval given late, on an older run, must not put an older commit
+      # back in production: only the head of main is deployed.
+      - name: Check this is the latest commit of main
+        run: |
+          head="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::error::main is now at $head: approve the run of that commit instead."
+            exit 1
+          fi
+
+      - name: Write the .env
+        run: scripts/ci/render-env.sh "$RUNNER_TEMP/production.env"
+
+      - name: Deploy over SSH
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          # The server's own key, pinned: a host answering with another one
+          # is refused instead of being trusted on first use.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "deploy $GITHUB_SHA" \
+            < "$RUNNER_TEMP/production.env"
+
+      - name: Forget the key and the .env
+        if: always()
+        run: rm -f ~/.ssh/deploy_key "$RUNNER_TEMP/production.env"
+
+  # A red smoke test leaves the new version running: roll back by hand, see
+  # docs/ops/runbook.md, "Revenir à la version précédente".
+  smoke:
+    name: Smoke test
+    runs-on: ubuntu-latest
+    needs: deploy
+    timeout-minutes: 5
+
+    steps:
+      # /api/health answers 200 once Caddy, the backend and PostgreSQL are all
+      # up; the backend takes a moment to boot after its migrations.
+      - name: Check the API answers
+        env:
+          DOMAIN: ${{ needs.deploy.outputs.domain }}
+        run: |
+          for attempt in $(seq 1 24); do
+            status="$(curl -s -o /dev/null -w '%{http_code}' "https://$DOMAIN/api/health" || true)"
+            if [ "$status" = 200 ]; then
+              echo "https://$DOMAIN is up"
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $status, retrying in 5 s"
+            sleep 5
+          done
+          echo "::error::https://$DOMAIN/api/health never answered 200"
+          exit 1

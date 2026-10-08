@@ -1,12 +1,18 @@
 # Production stack for the VPS. Not for local development: compose.yml is.
 #
-#   docker compose -f compose.prod.yml up -d --build
+# The server never builds: the CI builds the images once, pushes them to GHCR
+# tagged with the commit hash, and the server pulls them (.github/workflows/
+# ci-cd.yml, scripts/deploy/rekr-deploy). IMAGE_TAG picks that commit; changing
+# it back to an older hash is the rollback. The `build` sections only serve to
+# reproduce the images locally:
+#
+#   IMAGE_TAG=local docker compose -f compose.prod.yml build
 #
 # Values come from a `.env` file next to this one, on the server only. It is
-# generated at every deploy by .github/workflows/deploy.yml from the GitHub
-# `production` environment (see .env.prod.example and docs/deploiement-vps.md).
-# The `:?` forms below refuse to start the stack when a required secret is
-# missing, instead of booting with an empty one.
+# generated at every deploy from the GitHub `production` environment (see
+# .env.prod.example and docs/deploiement-vps.md). The `:?` forms below refuse
+# to start the stack when a required secret is missing, instead of booting
+# with an empty one.
 #
 # Caddy is the only service with published ports. PostgreSQL, Elasticsearch and
 # the API are reachable on the internal Docker network alone: the Hetzner
@@ -19,9 +25,12 @@ name: rekr
 
 services:
   caddy:
+    image: ghcr.io/2iacademy/rekr-web:${IMAGE_TAG:?IMAGE_TAG is required}
     build:
       context: ./clientApp
       target: prod
+      additional_contexts:
+        rekr-caddy: ./docker/caddy
       args:
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
         VITE_SENTRY_ENVIRONMENT: production
@@ -32,7 +41,6 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       # Certificates and ACME account. Losing this volume means asking Let's
       # Encrypt for new certificates, which is rate limited.
       - caddy_data:/data
@@ -43,6 +51,7 @@ services:
     mem_limit: 128m
 
   backend:
+    image: ghcr.io/2iacademy/rekr-backend:${IMAGE_TAG:?IMAGE_TAG is required}
     build:
       context: ./backend
       target: runner
@@ -100,6 +109,7 @@ services:
   # Applies pending Prisma migrations, then exits. The `runner` image ships
   # production dependencies only and has no Prisma CLI, hence `common`.
   migrate:
+    image: ghcr.io/2iacademy/rekr-migrate:${IMAGE_TAG:?IMAGE_TAG is required}
     build:
       context: ./backend
       target: common
