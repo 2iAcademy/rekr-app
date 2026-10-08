@@ -9,12 +9,46 @@ const renderPage = (props: Partial<React.ComponentProps<typeof MatchPage>> = {})
   );
 
 describe('MatchPage', () => {
-  it('affiche la célébration et les deux parties du match', () => {
+  it('annonce l’intérêt réciproque et réunit les deux parties du match', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { name: "C'est un match !" })).toBeInTheDocument();
-    expect(screen.getByText('Toi')).toBeInTheDocument();
-    expect(screen.getByText('Acme')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Acme a aussi retenu votre profil' }),
+    ).toBeVisible();
+    expect(screen.getByText('Intérêt réciproque')).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Match entre vous et Acme' })).toHaveTextContent(
+      /^CA$/,
+    );
+  });
+
+  it('reste lisible sans savoir qui a matché', () => {
+    renderPage({ matchedProfile: null });
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Nouveau match' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Votre match' })).toHaveTextContent(/^C$/);
+  });
+
+  it('récapitule l’offre concernée quand elle est connue', () => {
+    renderPage({ offer: { title: 'Développeur Full-Stack', contract: 'CDI', city: 'Lyon' } });
+
+    const recap = Object.fromEntries(
+      screen
+        .getAllByRole('term')
+        .map((term) => [term.textContent, term.nextElementSibling?.textContent]),
+    );
+    expect(recap).toEqual({ Offre: 'Développeur Full-Stack', Contrat: 'CDI', Ville: 'Lyon' });
+  });
+
+  it('n’affiche que les lignes connues du récapitulatif, et rien sans offre', () => {
+    const { unmount } = renderPage({
+      offer: { title: 'Data Analyst', contract: null, city: 'Lyon' },
+    });
+
+    expect(screen.getAllByRole('term').map((term) => term.textContent)).toEqual(['Offre', 'Ville']);
+    unmount();
+
+    renderPage();
+    expect(screen.queryByRole('term')).not.toBeInTheDocument();
   });
 
   it('affiche les actions de messagerie et de continuation', () => {
@@ -32,6 +66,15 @@ describe('MatchPage', () => {
 
     expect(screen.getByRole('img', { name: 'Camille' })).toHaveAttribute('src', '/camille.png');
     expect(screen.getByRole('img', { name: 'Acme' })).toHaveAttribute('src', '/acme.png');
+  });
+
+  it('convertit la clé de stockage de l’avatar en URL de fichier', () => {
+    renderPage({ matchedProfile: { name: 'Acme', avatarUrl: 'companies/8/logo/acme.webp' } });
+
+    expect(screen.getByRole('img', { name: 'Acme' })).toHaveAttribute(
+      'src',
+      '/api/files/companies/8/logo/acme.webp',
+    );
   });
 
   it('déclenche les actions correspondantes', async () => {

@@ -21,6 +21,10 @@ import { OFFER_STATUS_OPTIONS } from '@/domain/offerStatus';
 import type { OfferFormValue } from '@/features/recruiter-offers/offerPayload';
 import type { OfferFormError } from '@/features/recruiter-offers/offerValidation';
 import { MAX_FREE_TEXT_LENGTH } from '@/lib/bounds';
+import { cn } from '@/lib/utils';
+
+const SECTION = 'flex flex-col gap-4 rounded-2xl border border-line bg-card p-5 shadow-card sm:p-6';
+const SECTION_TITLE = 'text-base font-bold text-ink';
 
 interface OfferFormProps {
   value: OfferFormValue;
@@ -54,9 +58,9 @@ export function OfferForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-8 desktop:gap-10">
-      <section className="flex flex-col gap-4">
-        <h2 className="font-heading text-base font-semibold text-ink">L’offre</h2>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 md:gap-5">
+      <section className={SECTION}>
+        <h2 className={SECTION_TITLE}>L’offre</h2>
 
         <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:items-start md:gap-5">
           <TextField
@@ -115,8 +119,8 @@ export function OfferForm({
         />
       </section>
 
-      <section className="flex flex-col gap-6">
-        <h2 className="font-heading text-base font-semibold text-ink">Le poste</h2>
+      <section className={cn(SECTION, 'gap-6')}>
+        <h2 className={SECTION_TITLE}>Le poste</h2>
 
         <OptionCards
           legend="Type de contrat"
@@ -157,12 +161,14 @@ export function OfferForm({
         />
       </section>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="font-heading text-base font-semibold text-ink">Publication</h2>
-        <p className="text-sm text-ink-muted">
-          Seule une offre publiée est visible des candidats. Vous pouvez la remettre en brouillon ou
-          la fermer à tout moment.
-        </p>
+      <section className={SECTION}>
+        <div className="flex flex-col gap-1">
+          <h2 className={SECTION_TITLE}>Publication</h2>
+          <p className="text-sm text-ink-muted">
+            Seule une offre publiée est visible des candidats. Vous pouvez la remettre en brouillon
+            ou la fermer à tout moment.
+          </p>
+        </div>
 
         <OptionCards
           legend="Statut de l’offre"
@@ -173,16 +179,30 @@ export function OfferForm({
         />
       </section>
 
-      {error !== null && (
-        // The id is the one every field above points at through `markIfInvalid`;
-        // it comes from the shared helper so the two cannot drift apart.
-        <p id={WIZARD_ERROR_ID} role="alert" className="text-xs text-destructive">
-          {error.message}
-        </p>
-      )}
+      {/* Sticks above the phone tab bar so the action is never a scroll away;
+          bleeds to the screen edges on phones, stays in the column from `md:`.
+          The error sits in it for the same reason: it has to be read where the
+          button was pressed. */}
+      <div className="sticky bottom-[var(--tabbar-h,0px)] z-10 -mx-4 flex flex-col gap-2 border-t border-line bg-card px-4 py-3 sm:-mx-6 sm:px-6 md:bottom-4 md:mx-0 md:flex-row md:items-center md:justify-end md:gap-4 md:rounded-2xl md:border md:shadow-float md:float-bar md:px-5">
+        {error !== null && (
+          // The id is the one every field above points at through `markIfInvalid`;
+          // it comes from the shared helper so the two cannot drift apart.
+          <p
+            id={WIZARD_ERROR_ID}
+            role="alert"
+            className="text-xs text-destructive md:mr-auto md:text-sm"
+          >
+            {error.message}
+          </p>
+        )}
 
-      <div className="flex justify-start">
-        <Button type="submit" variant="role" size="xl" disabled={submitting}>
+        <Button
+          type="submit"
+          variant="brand"
+          size="xl"
+          disabled={submitting}
+          className="w-full md:w-auto"
+        >
           {submitting ? 'Enregistrement…' : submitLabel}
         </Button>
       </div>

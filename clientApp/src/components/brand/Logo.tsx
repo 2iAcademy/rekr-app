@@ -8,45 +8,45 @@ interface LogoProps {
   size?: LogoSize;
   orientation?: LogoOrientation;
   showWordmark?: boolean;
-  glow?: boolean;
+  showMark?: boolean;
   className?: string;
 }
 
 const mark: Record<LogoSize, string> = {
-  sm: 'w-10',
-  md: 'w-16',
-  lg: 'w-24',
+  sm: 'w-8',
+  md: 'w-12',
+  lg: 'w-20',
 };
 
 const wordmark: Record<LogoSize, string> = {
-  sm: 'text-lg tracking-[0.14em]',
-  md: 'text-2xl tracking-[0.16em]',
-  lg: 'text-[2rem] tracking-[0.18em]',
+  sm: 'text-[1.375rem]',
+  md: 'text-[1.75rem]',
+  lg: 'text-[2.75rem]',
 };
 
 const layout: Record<LogoOrientation, string> = {
-  horizontal: 'flex-row gap-2.5',
-  vertical: 'flex-col gap-4',
+  horizontal: 'flex-row gap-2',
+  vertical: 'flex-col gap-3',
 };
 
 export function Logo({
   size = 'md',
   orientation = 'horizontal',
   showWordmark = true,
-  glow = false,
+  showMark = false,
   className,
 }: LogoProps) {
   return (
-    <div className={cn('inline-flex items-center', layout[orientation], className)}>
-      <BrandMark
-        className={cn(
-          mark[size],
-          glow && 'drop-shadow-[0_12px_26px_color-mix(in_srgb,var(--brand)_28%,transparent)]',
-        )}
-      />
+    <div className={cn('inline-flex items-center text-ink', layout[orientation], className)}>
+      {showMark && <BrandMark className={mark[size]} />}
       {showWordmark ? (
-        <span className={cn('font-heading font-bold leading-none text-ink', wordmark[size])}>
-          REKR
+        <span
+          className={cn(
+            'font-heading leading-none font-extrabold tracking-[-0.04em]',
+            wordmark[size],
+          )}
+        >
+          rekr<span className="text-brand">.</span>
         </span>
       ) : (
         <span className="sr-only">Rekr</span>

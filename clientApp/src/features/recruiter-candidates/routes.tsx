@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { RouteGuard } from '@/features/auth/RouteGuard';
 import { OfferApplicantsPage } from './pages/OfferApplicantsPage';
 
@@ -38,6 +38,9 @@ function OfferApplicants() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Carried over on every rewrite of the search params below: it holds the
+  // offer title the list handed over, which a bare navigation would drop.
+  const { state } = useLocation();
 
   const offerId = parseId(id ?? null);
   const rawProfile = searchParams.get(PROFILE_PARAM);
@@ -74,9 +77,9 @@ function OfferApplicants() {
       },
       // Replaced: this corrects what the recruiter typed, it is not a step they
       // should have to walk back through.
-      { replace: true },
+      { replace: true, state },
     );
-  }, [canonicalProfile, isProfileCanonical, setSearchParams]);
+  }, [canonicalProfile, isProfileCanonical, setSearchParams, state]);
 
   // An unreadable offer id in the path is not a screen to word: there is no
   // offer to show, so the recruiter goes back to the list they came from.
@@ -89,7 +92,7 @@ function OfferApplicants() {
     next.set(PROFILE_PARAM, String(candidateUserId));
 
     // Pushed: the browser back button has to close the profile.
-    setSearchParams(next);
+    setSearchParams(next, { state });
   };
 
   const closeProfile = (): void => {
@@ -98,7 +101,7 @@ function OfferApplicants() {
 
     // Replaced: closing must not leave behind an entry that reopens the profile
     // on the next back.
-    setSearchParams(next, { replace: true });
+    setSearchParams(next, { replace: true, state });
   };
 
   return (

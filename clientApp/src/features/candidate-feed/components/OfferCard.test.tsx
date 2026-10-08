@@ -4,13 +4,21 @@ import userEvent from '@testing-library/user-event';
 import { anOffer } from '../fixtures';
 import { OfferCard } from './OfferCard';
 
+/** The value shown next to a fact's label in the card's list of facts. */
+const fact = (label: string): string | null =>
+  screen.getByText(label, { selector: 'dt' }).nextElementSibling?.textContent ?? null;
+
 describe('OfferCard', () => {
-  it('rend le titre, la ligne de contexte et le salaire de l’offre', () => {
+  it('rend le titre, l’entreprise et les faits qui décident de l’offre', () => {
     render(<OfferCard offer={anOffer} onViewOffer={vi.fn()} />);
 
     expect(screen.getByRole('heading', { name: 'Développeur Frontend React' })).toBeInTheDocument();
-    expect(screen.getByText('Studio Lumen · CDI · Hybride · Lyon')).toBeInTheDocument();
-    expect(screen.getByText('45 - 55 k€')).toBeInTheDocument();
+    expect(screen.getByText('Studio Lumen')).toBeInTheDocument();
+    expect(screen.getByText('Lyon')).toBeInTheDocument();
+    expect(fact('Contrat')).toBe('CDI');
+    expect(fact('Télétravail')).toBe('Hybride');
+    expect(fact('Expérience')).toBe('Confirmé');
+    expect(fact('Salaire')).toBe('45–55 k€');
   });
 
   /**
@@ -28,15 +36,14 @@ describe('OfferCard', () => {
       />,
     );
 
-    expect(
-      screen.getByText('Studio Lumen · Contrat non précisé · Télétravail non précisé · Lyon'),
-    ).toBeInTheDocument();
+    expect(fact('Contrat')).toBe('Non précisé');
+    expect(fact('Télétravail')).toBe('Non précisé');
   });
 
-  it('écarte de la ligne de contexte la ville absente, qui n’engage rien', () => {
+  it('n’affiche pas de ville absente, qui n’engage rien', () => {
     render(<OfferCard offer={{ ...anOffer, city: null }} onViewOffer={vi.fn()} />);
 
-    expect(screen.getByText('Studio Lumen · CDI · Hybride')).toBeInTheDocument();
+    expect(screen.queryByText('Lyon')).not.toBeInTheDocument();
   });
 
   it('délègue l’ouverture du détail', async () => {

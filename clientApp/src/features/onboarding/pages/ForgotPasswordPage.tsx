@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { MailCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { authControllerForgotPassword } from '@/api/generated';
 import { ApiError } from '@/api/customFetch';
 import { passwordForgotBusiness } from '@/features/auth/authFeedback';
 import { notifyFailure } from '@/lib/feedback/notify';
+import { AuthLayout } from '../components/AuthLayout';
+import { AUTH_LABEL, AUTH_LINK } from '../components/authStyles';
 
 /**
  * The endpoint answers 204 for an unknown address, an inactive account and a
@@ -59,52 +61,57 @@ export function ForgotPasswordPage({ onBack, onSignIn, onSubmit }: ForgotPasswor
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background px-6 pt-4 pb-8">
-      <header className="relative flex h-9 items-center justify-center">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Retour"
-          className="absolute left-0 flex size-9 cursor-pointer items-center justify-center rounded-full bg-card text-ink shadow-sm transition-colors hover:bg-muted"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <h1 className="font-heading text-base font-bold text-ink">Mot de passe oublié</h1>
-      </header>
-
+    <AuthLayout
+      title="Mot de passe oublié"
+      onBack={onBack}
+      footer={
+        <>
+          Vous vous en souvenez ?
+          <button type="button" onClick={onSignIn} className={AUTH_LINK}>
+            Connexion
+          </button>
+        </>
+      }
+    >
       {submitted ? (
-        <div className="mt-10 flex flex-col gap-1.5" role="status">
+        <div className="flex flex-col gap-1.5" role="status">
+          <span
+            aria-hidden="true"
+            className="mb-3 flex size-14 items-center justify-center rounded-full bg-brand-tint text-brand"
+          >
+            <MailCheck className="size-6" />
+          </span>
           <h2
             ref={successHeadingRef}
             tabIndex={-1}
-            className="font-heading text-2xl font-bold text-ink outline-none"
+            className="text-2xl font-extrabold text-ink outline-none"
           >
             Email envoyé.
           </h2>
-          <p className="text-sm text-ink-muted">
-            Si un compte est associé à <span className="font-medium text-ink">{email}</span>, vous
+          <p className="text-sm leading-relaxed text-ink-muted">
+            Si un compte est associé à <span className="font-semibold text-ink">{email}</span>, vous
             recevez un lien pour réinitialiser votre mot de passe. Pensez à vérifier vos spams.
           </p>
           <button
             type="button"
             onClick={() => setSubmitted(false)}
-            className="mt-4 cursor-pointer self-start text-sm font-medium text-role-strong hover:underline"
+            className={`${AUTH_LINK} mt-2 self-start text-sm`}
           >
             Modifier l'email
           </button>
         </div>
       ) : (
         <>
-          <div className="mt-10 flex flex-col gap-1.5">
-            <h2 className="font-heading text-2xl font-bold text-ink">Pas de panique.</h2>
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-2xl font-extrabold text-ink">Pas de panique.</h2>
             <p className="text-sm text-ink-muted">
               Saisissez votre email, on vous envoie un lien pour le réinitialiser.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
+          <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="forgot-email" className="text-xs text-ink-muted">
+              <label htmlFor="forgot-email" className={AUTH_LABEL}>
                 Email
               </label>
               <Input
@@ -118,23 +125,12 @@ export function ForgotPasswordPage({ onBack, onSignIn, onSubmit }: ForgotPasswor
               />
             </div>
 
-            <Button type="submit" variant="role" size="xl" className="mt-1 w-full">
+            <Button type="submit" variant="brand" size="xl" className="mt-1 w-full">
               Envoyer le lien
             </Button>
           </form>
         </>
       )}
-
-      <p className="mt-8 flex items-center justify-center gap-1.5 text-sm text-ink-muted">
-        Vous vous en souvenez ?
-        <button
-          type="button"
-          onClick={onSignIn}
-          className="cursor-pointer font-medium text-role-strong hover:underline"
-        >
-          Connexion
-        </button>
-      </p>
-    </main>
+    </AuthLayout>
   );
 }

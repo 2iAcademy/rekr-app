@@ -4,7 +4,7 @@ interface CandidateAvatarProps {
   /** Full name: alternative text of the photo, and source of the fallback initial. */
   name: string;
   avatarUrl: string | null;
-  /** Size — and, on the detail screen, elevation: the two screens frame it differently. */
+  /** Size and initial's font size: the row and the profile frame it differently. */
   className: string;
 }
 
@@ -20,12 +20,12 @@ export function CandidateAvatar({ name, avatarUrl, className }: CandidateAvatarP
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-card',
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-tint',
         className,
       )}
     >
       {src === null ? (
-        <span aria-hidden="true" className="font-heading text-4xl font-bold text-role">
+        <span aria-hidden="true" className="font-extrabold text-brand-strong">
           {name.charAt(0).toUpperCase()}
         </span>
       ) : (

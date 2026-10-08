@@ -70,7 +70,7 @@ export function JobFamilyChips({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-baseline justify-between gap-3">
-        <p id={legendId} className="text-xs text-ink-muted">
+        <p id={legendId} className="text-sm font-semibold text-ink">
           Domaine(s) recherché(s)
         </p>
         {/* The count replaces « 3 au maximum »: it says the same rule and, once
@@ -78,8 +78,8 @@ export function JobFamilyChips({
         <p
           aria-live="polite"
           className={cn(
-            'text-xs tabular-nums transition-colors',
-            full ? 'font-semibold text-role' : 'text-ink-muted',
+            'tabular text-xs transition-colors',
+            full ? 'font-semibold text-ink' : 'text-ink-muted',
           )}
         >
           {values.length} / {MAX_JOB_FAMILIES}
@@ -110,16 +110,15 @@ export function JobFamilyChips({
               <label
                 key={family.id}
                 className={cn(
-                  'flex h-11 items-center gap-2 rounded-full pr-4 pl-3 text-sm whitespace-nowrap',
-                  'transition-all duration-150 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-role/40',
+                  'flex h-11 items-center gap-2 rounded-xl border pr-4 pl-3 text-sm whitespace-nowrap',
+                  'transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand/30',
                   selected
-                    ? 'bg-role-gradient font-semibold text-white shadow-role'
-                    : 'border border-line bg-card text-ink',
+                    ? 'border-brand bg-brand-tint font-semibold text-brand-strong'
+                    : 'border-line bg-card text-ink',
                   // The cap dims what it forbids instead of hiding it: the
                   // candidate keeps seeing the trades they did not pick.
-                  !selected && full
-                    ? 'cursor-not-allowed opacity-45'
-                    : 'cursor-pointer hover:border-role/40 hover:shadow-sm',
+                  !selected && full ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+                  !selected && !full && 'hover:border-ink-faint/40',
                 )}
               >
                 <input
@@ -134,7 +133,7 @@ export function JobFamilyChips({
                   aria-hidden="true"
                   className={cn(
                     'size-4 shrink-0',
-                    selected ? 'text-white' : 'text-role',
+                    selected ? 'text-brand-strong' : 'text-ink-soft',
                     primary && 'fill-current',
                   )}
                 />
