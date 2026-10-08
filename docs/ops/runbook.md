@@ -186,7 +186,8 @@ dc exec -T backend node -e 'fetch("http://elasticsearch:9200/rekr-offers-v2/_cou
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | Conteneur arrêté, ou `oom=true` (plus de 1200 Mo)                       | `dc up -d elasticsearch` : le backend se recale seul dans les 5 min                          |
 | Démarre puis s'arrête, `max virtual memory areas` dans les logs         | `vm.max_map_count` perdu : voir les prérequis de [deploiement-vps.md](../deploiement-vps.md) |
-| Cluster `green`/`yellow`, index absent (`_cat/indices` vide)            | Le backend le recrée à la recherche suivante ; sinon, reconstruire l'index (ci-dessous)      |
+| Cluster `green`/`yellow`, index absent (`_cat/indices` vide)            | Recréé seul à la prochaine recherche ou écriture ; sinon, reconstruire l'index (ci-dessous)  |
+| Le backend logue `unknown field [location]` à chaque fil                | Index créé sans son mapping (avant cette version) : reconstruire l'index (ci-dessous)        |
 | La clé répond `401`                                                     | Recréer la clé (ci-dessous)                                                                  |
 | Tout est vert, mais le backend logue encore `Retrying in …` après 5 min | Lire la raison en fin de ligne du log ; en dernier recours, `dc restart backend`             |
 
