@@ -2,6 +2,7 @@ import { Check, ChevronRight, Heart, X } from 'lucide-react';
 import type { OfferApplicantDto } from '@/api/generated';
 import { metaLine } from '@/components/feed/labels';
 import { Button } from '@/components/ui/button';
+import { fileUrl } from '@/lib/fileUrl';
 import { cn } from '@/lib/utils';
 import type { ApplicantDecision } from '../useApplicants';
 import { CandidateAvatar } from './CandidateAvatar';
@@ -52,7 +53,7 @@ export function ApplicantRow({
     <li className="relative flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface/60 sm:gap-4 sm:px-5">
       <CandidateAvatar
         name={firstName}
-        avatarUrl={applicant.picture}
+        avatarUrl={fileUrl(applicant.picture)}
         className="size-11 text-base"
       />
 

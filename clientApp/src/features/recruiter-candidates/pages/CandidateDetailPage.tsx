@@ -10,6 +10,7 @@ import { contractLabel } from '@/components/feed/labels';
 import { availabilityLabel, experienceLabel, remoteLabel } from '../labels';
 import type { ApplicantDecision } from '../useApplicants';
 import { FactList } from '@/components/ui/fact-list';
+import { fileUrl } from '@/lib/fileUrl';
 
 interface CandidateDetailPageProps {
   candidate: OfferApplicantDto;
@@ -150,7 +151,7 @@ export function CandidateDetailPage({
         <div className="flex items-center gap-4 p-5 sm:p-6">
           <CandidateAvatar
             name={firstName}
-            avatarUrl={candidate.picture}
+            avatarUrl={fileUrl(candidate.picture)}
             className="size-16 text-2xl"
           />
           <div className="flex min-w-0 flex-col gap-0.5">

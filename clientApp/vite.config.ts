@@ -26,6 +26,10 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Inline rather than the default registerSW.js: a separate 189-byte
+      // file is one more request, render-blocking in <head>, below Caddy's
+      // compression threshold, and served without long-term caching.
+      injectRegister: 'inline',
       // Workbox writes the service worker after Sentry's delete hook has run,
       // so its maps would survive in dist. They carry no app source, only the
       // local build path — not worth publishing either.
