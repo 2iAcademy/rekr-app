@@ -54,7 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (!res.ok) {
-          abandon();
+          // Only a refused cookie ends the session: a 502 during a deploy
+          // must not cost the user their next reload.
+          if (res.status === 401 || res.status === 403) {
+            abandon();
+          } else {
+            setStatus('anonymous');
+          }
 
           return;
         }
@@ -63,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (!cancelled) {
-          abandon();
+          setStatus('anonymous');
         }
       });
 

@@ -127,6 +127,29 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('anonymous'));
     expect(hasSessionHint()).toBe(false);
   });
+
+  /** A backend restarting during a deploy says nothing about the cookie. */
+  it('keeps the hint when the backend is down at boot', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('anonymous'));
+    expect(hasSessionHint()).toBe(true);
+  });
+
+  it('keeps the hint when the network fails at boot', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('anonymous'));
+    expect(hasSessionHint()).toBe(true);
+  });
 });
 
 /**
