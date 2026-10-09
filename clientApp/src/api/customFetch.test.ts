@@ -283,6 +283,19 @@ describe('customFetch — session', () => {
     expect(expired).toHaveBeenCalled();
   });
 
+  it('keeps the session when the refresh fails on a backend error', async () => {
+    setAccessToken('stale');
+    const expired = vi.fn();
+    const unsubscribe = onSessionExpired(expired);
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse(401, '{}') as unknown as Response)
+      .mockResolvedValueOnce(jsonResponse(502, '{}') as unknown as Response);
+
+    await expect(customFetch('/api/offers', { method: 'GET' })).rejects.toBeInstanceOf(ApiError);
+    expect(expired).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
   /** A wrong password is a 401 too. Refreshing there would be nonsense, and
    * would mask the real error. */
   it('does not refresh when the login itself returns 401', async () => {
