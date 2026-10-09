@@ -183,7 +183,7 @@ services:
       prometheus:
         condition: service_healthy
     restart: unless-stopped
-    mem_limit: 256m
+    mem_limit: 512m
     healthcheck:
       test:
         [
@@ -193,7 +193,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 120s
 
 volumes:
   pg18_data:
