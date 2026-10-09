@@ -91,7 +91,12 @@ const requestRefresh = async (): Promise<boolean> => {
 
   if (!res.ok) {
     clearAccessToken();
-    notifySessionExpired();
+
+    // A 502 or a 429 is not the server refusing the cookie: ending the session
+    // there would also drop the hint that lets the next reload restore it.
+    if (res.status === 401 || res.status === 403) {
+      notifySessionExpired();
+    }
 
     return false;
   }

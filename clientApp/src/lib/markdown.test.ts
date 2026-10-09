@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToMarkdown, markdownToHtml } from './markdown';
+import { htmlToMarkdown, markdownBlocks, markdownToHtml, markdownToPlainText } from './markdown';
 
 describe('markdownToHtml', () => {
   it('rend le gras et l’italique', () => {
@@ -74,5 +74,39 @@ describe('htmlToMarkdown', () => {
     const source = 'Une **équipe** *soudée*';
 
     expect(htmlToMarkdown(markdownToHtml(source))).toBe(source);
+  });
+});
+
+describe('markdownToPlainText', () => {
+  it('retire les marques et aplatit les lignes et les puces', () => {
+    expect(markdownToPlainText('Une **équipe** *soudée*\n\n- React\n- TypeScript')).toBe(
+      'Une équipe soudée · React · TypeScript',
+    );
+  });
+
+  it('ne double pas la ponctuation après une phrase terminée', () => {
+    expect(markdownToPlainText('Atelier nantais.\n- Pose\n- Finitions')).toBe(
+      'Atelier nantais. Pose · Finitions',
+    );
+  });
+
+  it('garde le signe moins d’une ligne qui n’est pas une puce', () => {
+    expect(markdownToPlainText('-20 % sur la mutuelle\n-\n- Pose')).toBe(
+      '-20 % sur la mutuelle · Pose',
+    );
+  });
+
+  it('rend une chaîne vide pour un contenu vide', () => {
+    expect(markdownToPlainText('')).toBe('');
+  });
+});
+
+describe('markdownBlocks', () => {
+  it('regroupe les puces consécutives en une liste et garde les paragraphes', () => {
+    expect(markdownBlocks('Intro **clé**\n\n- React\n- *Node*\nFin')).toEqual([
+      { kind: 'paragraph', spans: [{ text: 'Intro ' }, { text: 'clé', bold: true }] },
+      { kind: 'list', items: [[{ text: 'React' }], [{ text: 'Node', italic: true }]] },
+      { kind: 'paragraph', spans: [{ text: 'Fin' }] },
+    ]);
   });
 });

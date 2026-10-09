@@ -26,6 +26,10 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Inline rather than the default registerSW.js: a separate 189-byte
+      // file is one more request, render-blocking in <head>, below Caddy's
+      // compression threshold, and served without long-term caching.
+      injectRegister: 'inline',
       // Workbox writes the service worker after Sentry's delete hook has run,
       // so its maps would survive in dist. They carry no app source, only the
       // local build path — not worth publishing either.
@@ -39,7 +43,8 @@ export default defineConfig({
       manifest: {
         name: 'Rekr',
         short_name: 'Rekr',
-        theme_color: '#0EA672',
+        theme_color: '#ffffff',
+        background_color: '#f6f6f8',
         lang: 'fr',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },

@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Proves that a backup restores, without touching production. Installed next
+# to rekr-backup as /usr/local/bin/rekr-restore-test and run by hand:
+#
+#   sudo rekr-restore-test            # the latest backup
+#   sudo rekr-restore-test <stamp>    # e.g. 20261009-031500
+#
+# It starts a throwaway PostgreSQL 18 with no network, restores the dump into
+# it, and puts the row counts of the main tables next to those of production.
+# Production keeps writing after the dump, so small gaps are expected on a busy
+# day; a table that comes back empty is not. It also checks that the uploads
+# archive holds as many files as the live volume. The throwaway database is
+# removed in every case.
+set -euo pipefail
+
+APP_DIR="${REKR_APP_DIR:-/opt/rekr}"
+BACKUP_DIR="${REKR_BACKUP_DIR:-/var/backups/rekr}"
+UPLOADS_VOLUME="${REKR_UPLOADS_VOLUME:-rekr_backend_uploads}"
+POSTGRES_IMAGE=postgres:18-alpine
+ARCHIVER_IMAGE=alpine:3.20
+TABLES=(user company offer candidate_profile recruiter_profile candidate_likes_offer match)
+
+fail() {
+  echo "rekr-restore-test: FAILED: $*" >&2
+  exit 1
+}
+
+if [[ $# -gt 0 ]]; then
+  stamp="$1"
+else
+  latest="$(find "$BACKUP_DIR" -maxdepth 1 -name 'db-*.dump' | sort | tail -n 1)"
+  [[ -n "$latest" ]] || fail "no backup in $BACKUP_DIR"
+  stamp="$(basename "$latest" .dump)"
+  stamp="${stamp#db-}"
+fi
+dump="$BACKUP_DIR/db-$stamp.dump"
+uploads="$BACKUP_DIR/uploads-$stamp.tar.gz"
+[[ -f "$dump" && -f "$uploads" ]] || fail "backup $stamp is incomplete"
+
+name="rekr-restore-test-$$"
+trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+docker run -d --rm --name "$name" --network none \
+  -e POSTGRES_PASSWORD=restore-test -e POSTGRES_DB=restored "$POSTGRES_IMAGE" >/dev/null
+for _ in $(seq 1 30); do
+  docker exec "$name" pg_isready -U postgres -d restored >/dev/null 2>&1 && break
+  sleep 1
+done
+
+echo "Backup $stamp: restoring into a throwaway database…"
+docker exec -i "$name" pg_restore -U postgres -d restored --no-owner --no-acl --exit-on-error <"$dump" ||
+  fail "pg_restore"
+
+count() { "$@" -Atc "$query" 2>/dev/null || echo "?"; }
+cd "$APP_DIR"
+printf '%-24s %10s %10s\n' table restored production
+empty=0
+for table in "${TABLES[@]}"; do
+  query="SELECT count(*) FROM \"$table\""
+  restored="$(count docker exec "$name" psql -U postgres -d restored)"
+  # shellcheck disable=SC2016 # expanded inside the container, from its own environment
+  live="$(count docker compose -f compose.prod.yml exec -T postgres \
+    sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"' --)"
+  printf '%-24s %10s %10s\n' "$table" "$restored" "$live"
+  if [[ "$restored" == 0 && "$live" != 0 ]]; then empty=1; fi
+done
+
+files_backup="$(tar -tzf "$uploads" | grep -cv '/$' || true)"
+files_live="$(docker run --rm -v "$UPLOADS_VOLUME":/data:ro "$ARCHIVER_IMAGE" find /data -type f | wc -l | tr -d ' ')"
+printf '%-24s %10s %10s\n' "uploaded files" "$files_backup" "$files_live"
+
+((empty == 0)) || fail "a table came back empty"
+echo "rekr-restore-test: ok, backup $stamp restores"

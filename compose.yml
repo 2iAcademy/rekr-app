@@ -67,6 +67,10 @@ services:
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
+      # Only the backend creates the offers index, with its mapping. A write that
+      # lands first gets a 404 and triggers the backend's recovery, instead of an
+      # index whose mapping Elasticsearch guessed (`location` without geo_point).
+      action.auto_create_index: "-rekr-offers-*,+*"
       ES_JAVA_OPTS: -Xms512m -Xmx512m
     ports:
       - "9200:9200"

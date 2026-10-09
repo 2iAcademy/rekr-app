@@ -17,9 +17,10 @@ export interface ShellUser {
  *
  * The two roles no longer share a shape. A candidate swipes a deck of offers
  * and follows the matches it produces; a recruiter publishes an offer and reads
- * who applied to it, on the offer itself. « Matches » is common to both — it
- * carries the likes left unanswered on either side — and « Profil », the
- * account item, stays last for both.
+ * who applied to it, on the offer itself. « Activité » is common to both — it
+ * carries the matches and the likes left unanswered on either side, so
+ * « Matchs » would promise a reciprocity that is not always there — and
+ * « Profil », the account item, stays last for both.
  *
  * Each entry is left out of the role it does not serve rather than shown and
  * refused: every screen guards itself, so the item would only lead straight
@@ -29,8 +30,8 @@ export function navigationItems(isRecruiter: boolean): NavigationItem[] {
   return [
     ...(isRecruiter
       ? [{ label: 'Mes offres', to: '/recruteur/offres' }]
-      : [{ label: 'Feed', to: '/candidat/offres' }]),
-    { label: 'Matches', to: '/matches' },
+      : [{ label: 'Offres', to: '/candidat/offres' }]),
+    { label: 'Activité', to: '/matches' },
     { label: 'Profil', to: '/profil' },
   ];
 }

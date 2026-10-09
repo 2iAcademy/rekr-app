@@ -8,6 +8,7 @@ import {
   offerControllerUpdate,
 } from '@/api/generated';
 import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { OfferForm } from '@/features/recruiter-offers/components/OfferForm';
 import {
   buildOfferPayload,
@@ -18,6 +19,7 @@ import {
 import { firstOfferError, type OfferFormError } from '@/features/recruiter-offers/offerValidation';
 import type { BusinessMessages } from '@/lib/feedback/failureMessage';
 import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
+import { cn } from '@/lib/utils';
 
 const OFFERS_PATH = '/recruteur/offres';
 
@@ -181,56 +183,67 @@ export function OfferFormPage() {
   };
 
   return (
-    <div className="desktop:max-w-5xl mx-auto max-w-3xl md:mx-0 lg:max-w-4xl">
-      <Link
-        to={OFFERS_PATH}
-        className="mt-5 inline-flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink md:mt-0"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Retour à mes offres
-      </Link>
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 md:mx-0 lg:max-w-4xl desktop:max-w-5xl">
+      <div className="flex items-center gap-2">
+        <Link
+          to={OFFERS_PATH}
+          aria-label="Retour à mes offres"
+          className={cn(
+            buttonVariants({ variant: 'ghost', size: 'icon' }),
+            '-ml-2 size-11 rounded-xl text-ink hover:bg-surface hover:text-ink',
+          )}
+        >
+          <ArrowLeft aria-hidden="true" className="size-5" />
+        </Link>
 
-      <h1 className="mt-3 font-heading text-xl font-bold text-ink md:text-2xl">
-        {editing ? 'Modifier l’offre' : 'Nouvelle offre'}
-      </h1>
+        <h1 className="text-2xl font-extrabold text-ink md:text-[1.75rem]">
+          {editing ? 'Modifier l’offre' : 'Nouvelle offre'}
+        </h1>
+      </div>
 
       {current.status === 'loading' && (
-        <p role="status" className="mt-6 text-sm text-ink-muted">
-          Chargement de l’offre…
-        </p>
+        <div className="flex flex-col gap-4">
+          <p role="status" className="text-sm text-ink-muted">
+            Chargement de l’offre…
+          </p>
+          <div aria-hidden="true" className="h-64 animate-pulse rounded-2xl bg-surface" />
+          <div aria-hidden="true" className="h-48 animate-pulse rounded-2xl bg-surface" />
+        </div>
       )}
 
       {current.status === 'missing' && (
         <p
           role="alert"
-          className="mt-6 rounded-2xl border border-line bg-card p-5 text-sm text-ink"
+          className="rounded-2xl border border-line bg-card p-5 text-sm text-ink shadow-card"
         >
           {OFFER_GONE}
         </p>
       )}
 
       {current.status === 'failed' && (
-        <div className="mt-6 flex flex-col items-start gap-3 rounded-2xl border border-line bg-card p-5">
+        <div className="flex flex-col items-start gap-3 rounded-2xl border border-line bg-card p-5 shadow-card">
           <p role="alert" className="text-sm text-destructive">
             Impossible de charger cette offre.
           </p>
-          <Button variant="soft" size="lg" onClick={() => setAttempt((count) => count + 1)}>
+          <Button
+            variant="outline"
+            className="h-11 rounded-xl px-5"
+            onClick={() => setAttempt((count) => count + 1)}
+          >
             Réessayer
           </Button>
         </div>
       )}
 
       {current.status === 'ready' && (
-        <div className="mt-8">
-          <OfferForm
-            value={current.form}
-            onChange={patch}
-            onSubmit={() => void submit()}
-            submitting={saving}
-            submitLabel={editing ? 'Enregistrer' : 'Créer l’offre'}
-            error={current.error}
-          />
-        </div>
+        <OfferForm
+          value={current.form}
+          onChange={patch}
+          onSubmit={() => void submit()}
+          submitting={saving}
+          submitLabel={editing ? 'Enregistrer' : 'Créer l’offre'}
+          error={current.error}
+        />
       )}
     </div>
   );

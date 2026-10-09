@@ -273,17 +273,44 @@ curl -I https://rekr.tech
 
 Deux choses à sauvegarder, toujours ensemble : la base et les fichiers déposés
 (CV, photos, logos), qui vivent dans le volume `backend_uploads`. L'une sans
-l'autre laisse des lignes qui pointent vers des fichiers absents.
+l'autre laisse des lignes qui pointent vers des fichiers absents. L'index
+Elasticsearch ne se sauvegarde pas : il se reconstruit depuis PostgreSQL.
+
+`scripts/ops/rekr-backup` le fait chaque nuit à 3 h 15 : un `pg_dump`, que
+PostgreSQL rend cohérent sans arrêter l'application, et une archive du volume.
+Il vérifie que le dump est lisible, range les deux fichiers dans
+`/var/backups/rekr/` (lisible par root seulement) et supprime ceux de plus de
+7 jours. Le journal est dans `/var/log/rekr-backup.log`.
+
+Ces sauvegardes restent sur le disque du serveur : elles protègent d'une
+erreur sur les données, pas de la perte du serveur. Pour cela, il faut une
+copie ailleurs, par exemple l'option Backups de Hetzner, qui copie le disque
+entier chaque jour sur leur stockage (20 % du prix du serveur).
+
+Installation, une seule fois, depuis un compte administrateur (comme
+`rekr-deploy`, les scripts appartiennent à root) :
 
 ```bash
-docker compose -f compose.prod.yml exec -T postgres \
-  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > rekr-$(date +%F).dump
-docker run --rm -v rekr_backend_uploads:/data:ro -v "$PWD":/out alpine \
-  tar czf /out/uploads-$(date +%F).tar.gz -C /data .
+for f in rekr-backup rekr-restore-test; do
+  curl -fsSL "https://raw.githubusercontent.com/2iAcademy/rekr-app/main/scripts/ops/$f" -o "/tmp/$f"
+  sudo install -m 755 -o root -g root "/tmp/$f" "/usr/local/bin/$f" && rm "/tmp/$f"
+done
+curl -fsSL https://raw.githubusercontent.com/2iAcademy/rekr-app/main/scripts/ops/rekr-backup.cron -o /tmp/rekr-backup.cron
+sudo install -m 644 -o root -g root /tmp/rekr-backup.cron /etc/cron.d/rekr-backup && rm /tmp/rekr-backup.cron
 ```
 
-L'index Elasticsearch ne se sauvegarde pas : il se reconstruit depuis
-PostgreSQL.
+Puis une première sauvegarde à la main, et la preuve qu'elle se restaure :
+
+```bash
+sudo rekr-backup
+sudo rekr-restore-test
+```
+
+`rekr-restore-test` restaure la dernière sauvegarde dans une base PostgreSQL
+jetable, sans réseau, et met le nombre de lignes des tables principales et le
+nombre de fichiers en face de ceux de la production. Il échoue si une table
+revient vide. À relancer de temps en temps : une sauvegarde qu'on n'a jamais
+restaurée n'est pas une sauvegarde.
 
 ## En cas de panne
 

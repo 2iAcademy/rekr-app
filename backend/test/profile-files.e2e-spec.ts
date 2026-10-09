@@ -602,6 +602,33 @@ describe('Profile files (e2e)', () => {
       expect(response.headers['cache-control']).toContain('immutable');
     });
 
+    // The front builds the image URL itself with `fileUrl()`: the applicants
+    // list must hand over the bare key, or the recruiter's avatars break.
+    it('lets the recruiter of an offer load the picture of a candidate who liked it', async () => {
+      const { user: candidate, key } = await uploadPicture();
+      const { user: recruiter, company } = await createRecruiter();
+      const offer = await prisma.offer.create({
+        data: { title: 'Dev', companyId: company.id, status: 'open' },
+      });
+      await prisma.candidateLikesOffer.create({
+        data: { candidateUserId: candidate.id, offerId: offer.id },
+      });
+      const auth = bearerFor(app, recruiter.id, 'recruiter');
+
+      const applicants = await httpRequest(app)
+        .get(`/api/offers/${offer.id}/likes`)
+        .set('Authorization', auth)
+        .expect(200);
+      const [{ picture }] = applicants.body as { picture: string | null }[];
+      expect(picture).toBe(key);
+
+      const response = await httpRequest(app)
+        .get(`/api/files/${picture as string}`)
+        .set('Authorization', auth)
+        .expect(200);
+      expect(response.body).toEqual(pngBuffer());
+    });
+
     it('serves a company logo without authentication', async () => {
       const { user, company } = await createRecruiter();
       await httpRequest(app)

@@ -5,6 +5,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import {
   offerControllerFindApplicants,
+  offerControllerFindOneById,
   offerControllerLikeApplicant,
   type LikeResultDto,
   type OfferApplicantDto,
@@ -20,6 +21,7 @@ vi.mock('@/api/generated', () => ({
   authControllerLogout: vi.fn(),
   authControllerSignup: vi.fn(),
   offerControllerFindApplicants: vi.fn(),
+  offerControllerFindOneById: vi.fn(),
   offerControllerLikeApplicant: vi.fn(),
   offerControllerFindFeed: vi.fn().mockResolvedValue({ data: [] }),
   offerControllerFindMine: vi.fn().mockResolvedValue({ data: [] }),
@@ -28,6 +30,12 @@ vi.mock('@/api/generated', () => ({
 
 const findApplicants = vi.mocked(offerControllerFindApplicants);
 const likeApplicant = vi.mocked(offerControllerLikeApplicant);
+const findOffer = vi.mocked(offerControllerFindOneById);
+
+const offerTitled = (title: string) =>
+  ({ data: { id: 12, title }, status: 200, headers: new Headers() }) as unknown as Awaited<
+    ReturnType<typeof offerControllerFindOneById>
+  >;
 
 const answer = (data: OfferApplicantDto[]) =>
   ({ data, status: 200, headers: new Headers() }) as unknown as Awaited<
@@ -82,6 +90,7 @@ describe('OfferApplicantsRoute', () => {
     vi.clearAllMocks();
     sessionStorage.clear();
     findApplicants.mockResolvedValue(answer([anApplicant]));
+    findOffer.mockResolvedValue(offerTitled('Développeuse backend'));
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       status: 401,
@@ -149,7 +158,7 @@ describe('OfferApplicantsRoute', () => {
     } as unknown as Awaited<ReturnType<typeof offerControllerLikeApplicant>>);
     const router = renderAt(APPLICANTS_PATH);
 
-    await user.click(await screen.findByRole('button', { name: 'Liker Camille' }));
+    await user.click(await screen.findByRole('button', { name: "Ça m'intéresse : Camille" }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/match'));
     expect(
@@ -192,6 +201,59 @@ describe('OfferApplicantsRoute', () => {
 
     expect(profileParam(router)).toBeNull();
     expect(screen.queryByRole('region', { name: 'Profil de Camille' })).not.toBeInTheDocument();
+  });
+
+  // Le titre de l'offre arrive avec la navigation depuis la liste : il doit
+  // survivre à l'ouverture puis à la fermeture d'un profil, qui réécrivent l'URL.
+  it('garde le titre de l’offre transmis par la liste en ouvrant puis refermant un profil', async () => {
+    const user = userEvent.setup();
+    authenticateAs('recruiter');
+    const router = createMemoryRouter(routes, {
+      initialEntries: [
+        { pathname: APPLICANTS_PATH, state: { offerTitle: 'Développeuse backend' } },
+      ],
+    });
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText('Développeuse backend')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Voir le profil de Camille' }));
+    await user.click(await screen.findByRole('button', { name: 'Retour à la liste' }));
+
+    expect(await screen.findByText('Développeuse backend')).toBeInTheDocument();
+    // Déjà connu : pas de seconde requête pour le relire.
+    expect(findOffer).not.toHaveBeenCalled();
+  });
+
+  // Un lien direct ou un rechargement n'apportent aucun état : le titre est
+  // alors demandé à l'API plutôt que perdu.
+  it('charge le titre de l’offre sur une visite directe', async () => {
+    authenticateAs('recruiter');
+    renderAt(APPLICANTS_PATH);
+
+    expect(await screen.findByText('Développeuse backend')).toBeInTheDocument();
+    expect(findOffer).toHaveBeenCalledWith(12);
+  });
+
+  it('garde la liste sans titre quand l’offre ne se charge pas', async () => {
+    findOffer.mockRejectedValue(new Error('network'));
+    authenticateAs('recruiter');
+    renderAt(APPLICANTS_PATH);
+
+    await screen.findByRole('button', { name: 'Voir le profil de Camille' });
+
+    expect(screen.queryByText('Développeuse backend')).not.toBeInTheDocument();
+  });
+
+  it('rappelle l’offre sur la fiche du candidat', async () => {
+    authenticateAs('recruiter');
+    renderAt(`${APPLICANTS_PATH}?profil=${anApplicant.userId}`);
+
+    expect(await screen.findByText('Offre : Développeuse backend')).toBeInTheDocument();
   });
 
   it.each(['0', 'abc', ' 1 ', ''])('nettoie un paramètre de profil illisible (%s)', async (raw) => {
