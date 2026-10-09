@@ -90,4 +90,20 @@ describe('ApplicantRow', () => {
     renderRow({ desiredJobTitle: null });
     expect(screen.queryByText('Développeuse back-end')).not.toBeInTheDocument();
   });
+
+  // L'API renvoie une clé de stockage, pas une URL : sans le préfixe, le
+  // navigateur la résout par rapport à la page et l'image casse.
+  it('affiche la photo depuis l’URL de lecture du fichier', () => {
+    renderRow({ picture: 'candidates/1/picture/photo.png' });
+    expect(screen.getByRole('img', { name: 'Camille' })).toHaveAttribute(
+      'src',
+      '/api/files/candidates/1/picture/photo.png',
+    );
+  });
+
+  it('garde l’initiale quand le candidat n’a pas de photo', () => {
+    renderRow({ picture: null });
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.getByText('C')).toBeInTheDocument();
+  });
 });
