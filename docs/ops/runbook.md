@@ -100,7 +100,7 @@ done
 **Remède**
 
 - Serveur éteint : le rallumer depuis la console Hetzner. Les services ont `restart: unless-stopped` et
-  repartent seuls. Ensuite, voir la fiche 5 : au redémarrage, le backend peut partir avant Elasticsearch.
+  repartent seuls. Si le backend part avant Elasticsearch, il le retente seul : voir la fiche 5.
 - Caddy arrêté : `dc up -d caddy` ✅
 - Certificat refusé pour cause de limite Let's Encrypt : attendre la fin de la fenêtre (une semaine au pire). Ne
   pas supprimer `caddy_data`, ça aggrave le problème. ⚠️
@@ -160,6 +160,13 @@ df -h /                                                                        #
 **Ce n'est pas une panne du site.** Le fil candidat continue de marcher, trié par PostgreSQL au lieu du
 classement par pertinence. Le backend l'écrit dans ses logs : `candidate feeds will use PostgreSQL ordering`.
 
+**Le backend se répare seul.** Tant qu'Elasticsearch ne répond pas, il retente en arrière-plan, de plus en plus
+espacé : `Retrying in 5s`, puis 10 s, 20 s… jusqu'à 5 min entre deux essais. Dès qu'Elasticsearch répond, il crée
+l'index s'il manque, le recale sur PostgreSQL (offres créées, modifiées ou fermées pendant la panne comprises) et
+logue l'écart qu'il a corrigé : `Elasticsearch drift: X open offers missing from the index, Y indexed offers no
+longer open.` Le fil est de nouveau classé, sans redémarrage. Il n'y a donc rien à faire tant qu'Elasticsearch
+lui-même n'est pas en cause.
+
 **Diagnostic**
 
 ```bash
@@ -175,17 +182,17 @@ dc exec -T backend node -e 'fetch("http://elasticsearch:9200/rekr-offers-v2/_cou
   {headers:{Authorization:"ApiKey "+process.env.ELASTICSEARCH_API_KEY}}).then(r=>console.log(r.status))'
 ```
 
-| Constat                                                                          | Remède                                                                                       |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Conteneur arrêté, ou `oom=true` (plus de 1200 Mo)                                | `dc up -d elasticsearch`, puis redémarrer le backend (ci-dessous)                            |
-| Démarre puis s'arrête, `max virtual memory areas` dans les logs                  | `vm.max_map_count` perdu : voir les prérequis de [deploiement-vps.md](../deploiement-vps.md) |
-| Cluster `green`/`yellow`, index absent (`_cat/indices` vide)                     | Reconstruire l'index (ci-dessous)                                                            |
-| La clé répond `401`                                                              | Recréer la clé (ci-dessous)                                                                  |
-| Tout est vert, mais le backend logue `Elasticsearch is unavailable` au démarrage | Il a démarré avant Elasticsearch : `dc restart backend`                                      |
+| Constat                                                                 | Remède                                                                                       |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Conteneur arrêté, ou `oom=true` (plus de 1200 Mo)                       | `dc up -d elasticsearch` : le backend se recale seul dans les 5 min                          |
+| Démarre puis s'arrête, `max virtual memory areas` dans les logs         | `vm.max_map_count` perdu : voir les prérequis de [deploiement-vps.md](../deploiement-vps.md) |
+| Cluster `green`/`yellow`, index absent (`_cat/indices` vide)            | Recréé seul à la prochaine recherche ou écriture ; sinon, reconstruire l'index (ci-dessous)  |
+| Le backend logue `unknown field [location]` à chaque fil                | Index créé sans son mapping (avant cette version) : reconstruire l'index (ci-dessous)        |
+| La clé répond `401`                                                     | Recréer la clé (ci-dessous)                                                                  |
+| Tout est vert, mais le backend logue encore `Retrying in …` après 5 min | Lire la raison en fin de ligne du log ; en dernier recours, `dc restart backend`             |
 
-Le dernier cas est le plus probable après un redémarrage du serveur. `depends_on` attend qu'Elasticsearch soit
-lancé, pas qu'il soit prêt. Si le backend démarre avant, il ne crée pas l'index et reste sur le tri PostgreSQL
-jusqu'à son prochain redémarrage. Constaté sur la pile locale au premier démarrage (✅).
+Après un redémarrage du serveur, le backend part souvent avant Elasticsearch : `depends_on` attend qu'il soit
+lancé, pas qu'il soit prêt. Quelques `Retrying in …` puis une ligne `Elasticsearch drift` sont alors normaux.
 
 **Reconstruire l'index** : PostgreSQL est la source de vérité, reconstruire ne perd rien. Actions > CI/CD >
 Run workflow, en cochant « Reconstruire l'index Elasticsearch », puis approuver. Le déploiement suivant repart
@@ -211,11 +218,8 @@ valeur du `.env` »).
 
 Puis invalider l'ancienne clé (`DELETE /_security/api_key` avec son id, voir le script).
 
-**Limite connue** : une offre créée ou fermée pendant la panne n'est pas rattrapée quand Elasticsearch revient
-(#227). Après une panne longue, reconstruire l'index.
-
-**Vérification** : `/api/health/search` répond `200`, et `_cat/indices` montre `rekr-offers-v2` avec autant de
-documents que d'offres ouvertes.
+**Vérification** : `/api/health/search` répond `200`, le backend a logué `Elasticsearch drift` depuis le retour
+d'Elasticsearch, et `_cat/indices` montre `rekr-offers-v2` avec autant de documents que d'offres ouvertes.
 
 ## 6. Une migration échoue au déploiement
 
