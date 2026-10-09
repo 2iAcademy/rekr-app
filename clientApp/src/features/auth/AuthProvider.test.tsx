@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { AuthProvider } from './AuthProvider';
 import { useAuth } from './useAuth';
 import { clearAccessToken, getAccessToken } from '@/api/tokenStore';
+import { clearSessionHint, hasSessionHint } from '@/lib/sessionHint';
 
 const Probe = () => {
   const { status, user, markProfileCompleted, accountDeleted } = useAuth();
@@ -83,6 +84,48 @@ describe('AuthProvider', () => {
     renderProvider();
 
     expect(screen.getByTestId('status')).toHaveTextContent('loading');
+  });
+
+  /** A first visit has no cookie to trade: asking anyway only earns a 401
+   * that the browser logs as an error. */
+  it('skips the boot refresh on a browser that never signed in', () => {
+    clearSessionHint();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    renderProvider();
+
+    expect(screen.getByTestId('status')).toHaveTextContent('anonymous');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps the hint once a session is restored', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        accessToken: 'fresh',
+        user: { id: 1, email: 'back@test.dev', role: 'user', userType: 'candidate' },
+      }),
+    } as unknown as Response);
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'));
+    expect(hasSessionHint()).toBe(true);
+  });
+
+  /** An expired cookie must not cost a refresh on every later visit. */
+  it('drops the hint when the cookie is refused', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('anonymous'));
+    expect(hasSessionHint()).toBe(false);
   });
 });
 
