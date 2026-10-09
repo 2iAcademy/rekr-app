@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider, type InitialEntry } from 'react-router';
 import { AuthProvider } from '@/features/auth/AuthProvider';
@@ -62,18 +62,22 @@ const authenticateAsCandidate = () => {
   } as unknown as Response);
 };
 
-const renderAt = (entry: InitialEntry) => {
+const renderAt = async (entry: InitialEntry) => {
   const router = createMemoryRouter(routes, { initialEntries: [entry] });
-  render(
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>,
-  );
+  // Flush session refresh and offer loading before querying the page. Under
+  // parallel suite load, that startup can exceed findByRole's default timeout.
+  await act(async () => {
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+  });
 
   return router;
 };
 
-const url = (router: ReturnType<typeof renderAt>) =>
+const url = (router: Awaited<ReturnType<typeof renderAt>>) =>
   `${router.state.location.pathname}${router.state.location.search}`;
 
 const openedFrom = (from: unknown): InitialEntry => ({ pathname: '/offres/30', state: { from } });
@@ -93,7 +97,7 @@ describe('retour depuis le détail d’une offre', () => {
 
   it('revient à l’onglet d’origine après le retrait du like', async () => {
     const user = userEvent.setup();
-    const router = renderAt(openedFrom('/matches?onglet=mes-likes'));
+    const router = await renderAt(openedFrom('/matches?onglet=mes-likes'));
 
     await user.click(await screen.findByRole('button', { name: 'Retirer mon like' }));
 
@@ -102,7 +106,7 @@ describe('retour depuis le détail d’une offre', () => {
 
   it('revient au feed quand l’écran a été ouvert sans origine', async () => {
     const user = userEvent.setup();
-    const router = renderAt('/offres/30');
+    const router = await renderAt('/offres/30');
 
     await user.click(await screen.findByRole('button', { name: 'Retirer mon like' }));
 
@@ -121,7 +125,7 @@ describe('retour depuis le détail d’une offre', () => {
     ['autre chose qu’une chaîne', 42],
   ])('ignore une origine qui est %s', async (_, from) => {
     const user = userEvent.setup();
-    const router = renderAt(openedFrom(from));
+    const router = await renderAt(openedFrom(from));
 
     await user.click(await screen.findByRole('button', { name: 'Fermer' }));
 
