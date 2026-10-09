@@ -183,6 +183,8 @@ describe('MatchesPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Matchs' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Matchs' })).toHaveAttribute('aria-selected', 'true');
+    // Les onglets mêlent likes et matchs : la liste porte le nom du menu.
+    expect(screen.getByRole('tablist', { name: 'Filtrer l’activité' })).toBeInTheDocument();
     expect(await screen.findByText('Acme Corp')).toBeInTheDocument();
   });
 

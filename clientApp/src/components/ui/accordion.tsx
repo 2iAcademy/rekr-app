@@ -93,7 +93,7 @@ export function ProfileSection({ value, title, summary, children }: ProfileSecti
           aria-controls={panelId}
           onClick={() => sections.toggle(value)}
           className={cn(
-            'flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left',
+            'flex min-h-14 w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left',
             'text-base font-bold text-ink transition-colors hover:bg-surface',
             'outline-none focus-visible:ring-3 focus-visible:ring-brand/30',
             isOpen && 'rounded-b-none',

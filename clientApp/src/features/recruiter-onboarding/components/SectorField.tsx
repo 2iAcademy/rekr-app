@@ -30,7 +30,7 @@ export function SectorField({ value, onChange, invalid, describedBy }: SectorFie
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
-            'h-12 w-full cursor-pointer appearance-none rounded-xl border border-line bg-card pr-11 pl-4 text-sm text-ink outline-none transition-colors',
+            'h-12 w-full appearance-none rounded-xl border border-line bg-card pr-11 pl-4 text-sm text-ink outline-none transition-colors',
             'focus-visible:border-brand focus-visible:ring-3 focus-visible:ring-brand/20',
             'disabled:cursor-not-allowed disabled:opacity-50',
             'aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20',
@@ -55,7 +55,7 @@ export function SectorField({ value, onChange, invalid, describedBy }: SectorFie
       {status === 'failed' && (
         <p role="alert" className="text-xs text-destructive">
           Impossible de charger les secteurs.{' '}
-          <button type="button" onClick={reload} className="cursor-pointer font-semibold underline">
+          <button type="button" onClick={reload} className="font-semibold underline">
             Réessayer
           </button>
         </p>

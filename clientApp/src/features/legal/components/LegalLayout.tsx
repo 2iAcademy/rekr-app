@@ -22,7 +22,7 @@ export function LegalLayout({ title, version, onBack, children }: LegalLayoutPro
             type="button"
             onClick={onBack}
             aria-label="Retour"
-            className="absolute left-0 flex size-9 cursor-pointer items-center justify-center rounded-full bg-card text-ink shadow-sm transition-colors hover:bg-muted"
+            className="absolute left-0 flex size-9 items-center justify-center rounded-full bg-card text-ink shadow-sm transition-colors hover:bg-muted"
           >
             <ChevronLeft className="size-5" />
           </button>

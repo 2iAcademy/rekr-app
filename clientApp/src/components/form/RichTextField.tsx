@@ -207,7 +207,7 @@ export function RichTextField({
               // the command runs.
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => run(command)}
-              className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none aria-pressed:bg-brand-tint aria-pressed:text-brand-strong"
+              className="flex size-11 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none aria-pressed:bg-brand-tint aria-pressed:text-brand-strong"
             >
               <Icon className="size-4" />
             </button>

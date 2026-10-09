@@ -4,7 +4,7 @@
  * The applicants endpoint answers people, not the offer they applied to, so the
  * title shown above the list travels with the navigation instead of costing a
  * second request. A direct visit (typed URL, reload in another tab) carries
- * nothing, and the screen simply goes without the reminder.
+ * nothing, and `useOfferTitle` then asks the API for it.
  */
 export interface ApplicantsLocationState {
   offerTitle: string;

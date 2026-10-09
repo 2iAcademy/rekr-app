@@ -35,7 +35,7 @@ export function JobFamilySelect({ value, onChange, invalid, describedBy }: JobFa
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
-            'h-12 w-full cursor-pointer appearance-none rounded-xl border border-line bg-card pr-11 pl-4 text-sm text-ink outline-none transition-colors',
+            'h-12 w-full appearance-none rounded-xl border border-line bg-card pr-11 pl-4 text-sm text-ink outline-none transition-colors',
             'hover:border-ink-faint/40',
             'focus-visible:border-brand focus-visible:ring-3 focus-visible:ring-brand/20',
             'disabled:cursor-not-allowed disabled:opacity-50',
@@ -61,7 +61,7 @@ export function JobFamilySelect({ value, onChange, invalid, describedBy }: JobFa
       {status === 'failed' && (
         <p role="alert" className="text-xs text-destructive">
           Impossible de charger les domaines.{' '}
-          <button type="button" onClick={reload} className="cursor-pointer underline">
+          <button type="button" onClick={reload} className="underline">
             Réessayer
           </button>
         </p>

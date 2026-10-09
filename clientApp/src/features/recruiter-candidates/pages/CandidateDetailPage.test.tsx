@@ -9,9 +9,15 @@ import { CandidateDetailPage } from './CandidateDetailPage';
 type Overrides = Partial<OfferApplicantDto> & {
   decision?: ApplicantDecision;
   pending?: boolean;
+  offerTitle?: string | null;
 };
 
-const renderPage = ({ decision = null, pending, ...overrides }: Overrides = {}) => {
+const renderPage = ({
+  decision = null,
+  pending,
+  offerTitle = null,
+  ...overrides
+}: Overrides = {}) => {
   const onBack = vi.fn();
   const onLike = vi.fn();
   const onPass = vi.fn();
@@ -21,6 +27,7 @@ const renderPage = ({ decision = null, pending, ...overrides }: Overrides = {}) 
       candidate={{ ...anApplicant, ...overrides }}
       decision={decision}
       pending={pending}
+      offerTitle={offerTitle}
       onBack={onBack}
       onLike={onLike}
       onPass={onPass}
@@ -205,6 +212,18 @@ describe('CandidateDetailPage', () => {
     renderPage();
 
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('rappelle l’offre d’où vient le recruteur', () => {
+    renderPage({ offerTitle: 'Développeuse backend' });
+
+    expect(screen.getByText('Offre : Développeuse backend')).toBeInTheDocument();
+  });
+
+  it('se passe du rappel quand le titre de l’offre est inconnu', () => {
+    renderPage({ offerTitle: null });
+
+    expect(screen.queryByText(/^Offre :/)).not.toBeInTheDocument();
   });
 
   // L'API renvoie une clé de stockage, pas une URL : sans le préfixe, le
