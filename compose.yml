@@ -6,7 +6,8 @@ services:
       target: dev
     # Migrations run once per container start; `nest start --watch` reloads
     # inside the same process, so a code change does not replay them.
-    command: sh -c "npx prisma migrate deploy && npm run start:dev"
+    command: sh -o pipefail -c "(npx prisma migrate deploy && npm run start:dev) 2>&1 | tee -a /var/log/rekr/backend.log"
+    init: true
     environment:
       NODE_ENV: development
       PORT: ${PORT:-3001}
@@ -41,6 +42,7 @@ services:
       STREAM_API_KEY: ${STREAM_API_KEY:-}
       STREAM_API_SECRET: ${STREAM_API_SECRET:-}
     volumes:
+      - backend_logs:/var/log/rekr
       - ./backend:/app
       - /app/node_modules
       # The uploaded files: CVs, profile pictures, company logos and covers.
@@ -68,10 +70,12 @@ services:
       discovery.type: single-node
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: -Xms512m -Xmx512m
+      ES_LOG_STYLE: file
     ports:
       - "9200:9200"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
+      - elasticsearch_logs:/usr/share/elasticsearch/logs
     healthcheck:
       test:
         [
@@ -83,14 +87,18 @@ services:
       retries: 20
 
   frontend:
+    command: sh -o pipefail -c "npm run dev 2>&1 | tee -a /home/node/logs/frontend.log"
+    init: true
     build:
       context: ./clientApp
       dockerfile: Dockerfile
       target: dev
     environment:
+      CONTAINER_LOGS: "true"
       VITE_API_TARGET: ${VITE_API_TARGET:-http://backend:3001}
       VITE_API_URL: ${VITE_API_URL:-/api}
     volumes:
+      - frontend_logs:/home/node/logs
       - ./clientApp:/app
       # Named, not anonymous, and that is the whole point.
       #
@@ -122,6 +130,22 @@ services:
 
   postgres:
     image: postgres:18-alpine
+    # Prepare only the separate log directory, then use the official entrypoint.
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /var/log/postgresql
+        chown postgres:postgres /var/log/postgresql
+        exec docker-entrypoint.sh postgres \
+          -c logging_collector=on \
+          -c log_destination=jsonlog \
+          -c log_directory=/var/log/postgresql \
+          -c log_filename=postgresql-%a.log \
+          -c log_rotation_age=1d \
+          -c log_rotation_size=0 \
+          -c log_truncate_on_rotation=on \
+          -c log_min_error_statement=panic
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -130,6 +154,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pg18_data:/var/lib/postgresql
+      - postgres_logs:/var/log/postgresql
     healthcheck:
       test:
         [
@@ -140,7 +165,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # Local monitoring bootstrap. Application instrumentation comes later.
+  # Development monitoring
   prometheus:
     image: prom/prometheus:v3.14.0
     command:
@@ -169,9 +194,8 @@ services:
   grafana:
     image: grafana/grafana:13.2.2
     environment:
-      # Local-only bootstrap credentials; Grafana requests a password change.
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Define GRAFANA_ADMIN_PASSWORD in .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
@@ -195,10 +219,47 @@ services:
       retries: 10
       start_period: 120s
 
+  loki:
+    image: grafana/loki:3.7.8
+    command:
+      - -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./docker/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    restart: unless-stopped
+    mem_limit: 512m
+
+  alloy:
+    image: grafana/alloy:v1.20.1
+    command:
+      - run
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./docker/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - backend_logs:/var/log/rekr:ro
+      - frontend_logs:/var/log/frontend:ro
+      - postgres_logs:/var/log/postgresql:ro
+      - elasticsearch_logs:/var/log/elasticsearch:ro
+      - alloy_data:/var/lib/alloy/data
+    depends_on:
+      loki:
+        condition: service_started
+    restart: unless-stopped
+    mem_limit: 256m
+
 volumes:
   pg18_data:
   frontend_node_modules:
   backend_uploads:
   elasticsearch_data:
   prometheus_data:
+  loki_data:
   grafana_data:
+  backend_logs:
+  alloy_data:
+  frontend_logs:
+  postgres_logs:
+  elasticsearch_logs:

@@ -230,10 +230,13 @@ describe('OfferSearchService', () => {
 
     await service.syncOffer(42);
 
-    expect(elastic.delete).toHaveBeenCalledWith({
-      index: 'rekr-offers-v2',
-      id: '42',
-    });
+    expect(elastic.delete).toHaveBeenCalledWith(
+      {
+        index: 'rekr-offers-v2',
+        id: '42',
+      },
+      { ignore: [404] },
+    );
     expect(elastic.index).not.toHaveBeenCalled();
   });
 

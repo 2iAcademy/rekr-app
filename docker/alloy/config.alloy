@@ -1,0 +1,53 @@
+// Each service shares only its log directory, read-only in Alloy.
+loki.source.file "backend" {
+  targets = [{
+    __path__    = "/var/log/rekr/backend.log",
+    service     = "backend",
+    environment = "development",
+  }]
+  forward_to = [loki.process.backend.receiver]
+}
+
+// Discover native rotating files, without mounting database data or Docker's socket.
+local.file_match "services" {
+  path_targets = [
+    { __path__ = "/var/log/frontend/frontend.log", service = "frontend", environment = "development" },
+    { __path__ = "/var/log/postgresql/*.json", service = "postgresql", environment = "development" },
+    { __path__ = "/var/log/elasticsearch/*_server.json", service = "elasticsearch", environment = "development" },
+  ]
+  sync_period = "5s"
+}
+
+loki.source.file "services" {
+  targets    = local.file_match.services.targets
+  forward_to = [loki.process.backend.receiver]
+}
+
+// One common pipeline: text prefixes first, then authoritative JSON severity.
+// Keep the component name so backend reading positions remain unchanged.
+loki.process "backend" {
+  stage.decolorize {}
+  stage.regex {
+    expression = `(?:\[Nest\].*?\s|\[)(?P<level>LOG|INFO|WARN|WARNING|ERROR|DEBUG|VERBOSE|FATAL)(?:\]|\s)`
+  }
+  stage.regex {
+    expression = `^npm (?P<level>warn|error)\b`
+  }
+  stage.json {
+    expressions = { json_level = `level || "log.level" || error_severity` }
+  }
+  stage.template {
+    source = "level"
+    template = `{{ $level := ToLower (or .json_level .Value "unknown") }}{{ if or (eq $level "log") (eq $level "notice") }}info{{ else if eq $level "warning" }}warn{{ else if or (eq $level "fatal") (eq $level "panic") }}error{{ else }}{{ $level }}{{ end }}`
+  }
+  stage.labels {
+    values = { level = "" }
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

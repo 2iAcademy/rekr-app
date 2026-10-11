@@ -1,6 +1,9 @@
-# No application targets yet: this step only starts the services.
 global:
   scrape_interval: 30s
   evaluation_interval: 30s
 
-scrape_configs: []
+scrape_configs:
+  - job_name: rekr-backend
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ["backend:3001"]

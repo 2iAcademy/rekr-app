@@ -1,3 +1,4 @@
+import { externalCall } from '../observability/failure-log';
 import {
   Injectable,
   Logger,
@@ -58,18 +59,22 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
     if (!this.client) return;
 
     try {
-      const exists = await this.client.indices.exists({ index: OFFERS_INDEX });
+      const exists = await externalCall('elasticsearch', 'index_exists', () =>
+        this.client!.indices.exists({ index: OFFERS_INDEX }),
+      );
       const rebuild = process.env.ELASTICSEARCH_REINDEX_ON_STARTUP === 'true';
       if (exists && rebuild) {
-        await this.client.indices.delete({ index: OFFERS_INDEX });
+        await externalCall('elasticsearch', 'delete_index', () =>
+          this.client!.indices.delete({ index: OFFERS_INDEX }),
+        );
       }
       if (!exists || rebuild) {
         await this.createIndex();
         await this.reindexAll();
       }
-    } catch (cause) {
+    } catch {
       this.logger.warn(
-        `Elasticsearch is unavailable; candidate feeds will use PostgreSQL ordering. ${this.reasonOf(cause)}`,
+        `Elasticsearch is unavailable; candidate feeds will use PostgreSQL ordering.`,
       );
     }
   }
@@ -91,36 +96,41 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
     const { filter, functions } = buildOfferRankingQuery(profile);
 
     try {
-      const response = await this.client.search<OfferSearchDocument>({
-        index: OFFERS_INDEX,
-        size: Math.min(limit * 3, 300),
-        track_total_hits: false,
-        query: {
-          function_score: {
-            query: { bool: { filter } },
-            functions,
-            // Every criterion adds its own points to a base of zero: the score
-            // an offer carries is the sum of the weights it earned, and nothing
-            // Elasticsearch computed on its own.
-            score_mode: 'sum',
-            boost_mode: 'replace',
-          },
-        },
-        sort: [
-          { _score: { order: 'desc' } },
-          { createdAt: { order: 'desc' } },
-          { id: { order: 'desc' } },
-        ],
-        _source: ['id'],
-      });
+      const response = await externalCall(
+        'elasticsearch',
+        'search_offers',
+        () =>
+          this.client!.search<OfferSearchDocument>({
+            index: OFFERS_INDEX,
+            size: Math.min(limit * 3, 300),
+            track_total_hits: false,
+            query: {
+              function_score: {
+                query: { bool: { filter } },
+                functions,
+                // Every criterion adds its own points to a base of zero: the score
+                // an offer carries is the sum of the weights it earned, and nothing
+                // Elasticsearch computed on its own.
+                score_mode: 'sum',
+                boost_mode: 'replace',
+              },
+            },
+            sort: [
+              { _score: { order: 'desc' } },
+              { createdAt: { order: 'desc' } },
+              { id: { order: 'desc' } },
+            ],
+            _source: ['id'],
+          }),
+      );
 
       return response.hits.hits.flatMap((hit) => {
         const id = hit._source?.id ?? Number(hit._id);
         return Number.isInteger(id) && id > 0 ? [id] : [];
       });
-    } catch (cause) {
+    } catch {
       this.logger.warn(
-        `Elasticsearch search failed; candidate feeds will use PostgreSQL ordering. ${this.reasonOf(cause)}`,
+        `Elasticsearch search failed; candidate feeds will use PostgreSQL ordering.`,
       );
       return null;
     }
@@ -134,15 +144,15 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
     if (!this.client) return 'disabled';
 
     try {
-      const exists = await this.client.indices.exists(
-        { index: OFFERS_INDEX },
-        { requestTimeout: 2000, maxRetries: 0 },
+      const exists = await externalCall('elasticsearch', 'health_check', () =>
+        this.client!.indices.exists(
+          { index: OFFERS_INDEX },
+          { requestTimeout: 2000, maxRetries: 0 },
+        ),
       );
       return exists ? 'available' : 'unavailable';
-    } catch (cause) {
-      this.logger.warn(
-        `Elasticsearch health check failed. ${this.reasonOf(cause)}`,
-      );
+    } catch {
+      this.logger.warn(`Elasticsearch health check failed.`);
       return 'unavailable';
     }
   }
@@ -174,9 +184,12 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
       });
 
       if (!offer || offer.status !== 'open') {
-        await this.client
-          .delete({ index: OFFERS_INDEX, id: String(offerId) })
-          .catch(() => undefined);
+        await externalCall('elasticsearch', 'delete_offer', () =>
+          this.client!.delete(
+            { index: OFFERS_INDEX, id: String(offerId) },
+            { ignore: [404] },
+          ),
+        ).catch(() => undefined);
         return;
       }
 
@@ -198,39 +211,41 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
           : {}),
         createdAt: offer.createdAt.toISOString(),
       };
-      await this.client.index({
-        index: OFFERS_INDEX,
-        id: String(offer.id),
-        document,
-        refresh: false,
-      });
-    } catch (cause) {
-      this.logger.warn(
-        `Could not sync offer ${offerId} to Elasticsearch. ${this.reasonOf(cause)}`,
+      await externalCall('elasticsearch', 'index_offer', () =>
+        this.client!.index({
+          index: OFFERS_INDEX,
+          id: String(offer.id),
+          document,
+          refresh: false,
+        }),
       );
+    } catch {
+      this.logger.warn(`Could not sync offer ${offerId} to Elasticsearch.`);
     }
   }
 
   private async createIndex(): Promise<void> {
-    await this.client!.indices.create({
-      index: OFFERS_INDEX,
-      settings: { number_of_replicas: 0 },
-      mappings: {
-        properties: {
-          id: { type: 'integer' },
-          status: { type: 'keyword' },
-          jobFamilyId: { type: 'integer' },
-          skills: { type: 'keyword' },
-          contractType: { type: 'keyword' },
-          minExperienceLevel: { type: 'keyword' },
-          remotePolicy: { type: 'keyword' },
-          salaryMin: { type: 'integer' },
-          salaryMax: { type: 'integer' },
-          location: { type: 'geo_point' },
-          createdAt: { type: 'date' },
+    await externalCall('elasticsearch', 'create_index', () =>
+      this.client!.indices.create({
+        index: OFFERS_INDEX,
+        settings: { number_of_replicas: 0 },
+        mappings: {
+          properties: {
+            id: { type: 'integer' },
+            status: { type: 'keyword' },
+            jobFamilyId: { type: 'integer' },
+            skills: { type: 'keyword' },
+            contractType: { type: 'keyword' },
+            minExperienceLevel: { type: 'keyword' },
+            remotePolicy: { type: 'keyword' },
+            salaryMin: { type: 'integer' },
+            salaryMax: { type: 'integer' },
+            location: { type: 'geo_point' },
+            createdAt: { type: 'date' },
+          },
         },
-      },
-    });
+      }),
+    );
   }
   private async reindexAll(): Promise<void> {
     let afterId: number | undefined;
@@ -246,9 +261,5 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
       afterId = offers.at(-1)?.id;
       if (offers.length < REINDEX_BATCH_SIZE) return;
     } while (afterId !== undefined);
-  }
-
-  private reasonOf(cause: unknown): string {
-    return cause instanceof Error ? cause.message : String(cause);
   }
 }

@@ -1,6 +1,6 @@
 import path from 'path';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
-import { defineConfig } from 'vite';
+import { createLogger, defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
@@ -19,8 +19,25 @@ import tailwindcss from '@tailwindcss/vite';
  */
 const DEV_PORT = Number(process.env.VITE_DEV_PORT ?? 8080);
 
+// Explicit severity prefixes let Alloy label Vite's otherwise plain text logs.
+const containerLogger = createLogger();
+for (const level of ['info', 'warn', 'warnOnce', 'error'] as const) {
+  const write = containerLogger[level].bind(containerLogger);
+  containerLogger[level] = (message, options) => {
+    const severity = level === 'warnOnce' ? 'WARN' : level.toUpperCase();
+    write(
+      message
+        .split('\n')
+        .map((line) => `[${severity}] ${line}`)
+        .join('\n'),
+      options,
+    );
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  customLogger: process.env.CONTAINER_LOGS === 'true' ? containerLogger : undefined,
   plugins: [
     react(),
     tailwindcss(),
