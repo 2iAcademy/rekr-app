@@ -29,9 +29,18 @@ describe('PrivacyPolicyPage', () => {
     expect(screen.getByText(/CNIL/)).toBeInTheDocument();
   });
 
+  it('nomme chaque sous-traitant qui reçoit des données', () => {
+    render(<PrivacyPolicyPage />);
+    const item = screen.getByText(/Sous-traitants techniques/);
+
+    expect(item).toHaveTextContent(/Sentry/);
+    expect(item).toHaveTextContent(/Stream/);
+    expect(item).toHaveTextContent(/Brevo/);
+  });
+
   it('affiche la version du texte, celle que l’inscription enregistre', () => {
     render(<PrivacyPolicyPage />);
 
-    expect(screen.getByText(/Version du 7 octobre 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Version du 11 octobre 2026/)).toBeInTheDocument();
   });
 });
