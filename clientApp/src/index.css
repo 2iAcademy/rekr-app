@@ -238,3 +238,20 @@
     scrollbar-width: thin;
   }
 }
+
+/* Once for the whole app, like the cursor rule above: with « reduce motion » on,
+   every transition and animation ends at once, Sonner and Base UI included.
+   Shortened rather than removed, so a listener waiting on `animationend` or
+   `transitionend` still hears it. Outside the layers so it beats a utility. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}

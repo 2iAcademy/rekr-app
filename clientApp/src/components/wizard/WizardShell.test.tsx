@@ -90,4 +90,35 @@ describe('WizardShell', () => {
 
     expect(screen.getByRole('button', { name: 'Enregistrement…' })).toBeDisabled();
   });
+
+  // The page has just loaded: taking the focus would skip the skip link and
+  // the way back for a user who has not moved yet.
+  it('laisse le focus en place au premier affichage', () => {
+    renderShell();
+
+    expect(screen.getByRole('heading', { name: 'Ma société' })).not.toHaveFocus();
+  });
+
+  it('place le focus sur le titre de la nouvelle étape, en avant comme en arrière', () => {
+    const { rerender } = renderShell();
+    const shellAt = (current: number, title: string) => (
+      <WizardShell
+        title={title}
+        current={current}
+        total={5}
+        submitLabel="Continuer"
+        submittingLabel="Publication…"
+        onBack={vi.fn()}
+        onSubmit={vi.fn()}
+      >
+        <p>Contenu de l’étape</p>
+      </WizardShell>
+    );
+
+    rerender(shellAt(3, 'Culture'));
+    expect(screen.getByRole('heading', { name: 'Culture' })).toHaveFocus();
+
+    rerender(shellAt(2, 'Ma société'));
+    expect(screen.getByRole('heading', { name: 'Ma société' })).toHaveFocus();
+  });
 });

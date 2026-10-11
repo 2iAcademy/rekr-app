@@ -572,3 +572,46 @@ describe('pages légales', () => {
     });
   });
 });
+
+// The skip link sits above every layout, so each kind of screen is visited: the
+// public ones, a legal text, and the shell with its navigation.
+describe('lien d’évitement', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+  });
+
+  const skipToContent = async () => {
+    const user = userEvent.setup();
+    await user.tab();
+
+    const skipLink = screen.getByRole('link', { name: 'Aller au contenu' });
+    expect(skipLink).toHaveFocus();
+    expect(skipLink).toHaveAttribute('href', '#contenu');
+
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('main')).toHaveFocus();
+  };
+
+  it.each(['/', '/inscription', '/connexion', '/mentions-legales'])(
+    'ouvre la tabulation de %s et mène au contenu principal',
+    async (path) => {
+      renderAt(path);
+      await screen.findByRole('main');
+
+      await skipToContent();
+    },
+  );
+
+  it('passe avant la navigation du shell', async () => {
+    authenticateAs('candidate');
+    renderAt('/matches');
+    await screen.findAllByRole('navigation');
+
+    await skipToContent();
+  });
+});

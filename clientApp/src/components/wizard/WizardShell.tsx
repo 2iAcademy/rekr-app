@@ -1,8 +1,9 @@
-import type { FormEvent, ReactNode } from 'react';
+import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WIZARD_ERROR_ID } from './wizardError';
 import { WizardProgress } from './WizardProgress';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 interface WizardShellProps {
   title: string;
@@ -30,6 +31,21 @@ export function WizardShell({
   children,
 }: WizardShellProps) {
   const canGoBack = current > 1;
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const shownStep = useRef(current);
+
+  /**
+   * The button that moved the wizard on stays where it was, so without this a
+   * keyboard or screen reader user is left at the bottom of a step they have not
+   * read. Not on the first render: the page has just loaded, and the browser
+   * already starts from the top.
+   */
+  useEffect(() => {
+    if (shownStep.current === current) return;
+
+    shownStep.current = current;
+    headingRef.current?.focus();
+  }, [current]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -37,7 +53,11 @@ export function WizardShell({
   };
 
   return (
-    <main className="flex min-h-dvh w-full flex-col bg-background">
+    <main
+      id={MAIN_CONTENT_ID}
+      tabIndex={-1}
+      className="flex min-h-dvh w-full flex-col bg-background outline-none"
+    >
       <header className="sticky top-0 z-10 border-b border-line bg-card">
         <div className="mx-auto flex min-h-16 w-full max-w-xl items-center gap-3 px-4 py-2">
           {canGoBack && (
@@ -64,7 +84,13 @@ export function WizardShell({
           `bottom-0`. */}
       <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
         <div className="mx-auto w-full max-w-xl flex-1 px-4 pt-6 pb-8 md:pt-10">
-          <h1 className="text-2xl font-extrabold text-ink md:text-[1.75rem]">{title}</h1>
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="text-2xl font-extrabold text-ink outline-none md:text-[1.75rem]"
+          >
+            {title}
+          </h1>
 
           <div className="mt-5 flex flex-col gap-5 rounded-2xl border border-line bg-card p-5 shadow-card sm:p-6">
             {children}

@@ -2,10 +2,12 @@ import { Navigate, Outlet } from 'react-router';
 import { isRecruiter, userTypeLabel } from '@/domain/userType';
 import { useAuth } from '@/features/auth/useAuth';
 import { LogoutButton } from '@/features/profile/components/LogoutButton';
+import { cn } from '@/lib/utils';
 import { AppHeader } from './AppHeader';
 import { AppShellSkeleton } from './AppShellSkeleton';
 import { BottomTabBar } from './BottomTabBar';
 import { navigationItems, type ShellUser } from './navigation';
+import { MAIN_CONTENT_ID } from './mainContent';
 
 const PROFILE_TO = '/profil';
 
@@ -59,7 +61,14 @@ export function AppShell() {
           logoutIcon={<LogoutButton appearance="icon" className="hidden md:flex" />}
         />
 
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4 pb-[calc(var(--tabbar-h)+2rem)] sm:px-6 sm:pt-6 md:px-10 md:pt-10">
+        <main
+          id={MAIN_CONTENT_ID}
+          tabIndex={-1}
+          className={cn(
+            'mx-auto w-full max-w-6xl flex-1 px-4 pt-4 pb-[calc(var(--tabbar-h)+2rem)] outline-none',
+            'sm:px-6 sm:pt-6 md:px-10 md:pt-10',
+          )}
+        >
           <Outlet />
         </main>
       </div>

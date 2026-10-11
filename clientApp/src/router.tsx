@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
+import { RootLayout } from '@/components/layout/RootLayout';
 import { AnonymousOnly } from '@/features/auth/AnonymousOnly';
 import { HomeRedirect } from '@/features/auth/HomeRedirect';
 import { RouteGuard } from '@/features/auth/RouteGuard';
@@ -23,49 +24,55 @@ import { RecruiterOnboardingRoute } from '@/features/recruiter-onboarding/routes
 
 export const routes = [
   {
-    element: <AnonymousOnly />,
+    // Above every layout: the skip link has to be the first thing Tab reaches.
+    element: <RootLayout />,
     children: [
-      { path: '/', element: <SplashRoute /> },
-      { path: '/inscription', element: <SignupRoute /> },
-      { path: '/connexion', element: <SigninRoute /> },
-      { path: '/mot-de-passe-oublie', element: <ForgotPasswordRoute /> },
-      { path: '/reinitialiser-mot-de-passe', element: <ResetPasswordRoute /> },
-    ],
-  },
-
-  // Under neither guard: read before an account exists, and reread after.
-  { path: '/confidentialite', element: <PrivacyPolicyRoute /> },
-  { path: '/mentions-legales', element: <LegalNoticeRoute /> },
-
-  { path: '/candidat/onboarding', element: <CandidateOnboardingRoute /> },
-  { path: '/recruteur/onboarding', element: <RecruiterOnboardingRoute /> },
-  {
-    element: <RouteGuard profile="complete" />,
-    children: [
-      { path: '/offres/:id', element: <OfferDetailRoute /> },
-      { path: '/match', element: <MatchRoute /> },
-      // Full screen, outside the shell: the thread and its composer need the
-      // whole height, the bottom navigation would sit on the composer.
-      { path: '/matches/:matchId/conversation', element: <ConversationRoute /> },
       {
-        element: <AppShell />,
+        element: <AnonymousOnly />,
         children: [
-          { path: '/matches', element: <MatchesRoute /> },
-          { path: '/recruteur/offres', element: <RecruiterOffersRoute /> },
-          // Declared before the dynamic sibling, which is where a reader looks
-          // for the answer; react-router ranks by specificity, so the order is a
-          // convention here rather than the thing that keeps them apart.
-          { path: '/recruteur/offres/nouvelle', element: <OfferFormRoute /> },
-          { path: '/recruteur/offres/:id/edition', element: <OfferFormRoute /> },
-          { path: '/recruteur/offres/:id/candidats', element: <OfferApplicantsRoute /> },
-          { path: '/candidat/offres', element: <CandidateFeedRoute /> },
-          { path: '/profil', element: <ProfileRoute /> },
+          { path: '/', element: <SplashRoute /> },
+          { path: '/inscription', element: <SignupRoute /> },
+          { path: '/connexion', element: <SigninRoute /> },
+          { path: '/mot-de-passe-oublie', element: <ForgotPasswordRoute /> },
+          { path: '/reinitialiser-mot-de-passe', element: <ResetPasswordRoute /> },
         ],
       },
+
+      // Under neither guard: read before an account exists, and reread after.
+      { path: '/confidentialite', element: <PrivacyPolicyRoute /> },
+      { path: '/mentions-legales', element: <LegalNoticeRoute /> },
+
+      { path: '/candidat/onboarding', element: <CandidateOnboardingRoute /> },
+      { path: '/recruteur/onboarding', element: <RecruiterOnboardingRoute /> },
+      {
+        element: <RouteGuard profile="complete" />,
+        children: [
+          { path: '/offres/:id', element: <OfferDetailRoute /> },
+          { path: '/match', element: <MatchRoute /> },
+          // Full screen, outside the shell: the thread and its composer need the
+          // whole height, the bottom navigation would sit on the composer.
+          { path: '/matches/:matchId/conversation', element: <ConversationRoute /> },
+          {
+            element: <AppShell />,
+            children: [
+              { path: '/matches', element: <MatchesRoute /> },
+              { path: '/recruteur/offres', element: <RecruiterOffersRoute /> },
+              // Declared before the dynamic sibling, which is where a reader looks
+              // for the answer; react-router ranks by specificity, so the order is a
+              // convention here rather than the thing that keeps them apart.
+              { path: '/recruteur/offres/nouvelle', element: <OfferFormRoute /> },
+              { path: '/recruteur/offres/:id/edition', element: <OfferFormRoute /> },
+              { path: '/recruteur/offres/:id/candidats', element: <OfferApplicantsRoute /> },
+              { path: '/candidat/offres', element: <CandidateFeedRoute /> },
+              { path: '/profil', element: <ProfileRoute /> },
+            ],
+          },
+        ],
+      },
+
+      { path: '*', element: <HomeRedirect /> },
     ],
   },
-
-  { path: '*', element: <HomeRedirect /> },
 ];
 
 export const router = createBrowserRouter(routes);

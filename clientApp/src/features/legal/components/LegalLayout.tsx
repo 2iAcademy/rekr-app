@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 interface LegalLayoutProps {
   title: string;
@@ -15,7 +16,11 @@ interface LegalLayoutProps {
  */
 export function LegalLayout({ title, version, onBack, children }: LegalLayoutProps) {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col bg-background px-6 pt-4 pb-12">
+    <main
+      id={MAIN_CONTENT_ID}
+      tabIndex={-1}
+      className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col bg-background px-6 pt-4 pb-12 outline-none"
+    >
       <header className="relative flex h-9 items-center justify-center">
         {onBack && (
           <button
