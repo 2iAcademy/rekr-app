@@ -69,8 +69,8 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
             Sous-traitants techniques : l’hébergeur de l’application, Sentry pour le suivi des
             erreurs, Stream (getstream.io) qui héberge la messagerie, c’est-à-dire les messages et
             le nom affiché de chaque participant, et Brevo, qui envoie les e-mails de
-            réinitialisation du mot de passe et reçoit pour cela votre adresse e-mail. Aucune
-            donnée n’est vendue ni cédée.
+            réinitialisation du mot de passe et reçoit pour cela votre adresse e-mail. Aucune donnée
+            n’est vendue ni cédée.
           </li>
         </ul>
       </LegalSection>
