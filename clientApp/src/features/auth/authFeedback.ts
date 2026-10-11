@@ -1,6 +1,6 @@
 import type { BusinessMessages } from '@/lib/feedback/failureMessage';
 
-export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MIN_LENGTH = 12;
 
 export const SIGNUP_SUCCESS = 'Compte créé. Bienvenue sur Rekr !';
 export const LOGIN_SUCCESS = 'Vous êtes connecté.';

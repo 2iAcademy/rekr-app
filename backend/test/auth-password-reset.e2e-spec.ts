@@ -243,10 +243,11 @@ describe('Auth password reset (e2e)', () => {
   });
 
   it.each([
-    ['aaaaaaaa', WEAK_PASSWORD_MESSAGES.distinct],
+    ['aaaaaaaaaaaa', WEAK_PASSWORD_MESSAGES.distinct],
+    ['Sup3rSecret', 'password must be longer than or equal to 12 characters'],
     ['Motdepasse1!', WEAK_PASSWORD_MESSAGES.common],
-    ['12345678!', WEAK_PASSWORD_MESSAGES.walk],
-    ['P@ssw0rd', WEAK_PASSWORD_MESSAGES.common],
+    ['1234567890!!', WEAK_PASSWORD_MESSAGES.walk],
+    ['P@ssw0rd2024', WEAK_PASSWORD_MESSAGES.common],
     ['candidate@test.dev', WEAK_PASSWORD_MESSAGES.email],
     ['CANDIDATE@TEST.DEV', WEAK_PASSWORD_MESSAGES.email],
   ])(
