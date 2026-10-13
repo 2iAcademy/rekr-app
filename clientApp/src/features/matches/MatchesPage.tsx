@@ -62,6 +62,12 @@ interface ListRow {
    * two like tabs exclude the pairs that have one.
    */
   matchId?: number;
+  /**
+   * Who and which offer the match is about, for the controls that end it. The
+   * same counterpart can match on several offers, and a screen reader listing
+   * the buttons would otherwise read the same name once per offer.
+   */
+  matchSubject?: string;
 }
 
 const initial = (name: string) => name.trim().charAt(0).toUpperCase();
@@ -89,6 +95,7 @@ function matchRow(match: MatchListItemDto): ListRow {
     avatarUrl: fileUrl(match.counterpart.avatarUrl),
     isNew: age >= 0 && age < DAY_IN_MS,
     matchId: match.id,
+    matchSubject: `${match.counterpart.name}, offre ${match.offer.title}`,
   };
 }
 
@@ -407,15 +414,15 @@ function useUnmatch(matchId: number | undefined, name: string, onEnded: () => vo
  * key for a two-word question. In the row, the confirmation stays next to the
  * name it is about and the focus never leaves the list.
  */
-function UnmatchTrigger({ name, unmatch }: { name: string; unmatch: Unmatch }) {
+function UnmatchTrigger({ subject, unmatch }: { subject: string; unmatch: Unmatch }) {
   const isOpen = unmatch.state !== 'idle';
 
   return (
     <button
       type="button"
       // The control is the same on every row, so its name carries the
-      // counterpart: it is the only thing telling two rows apart.
-      aria-label={`Mettre fin au match avec ${name}`}
+      // counterpart and the offer: together they tell two rows apart.
+      aria-label={`Mettre fin au match avec ${subject}`}
       aria-expanded={isOpen}
       title="Mettre fin au match"
       disabled={unmatch.state === 'pending'}
@@ -432,7 +439,15 @@ function UnmatchTrigger({ name, unmatch }: { name: string; unmatch: Unmatch }) {
   );
 }
 
-function UnmatchConfirmation({ name, unmatch }: { name: string; unmatch: Unmatch }) {
+function UnmatchConfirmation({
+  name,
+  subject,
+  unmatch,
+}: {
+  name: string;
+  subject: string;
+  unmatch: Unmatch;
+}) {
   const isPending = unmatch.state === 'pending';
 
   return (
@@ -455,7 +470,7 @@ function UnmatchConfirmation({ name, unmatch }: { name: string; unmatch: Unmatch
         variant="destructive"
         size="lg"
         className="h-11 rounded-xl px-4"
-        aria-label={isPending ? undefined : `Confirmer la fin du match avec ${name}`}
+        aria-label={isPending ? undefined : `Confirmer la fin du match avec ${subject}`}
         disabled={isPending}
         onClick={() => void unmatch.confirm()}
       >
@@ -539,10 +554,12 @@ function Row({
             {body}
           </Link>
         )}
-        {row.matchId !== undefined && <UnmatchTrigger name={row.name} unmatch={unmatch} />}
+        {row.matchSubject !== undefined && (
+          <UnmatchTrigger subject={row.matchSubject} unmatch={unmatch} />
+        )}
       </div>
-      {row.matchId !== undefined && unmatch.state !== 'idle' && (
-        <UnmatchConfirmation name={row.name} unmatch={unmatch} />
+      {row.matchSubject !== undefined && unmatch.state !== 'idle' && (
+        <UnmatchConfirmation name={row.name} subject={row.matchSubject} unmatch={unmatch} />
       )}
     </li>
   );

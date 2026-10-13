@@ -651,18 +651,20 @@ describe('MatchesPage', () => {
    * trop ne défasse rien.
    */
   describe('fin du match', () => {
-    const endMatchButton = (name: string) =>
-      screen.getByRole('button', { name: `Mettre fin au match avec ${name}` });
+    const endMatchButton = (name: string, offer: string) =>
+      screen.getByRole('button', { name: `Mettre fin au match avec ${name}, offre ${offer}` });
 
-    const confirmButton = (name: string) =>
-      screen.getByRole('button', { name: `Confirmer la fin du match avec ${name}` });
+    const confirmButton = (name: string, offer: string) =>
+      screen.getByRole('button', {
+        name: `Confirmer la fin du match avec ${name}, offre ${offer}`,
+      });
 
     it('propose de mettre fin au match sur une ligne de match côté candidat', async () => {
       renderPage();
 
       await screen.findByText('Acme Corp');
 
-      expect(endMatchButton('Acme Corp')).toBeInTheDocument();
+      expect(endMatchButton('Acme Corp', 'Développeur Full-Stack')).toBeInTheDocument();
     });
 
     it('propose de mettre fin au match sur une ligne de match côté recruteur', async () => {
@@ -672,7 +674,25 @@ describe('MatchesPage', () => {
 
       await screen.findByText('Camille Durand');
 
-      expect(endMatchButton('Camille Durand')).toBeInTheDocument();
+      expect(endMatchButton('Camille Durand', 'Développeur Back-End')).toBeInTheDocument();
+    });
+
+    // Une même personne peut matcher sur plusieurs offres : sans l'offre dans
+    // le nom, un lecteur d'écran lirait deux fois le même bouton.
+    it('distingue les boutons de deux matchs avec la même personne', async () => {
+      authenticateAs('recruiter');
+      getMatches.mockResolvedValue(
+        matches([
+          aRecruiterMatch,
+          { ...aRecruiterMatch, id: 22, offer: { id: 42, title: 'Développeur Front-End' } },
+        ]),
+      );
+      renderPage();
+
+      await screen.findAllByText('Camille Durand');
+
+      expect(endMatchButton('Camille Durand', 'Développeur Back-End')).toBeInTheDocument();
+      expect(endMatchButton('Camille Durand', 'Développeur Front-End')).toBeInTheDocument();
     });
 
     // Un like sans match n'a pas de match à défaire : l'action n'a rien à y faire.
@@ -702,10 +722,10 @@ describe('MatchesPage', () => {
       renderPage();
 
       await screen.findByText('Acme Corp');
-      await user.click(endMatchButton('Acme Corp'));
+      await user.click(endMatchButton('Acme Corp', 'Développeur Full-Stack'));
 
       expect(unmatch).not.toHaveBeenCalled();
-      expect(confirmButton('Acme Corp')).toBeInTheDocument();
+      expect(confirmButton('Acme Corp', 'Développeur Full-Stack')).toBeInTheDocument();
     });
 
     it('n’appelle rien quand la confirmation est annulée', async () => {
@@ -713,11 +733,11 @@ describe('MatchesPage', () => {
       renderPage();
 
       await screen.findByText('Acme Corp');
-      await user.click(endMatchButton('Acme Corp'));
+      await user.click(endMatchButton('Acme Corp', 'Développeur Full-Stack'));
       await user.click(screen.getByRole('button', { name: 'Annuler' }));
 
       expect(unmatch).not.toHaveBeenCalled();
-      expect(endMatchButton('Acme Corp')).toBeInTheDocument();
+      expect(endMatchButton('Acme Corp', 'Développeur Full-Stack')).toBeInTheDocument();
       expect(screen.getByText('Acme Corp')).toBeInTheDocument();
     });
 
@@ -726,8 +746,8 @@ describe('MatchesPage', () => {
       renderPage();
 
       await screen.findByText('Acme Corp');
-      await user.click(endMatchButton('Acme Corp'));
-      await user.click(confirmButton('Acme Corp'));
+      await user.click(endMatchButton('Acme Corp', 'Développeur Full-Stack'));
+      await user.click(confirmButton('Acme Corp', 'Développeur Full-Stack'));
 
       await waitFor(() => expect(unmatch).toHaveBeenCalledExactlyOnceWith(12));
       await waitFor(() => expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument());
@@ -746,8 +766,8 @@ describe('MatchesPage', () => {
       renderPage();
 
       await screen.findByText('Acme Corp');
-      await user.click(endMatchButton('Acme Corp'));
-      await user.click(confirmButton('Acme Corp'));
+      await user.click(endMatchButton('Acme Corp', 'Développeur Full-Stack'));
+      await user.click(confirmButton('Acme Corp', 'Développeur Full-Stack'));
 
       await waitFor(() => expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument());
       expect(screen.getByText('Aucun match pour le moment')).toBeInTheDocument();
@@ -759,19 +779,19 @@ describe('MatchesPage', () => {
       renderPage();
 
       await screen.findByText('Acme Corp');
-      await user.click(endMatchButton('Acme Corp'));
-      await user.click(confirmButton('Acme Corp'));
+      await user.click(endMatchButton('Acme Corp', 'Développeur Full-Stack'));
+      await user.click(confirmButton('Acme Corp', 'Développeur Full-Stack'));
 
       expect(
         await screen.findByText('Une erreur est survenue. Réessayez dans un instant.'),
       ).toBeVisible();
       expect(screen.getByText('Acme Corp')).toBeInTheDocument();
 
-      const retry = endMatchButton('Acme Corp');
+      const retry = endMatchButton('Acme Corp', 'Développeur Full-Stack');
       expect(retry).toBeEnabled();
 
       await user.click(retry);
-      await user.click(confirmButton('Acme Corp'));
+      await user.click(confirmButton('Acme Corp', 'Développeur Full-Stack'));
 
       await waitFor(() => expect(unmatch).toHaveBeenCalledTimes(2));
       await waitFor(() => expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument());
@@ -792,8 +812,8 @@ describe('MatchesPage', () => {
       renderPage();
 
       await screen.findByText('Acme Corp');
-      await user.click(endMatchButton('Acme Corp'));
-      await user.click(confirmButton('Acme Corp'));
+      await user.click(endMatchButton('Acme Corp', 'Développeur Full-Stack'));
+      await user.click(confirmButton('Acme Corp', 'Développeur Full-Stack'));
 
       const pending = await screen.findByRole('button', { name: 'Suppression…' });
       expect(pending).toBeDisabled();
@@ -822,8 +842,8 @@ describe('MatchesPage', () => {
       renderPage();
 
       await screen.findByText('Acme Corp');
-      await user.click(endMatchButton('Orbit'));
-      await user.click(confirmButton('Orbit'));
+      await user.click(endMatchButton('Orbit', 'Développeur Full-Stack'));
+      await user.click(confirmButton('Orbit', 'Développeur Full-Stack'));
 
       await waitFor(() => expect(unmatch).toHaveBeenCalledExactlyOnceWith(13));
       await waitFor(() => expect(screen.queryByText('Orbit')).not.toBeInTheDocument());

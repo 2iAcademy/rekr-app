@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
@@ -9,6 +9,7 @@ import {
   type LikeResultDto,
   type OfferFeedItemDto,
 } from '@/api/generated';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 import { anOffer, anotherOffer } from '../fixtures';
 import { CandidateFeedPage } from './CandidateFeedPage';
 
@@ -304,6 +305,24 @@ describe('CandidateFeedPage', () => {
 
     await user.keyboard('{ArrowLeft}');
     expect(heading('Vous avez tout vu')).toBeVisible();
+  });
+
+  // Le lien d'évitement rend `main` focusable : un clic dans le vide y pose le
+  // focus, et les flèches doivent continuer à décider.
+  it('décide encore au clavier quand le focus est sur le contenu principal', async () => {
+    const user = userEvent.setup();
+    const main = document.createElement('main');
+    main.id = MAIN_CONTENT_ID;
+    main.tabIndex = -1;
+    document.body.append(main);
+    onTestFinished(() => main.remove());
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Développeur Frontend React' });
+    main.focus();
+    await user.keyboard('{ArrowLeft}');
+
+    expect(heading('Data Analyst')).toBeVisible();
   });
 
   it('propose de réessayer quand le chargement échoue', async () => {
