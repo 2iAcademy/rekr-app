@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { Building2, Search, type LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { Button } from '@/components/ui/button';
@@ -83,7 +84,15 @@ export function SplashPage({ onCreateAccount, onSignIn, weeklyMatches = 0 }: Spl
           </Button>
 
           <p className="mt-2 text-center text-xs leading-snug text-ink-muted">
-            En continuant, vous acceptez les CGU et la politique de confidentialité.
+            En continuant, vous acceptez les{' '}
+            <Link to="/mentions-legales" className="underline underline-offset-2">
+              CGU
+            </Link>{' '}
+            et la{' '}
+            <Link to="/confidentialite" className="underline underline-offset-2">
+              politique de confidentialité
+            </Link>
+            .
           </p>
         </div>
       </div>

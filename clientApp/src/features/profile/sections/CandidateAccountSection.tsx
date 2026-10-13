@@ -331,6 +331,7 @@ export function CandidateAccountSection() {
             </div>
 
             <CityField
+              autoComplete="address-level2"
               label="Ville"
               selected={
                 form.city && form.postalCode

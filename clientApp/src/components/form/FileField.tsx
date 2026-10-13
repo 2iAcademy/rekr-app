@@ -12,7 +12,7 @@ import {
 // Text actions under the file name: two outlined buttons next to a thumbnail
 // left no room for the name itself on a phone.
 const FILE_ACTION =
-  '-my-1 inline-flex min-h-11 items-center rounded-md text-sm font-semibold text-brand-strong underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50';
+  '-my-1 inline-flex min-h-11 items-center rounded-md text-sm font-semibold text-brand-strong underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-brand/70 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50';
 
 interface FileFieldProps {
   label: string;
@@ -94,7 +94,10 @@ export function FileField({
   // layout: the « Aucun fichier choisi » text the browser appends next to it
   // cannot be styled, and it repeated the state line just above. A real button
   // opens the picker instead, in the same visual language as the rest of the
-  // form.
+  // form. That button is the field's only Tab stop: the hidden input would be a
+  // second one, with no visible focus (RGAA 10.7). So the button carries the
+  // field's name and help, and two « Choisir un fichier » on the same screen no
+  // longer sound alike (RGAA 11.9).
   const inputRef = useRef<HTMLInputElement>(null);
 
   const described = [hintId, rejection === null ? null : errorId, describedBy]
@@ -136,7 +139,14 @@ export function FileField({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">{presentLabel}</p>
               <div className="flex gap-4">
-                <button type="button" disabled={busy} onClick={openPicker} className={FILE_ACTION}>
+                <button
+                  type="button"
+                  aria-label={`Remplacer ${label}`}
+                  aria-describedby={described}
+                  disabled={busy}
+                  onClick={openPicker}
+                  className={FILE_ACTION}
+                >
                   Remplacer
                 </button>
 
@@ -172,6 +182,8 @@ export function FileField({
           <Button
             type="button"
             variant="outline"
+            aria-label={`Choisir un fichier : ${label}`}
+            aria-describedby={described}
             disabled={busy}
             onClick={openPicker}
             className="mt-1 h-11 rounded-xl px-4"
@@ -185,6 +197,7 @@ export function FileField({
         ref={inputRef}
         id={fieldId}
         type="file"
+        tabIndex={-1}
         accept={acceptAttribute(constraint)}
         disabled={busy}
         aria-required={required}

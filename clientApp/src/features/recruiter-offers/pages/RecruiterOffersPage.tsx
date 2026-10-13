@@ -119,7 +119,7 @@ export function RecruiterOffersPage() {
               aria-pressed={active}
               onClick={() => setStatusFilter(filter.value)}
               className={cn(
-                'h-10 shrink-0 rounded-lg px-3.5 text-sm font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-brand/30',
+                'h-10 shrink-0 rounded-lg px-3.5 text-sm font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-brand/70',
                 active ? 'bg-card text-ink shadow-card' : 'text-ink-muted hover:text-ink',
               )}
             >

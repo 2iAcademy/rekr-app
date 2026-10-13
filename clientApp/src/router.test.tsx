@@ -4,6 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
+import { APP_NAME, pageTitle } from '@/components/layout/documentTitle';
 import { AnonymousOnly } from '@/features/auth/AnonymousOnly';
 import { USER_TYPES, type UserType } from '@/domain/userType';
 import { AuthProvider } from '@/features/auth/AuthProvider';
@@ -38,6 +39,7 @@ vi.mock('@/api/generated', () => ({
 interface RouteLike {
   path?: string;
   element?: ReactNode;
+  handle?: unknown;
   children?: RouteLike[];
 }
 
@@ -117,10 +119,13 @@ const renderAt = (path: string) => {
 
 // The chrome the shell paints, queried by role so it does not depend on the
 // labels the sidebar and the header own. None of it belongs on a login screen.
+// The site footer is not part of it: every screen carries it, the login too.
 const shellChrome = () => [
   ...screen.queryAllByRole('complementary'),
-  ...screen.queryAllByRole('navigation'),
-  ...screen.queryAllByRole('link', { name: 'Mon profil' }),
+  ...screen
+    .queryAllByRole('navigation')
+    .filter((nav) => nav.getAttribute('aria-label') !== 'Liens du site'),
+  ...screen.queryAllByRole('link', { name: /^Mon profil/ }),
 ];
 
 describe('table de routage', () => {
@@ -161,6 +166,16 @@ describe('table de routage', () => {
 
   it('déclare une seule route attrape-tout', () => {
     expect(declaredPaths(entries).filter((path) => path === '*')).toHaveLength(1);
+  });
+
+  it('donne un titre à chaque écran déclaré, et un titre différent à chacun', () => {
+    const titled = flatten(entries).filter(
+      (route) => route.path !== undefined && route.path !== '*',
+    );
+    const titles = titled.map((route) => pageTitle([route.handle]));
+
+    expect(titles.filter((title) => title === APP_NAME)).toEqual([]);
+    expect(new Set(titles).size).toBe(titles.length);
   });
 
   /**

@@ -152,5 +152,18 @@ describe('AccountDataSection', () => {
       expect(screen.queryByLabelText('Mot de passe')).not.toBeInTheDocument();
       expect(deleteRequest).not.toHaveBeenCalled();
     });
+
+    // RGAA 12.8 : le bouton activé disparaît ; sans ce report, le focus tombait sur `body`.
+    it('place le focus sur le mot de passe à l’ouverture, puis sur le bouton à l’annulation', async () => {
+      const user = userEvent.setup();
+      renderSection();
+
+      expect(screen.getByRole('button', { name: 'Supprimer mon compte' })).not.toHaveFocus();
+      await user.click(screen.getByRole('button', { name: 'Supprimer mon compte' }));
+      expect(screen.getByLabelText('Mot de passe')).toHaveFocus();
+
+      await user.click(screen.getByRole('button', { name: 'Annuler' }));
+      expect(screen.getByRole('button', { name: 'Supprimer mon compte' })).toHaveFocus();
+    });
   });
 });
