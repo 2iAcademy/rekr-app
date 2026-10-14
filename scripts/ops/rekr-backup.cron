@@ -1,0 +1,5 @@
+# /etc/cron.d/rekr-backup — nightly backup of the production data (scripts/ops/rekr-backup).
+# Installed by an administrator, owned by root, mode 644.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+15 3 * * * root /usr/local/bin/rekr-backup >> /var/log/rekr-backup.log 2>&1

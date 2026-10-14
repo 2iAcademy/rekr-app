@@ -32,7 +32,12 @@ EXPOSE 3001
 CMD ["npm", "run", "start:dev"]
 
 FROM base AS prod-deps
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+# --omit=dev alone keeps the Prisma CLI, Prisma Studio and TypeScript: they are
+# optional peers of @prisma/client, which npm marks devOptional and installs
+# unless optional dependencies are left out too. The server never runs them,
+# since the client is generated at build time and compiled into dist. The only
+# other optional dependency is pg-cloudflare, for Cloudflare Workers.
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --omit=optional
 
 FROM node:24-alpine AS runner
 WORKDIR /app

@@ -15,6 +15,7 @@ import { OfferApplicantsPage } from './OfferApplicantsPage';
 
 vi.mock('@/api/generated', () => ({
   offerControllerFindApplicants: vi.fn(),
+  offerControllerFindOneById: vi.fn().mockResolvedValue({ data: { id: 12, title: 'Dev' } }),
   offerControllerLikeApplicant: vi.fn(),
   offerControllerPassApplicant: vi.fn(),
 }));
@@ -114,6 +115,19 @@ describe('OfferApplicantsPage', () => {
 
     expect(await screen.findByText(/Cette offre est introuvable/)).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // Une offre publiée d'une autre société se lit, mais ses candidats non :
+  // son titre au-dessus de « introuvable » ferait se contredire l'écran.
+  it('ne rappelle pas le titre d’une offre introuvable', async () => {
+    findApplicants.mockRejectedValue(
+      new ApiError({ status: 404, statusText: '', url: '/api/offers/12/likes', data: {} }),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText(/Cette offre est introuvable/)).toBeInTheDocument();
+    expect(screen.queryByText('Dev')).not.toBeInTheDocument();
   });
 
   it('propose de réessayer après un échec de chargement', async () => {

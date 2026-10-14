@@ -84,7 +84,7 @@ export function FeedCard({
         type="button"
         aria-label={detailLabel}
         onClick={onViewDetails}
-        className="mt-4 inline-flex cursor-pointer items-center gap-1.5 self-start rounded-md text-sm font-bold text-brand-strong underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
+        className="mt-4 inline-flex items-center gap-1.5 self-start rounded-md text-sm font-bold text-brand-strong underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
       >
         {detailText}
         <ArrowRight aria-hidden="true" className="size-4" />

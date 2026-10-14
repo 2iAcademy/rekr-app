@@ -1,7 +1,17 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { toast } from 'sonner';
+import { setSessionHint } from '@/lib/sessionHint';
+
+/**
+ * Most suites decide who is logged in through the boot refresh they mock.
+ * That refresh only runs when the browser has a session hint, so every test
+ * starts with one; AuthProvider.test.tsx covers the hint-less first visit.
+ */
+beforeEach(() => {
+  setSessionHint();
+});
 
 /**
  * jsdom implements neither `execCommand` nor `contentEditable` editing, so the

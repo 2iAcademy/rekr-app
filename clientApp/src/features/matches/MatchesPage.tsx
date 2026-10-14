@@ -421,7 +421,7 @@ function UnmatchTrigger({ name, unmatch }: { name: string; unmatch: Unmatch }) {
       disabled={unmatch.state === 'pending'}
       onClick={isOpen ? unmatch.cancel : unmatch.ask}
       className={cn(
-        'mr-2 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl transition-colors focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none disabled:cursor-default disabled:opacity-50',
+        'mr-2 flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none disabled:cursor-default disabled:opacity-50',
         isOpen
           ? 'bg-destructive-tint text-destructive'
           : 'text-ink-faint hover:bg-destructive-tint hover:text-destructive',
@@ -642,7 +642,7 @@ export function MatchesPage() {
 
       <div
         role="tablist"
-        aria-label="Filtrer les matchs"
+        aria-label="Filtrer l’activité"
         className="mt-5 inline-flex rounded-xl bg-surface p-1"
       >
         {tabs.map((item) => {
@@ -655,7 +655,7 @@ export function MatchesPage() {
               aria-selected={isActive}
               onClick={() => open(item)}
               className={cn(
-                'h-10 cursor-pointer rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none',
+                'h-10 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none',
                 isActive ? 'bg-card text-ink shadow-card' : 'text-ink-muted hover:text-ink',
               )}
             >
@@ -701,7 +701,7 @@ export function MatchesPage() {
           <button
             type="button"
             onClick={list.loadMore}
-            className="cursor-pointer font-semibold text-brand-strong underline underline-offset-2 focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
+            className="font-semibold text-brand-strong underline underline-offset-2 focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
           >
             Réessayer
           </button>

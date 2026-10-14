@@ -3,6 +3,7 @@ import { ArrowLeft, Users } from 'lucide-react';
 import { notifyFailure } from '@/lib/feedback/notify';
 import { applicantLikeBusiness } from '../applicantFeedback';
 import { offerTitleFrom } from '../offerContext';
+import { useOfferTitle } from '../useOfferTitle';
 import { matchedCandidate, type MatchedProfile } from '@/features/matches/likeResult';
 import { ApplicantRow } from '../components/ApplicantRow';
 import { CandidateDetailPage } from './CandidateDetailPage';
@@ -35,7 +36,7 @@ export function OfferApplicantsPage({
 }: OfferApplicantsPageProps) {
   const { applicants, status, truncated, pendingId, reload, like, pass, decisionFor } =
     useApplicants(offerId);
-  const offerTitle = offerTitleFrom(useLocation().state);
+  const offerTitle = useOfferTitle(offerId, offerTitleFrom(useLocation().state));
 
   const answer = (candidateUserId: number): void => {
     void like(candidateUserId)
@@ -62,6 +63,7 @@ export function OfferApplicantsPage({
         candidate={open}
         decision={decisionFor(open.userId)}
         pending={pendingId === open.userId}
+        offerTitle={offerTitle}
         onBack={onCloseProfile}
         onLike={() => answer(open.userId)}
         onPass={() => passApplicant(open.userId)}
@@ -81,7 +83,9 @@ export function OfferApplicantsPage({
         </Link>
 
         <div className="flex flex-col gap-1">
-          {offerTitle !== null && (
+          {/* Not over « introuvable »: an open offer of another company has a
+              readable title, but its applicants are not this recruiter's. */}
+          {offerTitle !== null && status !== 'missing' && (
             <p className="text-sm font-semibold break-words text-ink-muted">{offerTitle}</p>
           )}
           <h1 className="text-2xl font-extrabold text-ink md:text-[1.75rem]">
@@ -109,7 +113,7 @@ export function OfferApplicantsPage({
           <button
             type="button"
             onClick={reload}
-            className="cursor-pointer font-semibold underline underline-offset-4"
+            className="font-semibold underline underline-offset-4"
           >
             Réessayer
           </button>

@@ -136,7 +136,7 @@ export function TagInput({
                 onClick={() => onChange(values.filter((kept) => kept !== value))}
                 // The hit area overflows the chip: the icon alone would be a
                 // 24px target.
-                className="relative flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-ink-muted transition-colors after:absolute after:-inset-2.5 hover:bg-line hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
+                className="relative flex size-6 shrink-0 items-center justify-center rounded-md text-ink-muted transition-colors after:absolute after:-inset-2.5 hover:bg-line hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
               >
                 <X aria-hidden="true" className="size-3.5" />
               </button>

@@ -157,7 +157,7 @@ function ConversationHeader({
         type="button"
         onClick={onBack}
         aria-label="Retour"
-        className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-muted"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted"
       >
         <ArrowLeft className="size-5" aria-hidden />
       </button>

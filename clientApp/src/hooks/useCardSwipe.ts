@@ -18,8 +18,9 @@ const INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, [contenteditab
 const GESTURE_EVENTS = ['pointermove', 'pointerup', 'pointercancel'] as const;
 
 interface CardSwipeOptions {
-  onSwipeRight: () => void;
-  onSwipeLeft: () => void;
+  /** Receives the distance travelled, so the card can leave from where it was let go. */
+  onSwipeRight: (distance: number) => void;
+  onSwipeLeft: (distance: number) => void;
   threshold?: number;
   disabled?: boolean;
 }
@@ -121,12 +122,12 @@ export function useCardSwipe({
       endGesture();
 
       if (distance > threshold) {
-        onSwipeRight();
+        onSwipeRight(distance);
         return;
       }
 
       if (distance < -threshold) {
-        onSwipeLeft();
+        onSwipeLeft(distance);
       }
     };
 

@@ -119,7 +119,7 @@ export function RecruiterOffersPage() {
               aria-pressed={active}
               onClick={() => setStatusFilter(filter.value)}
               className={cn(
-                'h-10 shrink-0 cursor-pointer rounded-lg px-3.5 text-sm font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-brand/30',
+                'h-10 shrink-0 rounded-lg px-3.5 text-sm font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-brand/30',
                 active ? 'bg-card text-ink shadow-card' : 'text-ink-muted hover:text-ink',
               )}
             >
@@ -145,7 +145,7 @@ export function RecruiterOffersPage() {
           <button
             type="button"
             onClick={reload}
-            className="cursor-pointer font-semibold underline underline-offset-4"
+            className="font-semibold underline underline-offset-4"
           >
             Réessayer
           </button>

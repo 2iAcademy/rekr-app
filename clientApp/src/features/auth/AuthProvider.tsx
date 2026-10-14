@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { authControllerLogin, authControllerLogout, authControllerSignup } from '@/api/generated';
 import { clearAccessToken, onSessionExpired, setAccessToken } from '@/api/tokenStore';
 import { clearAllDrafts } from '@/lib/draftStorage';
+import { clearSessionHint, hasSessionHint, setSessionHint } from '@/lib/sessionHint';
 import {
   AuthContext,
   type AuthContextValue,
@@ -15,17 +16,23 @@ interface SessionPayload {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>('loading');
+  // A browser that never logged in has no cookie to trade (sessionHint.ts):
+  // it starts anonymous instead of waiting on a refresh bound to fail.
+  const [status, setStatus] = useState<AuthStatus>(() =>
+    hasSessionHint() ? 'loading' : 'anonymous',
+  );
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
 
   const adopt = useCallback((session: SessionPayload) => {
     setAccessToken(session.accessToken);
+    setSessionHint();
     setUser(session.user);
     setStatus('authenticated');
   }, []);
 
   const abandon = useCallback(() => {
     clearAccessToken();
+    clearSessionHint();
     clearAllDrafts();
     setUser(null);
     setStatus('anonymous');
@@ -34,6 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Boot: the access token died with the previous page, the cookie did not.
   // Trading one for the other is what makes a reload invisible to the user.
   useEffect(() => {
+    if (!hasSessionHint()) {
+      return;
+    }
+
     let cancelled = false;
 
     void fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' })
@@ -43,7 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (!res.ok) {
-          abandon();
+          // Only a refused cookie ends the session: a 502 during a deploy
+          // must not cost the user their next reload.
+          if (res.status === 401 || res.status === 403) {
+            abandon();
+          } else {
+            setStatus('anonymous');
+          }
 
           return;
         }
@@ -52,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (!cancelled) {
-          abandon();
+          setStatus('anonymous');
         }
       });
 

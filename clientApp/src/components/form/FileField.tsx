@@ -12,7 +12,7 @@ import {
 // Text actions under the file name: two outlined buttons next to a thumbnail
 // left no room for the name itself on a phone.
 const FILE_ACTION =
-  '-my-1 inline-flex min-h-11 cursor-pointer items-center rounded-md text-sm font-semibold text-brand-strong underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50';
+  '-my-1 inline-flex min-h-11 items-center rounded-md text-sm font-semibold text-brand-strong underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50';
 
 interface FileFieldProps {
   label: string;

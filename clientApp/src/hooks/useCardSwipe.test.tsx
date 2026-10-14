@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { useCardSwipe } from './useCardSwipe';
 
 interface HostProps {
-  onSwipeRight: () => void;
-  onSwipeLeft: () => void;
+  onSwipeRight: (distance: number) => void;
+  onSwipeLeft: (distance: number) => void;
   onInnerClick: () => void;
   threshold?: number;
   disabled?: boolean;
@@ -112,6 +112,8 @@ describe('useCardSwipe', () => {
     pointerUp();
 
     expect(onSwipeRight).toHaveBeenCalledTimes(1);
+    // The distance travelled lets the card leave from where the finger let go.
+    expect(onSwipeRight).toHaveBeenCalledWith(121);
     expect(onSwipeLeft).not.toHaveBeenCalled();
     expect(offset()).toBe(0);
   });
@@ -124,6 +126,7 @@ describe('useCardSwipe', () => {
     pointerUp();
 
     expect(onSwipeLeft).toHaveBeenCalledTimes(1);
+    expect(onSwipeLeft).toHaveBeenCalledWith(-121);
     expect(onSwipeRight).not.toHaveBeenCalled();
     expect(offset()).toBe(0);
   });

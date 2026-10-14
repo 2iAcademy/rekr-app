@@ -28,6 +28,12 @@ www.{$DOMAIN} {
 		@assets path /assets/*
 		header @assets Cache-Control "public, max-age=31536000, immutable"
 
+		# Everything else (index.html, the service worker, the manifest) keeps
+		# its name across builds: the browser revalidates it on every visit and
+		# gets a 304 when nothing changed, instead of guessing a lifetime.
+		@unversioned not path /assets/*
+		header @unversioned Cache-Control "no-cache"
+
 		header {
 			Strict-Transport-Security "max-age=31536000"
 			X-Content-Type-Options "nosniff"

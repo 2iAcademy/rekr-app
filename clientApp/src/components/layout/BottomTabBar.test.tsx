@@ -43,7 +43,7 @@ describe('BottomTabBar', () => {
 
     expect(tabs()).toEqual([
       { label: 'Offres', href: '/candidat/offres', current: 'page' },
-      { label: 'Matchs', href: '/matches', current: null },
+      { label: 'Activité', href: '/matches', current: null },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });
@@ -53,7 +53,7 @@ describe('BottomTabBar', () => {
 
     expect(tabs()).toEqual([
       { label: 'Mes offres', href: '/recruteur/offres', current: null },
-      { label: 'Matchs', href: '/matches', current: null },
+      { label: 'Activité', href: '/matches', current: null },
       { label: 'Profil', href: '/profil', current: 'page' },
     ]);
   });
@@ -65,7 +65,7 @@ describe('BottomTabBar', () => {
 
     expect(tabs()).toEqual([
       { label: 'Mes offres', href: '/recruteur/offres', current: 'page' },
-      { label: 'Matchs', href: '/matches', current: null },
+      { label: 'Activité', href: '/matches', current: null },
       { label: 'Profil', href: '/profil', current: null },
     ]);
   });
@@ -74,11 +74,11 @@ describe('BottomTabBar', () => {
     const actor = userEvent.setup();
     const { router } = renderTabBar();
 
-    await actor.click(within(tabBar()).getByRole('link', { name: 'Matchs' }));
+    await actor.click(within(tabBar()).getByRole('link', { name: 'Activité' }));
 
     expect(router.state.location.pathname).toBe('/matches');
     expect(tabs().filter((tab) => tab.current === 'page')).toEqual([
-      { label: 'Matchs', href: '/matches', current: 'page' },
+      { label: 'Activité', href: '/matches', current: 'page' },
     ]);
   });
 

@@ -200,7 +200,7 @@ describe('AppShell', () => {
   it('ouvre les matchs au recruteur dans les deux chromes', () => {
     renderShell('recruiter');
 
-    const matchLinks = screen.getAllByRole('link', { name: 'Matchs' });
+    const matchLinks = screen.getAllByRole('link', { name: 'Activité' });
 
     expect(matchLinks).toHaveLength(2);
     for (const link of matchLinks) {

@@ -81,6 +81,34 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* An answered card leaves from where it was let go (`--leave-from`, `--leave-tilt`,
+   set by the feed) towards the side of the decision. Short, and never waited on:
+   the next card is already underneath. */
+@theme {
+  --animate-card-leave-right: card-leave-right 220ms ease-in forwards;
+  --animate-card-leave-left: card-leave-left 220ms ease-in forwards;
+
+  @keyframes card-leave-right {
+    from {
+      transform: translateX(var(--leave-from, 0px)) rotate(var(--leave-tilt, 0deg));
+    }
+    to {
+      transform: translateX(120%) rotate(12deg);
+      opacity: 0;
+    }
+  }
+
+  @keyframes card-leave-left {
+    from {
+      transform: translateX(var(--leave-from, 0px)) rotate(var(--leave-tilt, 0deg));
+    }
+    to {
+      transform: translateX(-120%) rotate(-12deg);
+      opacity: 0;
+    }
+  }
+}
+
 :root {
   /* One accent for the whole product, candidates and recruiters alike: ink
      violet. It marks the primary action, the active tab, a selected option,
@@ -188,6 +216,16 @@
   }
   a {
     text-underline-offset: 3px;
+  }
+  /* Once for the whole app: a class added component by component is forgotten
+     on the next one. In the base layer, so `cursor-not-allowed` or
+     `cursor-grabbing` still win where a component sets them. */
+  :is(button, [role='button'], [role='option'], [role='tab'], summary, select):not(
+    :disabled,
+    [aria-disabled='true']
+  ),
+  label:has(input:not(:disabled)) {
+    cursor: pointer;
   }
   /* Salaries, counts and dates line up when they stack. */
   data,

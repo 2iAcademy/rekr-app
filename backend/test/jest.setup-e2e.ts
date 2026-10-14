@@ -44,3 +44,8 @@ process.env.REFRESH_TOKEN_REPLAY_SECONDS =
 // The retention purge runs at boot and on a timer. Off for the suite, which
 // drives it explicitly: a purge firing mid-test would race `resetDb`.
 process.env.ACCOUNT_PURGE_INTERVAL_HOURS = '0';
+
+// Elasticsearch is off for the same reason as the uploads: at boot the backend
+// re-aligns the offers index on the database it is given, so an index shared
+// with the dev stack would lose every offer the test database does not hold.
+process.env.ELASTICSEARCH_ENABLED = 'false';

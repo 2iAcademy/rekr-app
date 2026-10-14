@@ -60,7 +60,7 @@ export function JobFamilyChips({
     return (
       <p role="alert" className="text-xs text-destructive">
         Impossible de charger les domaines.{' '}
-        <button type="button" onClick={reload} className="cursor-pointer underline">
+        <button type="button" onClick={reload} className="underline">
           Réessayer
         </button>
       </p>
@@ -117,7 +117,7 @@ export function JobFamilyChips({
                     : 'border-line bg-card text-ink',
                   // The cap dims what it forbids instead of hiding it: the
                   // candidate keeps seeing the trades they did not pick.
-                  !selected && full ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+                  !selected && full && 'cursor-not-allowed opacity-50',
                   !selected && !full && 'hover:border-ink-faint/40',
                 )}
               >

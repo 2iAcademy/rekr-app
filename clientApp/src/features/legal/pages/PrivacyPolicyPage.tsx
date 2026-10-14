@@ -111,7 +111,10 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
       <LegalSection title="Cookies">
         <p>
           Rekr ne dépose qu’un cookie, strictement nécessaire : celui qui maintient votre session
-          ouverte. Aucun cookie de mesure d’audience ni de publicité n’est utilisé.
+          ouverte. Votre navigateur garde aussi quelques données techniques, tout aussi nécessaires
+          : un indicateur de session ouverte, vos brouillons de formulaire en cours et une copie de
+          l’application pour qu’elle se charge plus vite. Aucun cookie de mesure d’audience ni de
+          publicité n’est utilisé.
         </p>
       </LegalSection>
     </LegalLayout>
