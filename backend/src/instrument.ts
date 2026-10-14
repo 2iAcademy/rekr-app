@@ -48,4 +48,7 @@ Sentry.init({
   enabled,
   environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
   tracesSampleRate: readTracesSampleRate(),
+  // Sentry Logs: the lines `SentryLogger` copies there, searchable next to the
+  // errors instead of only in the containers on the server.
+  enableLogs: true,
 });

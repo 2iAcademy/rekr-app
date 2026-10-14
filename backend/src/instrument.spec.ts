@@ -6,6 +6,7 @@ type InitOptions = {
   enabled?: boolean;
   environment?: string;
   tracesSampleRate?: number;
+  enableLogs?: boolean;
 };
 
 const init = jest.fn<void, [InitOptions]>();
@@ -58,6 +59,10 @@ describe('instrument', () => {
     process.env.SENTRY_DSN = '   ';
 
     expect(loadInstrument().enabled).toBe(false);
+  });
+
+  it('turns Sentry Logs on', () => {
+    expect(loadInstrument().enableLogs).toBe(true);
   });
 
   it('sends no traces unless a sample rate is configured', () => {

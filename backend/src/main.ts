@@ -1,11 +1,14 @@
 import './instrument';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { SentryLogger } from './common/logging/sentry-logger';
 import { configureApp } from './setup-app';
 import { mountSwaggerIfExposed } from './swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Buffered until the Sentry logger is in place, so the first lines reach it.
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(new SentryLogger());
   configureApp(app);
   mountSwaggerIfExposed(app);
 
