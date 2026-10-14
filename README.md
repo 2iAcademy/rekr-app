@@ -190,7 +190,7 @@ Line endings are normalised to LF through `.gitattributes`: ESLint tolerates CRL
 Two checks run against a live stack rather than inside a test runner:
 
 - `e2e/`: Playwright tests in Chromium. The `E2E navigateur` job runs them on every pull request, against the API started by `compose.yml` and the front built and served by `vite preview`. Locally, with the stack up: `cd e2e && npm ci && npx playwright install chromium && E2E_BASE_URL=http://localhost:8080 npx playwright test`. Each run creates its own accounts (`@rekr.test`).
-- `loadtest/`: a k6 scenario of the candidate path (feed, like or pass, likes and matches) with 50 concurrent users for 5 minutes, plus a login every 2 seconds. It runs on a throwaway stack with the production images and memory limits; see the header of `loadtest/compose.yml`. Never point it at production: it creates 300 offers and 50 accounts.
+- `loadtest/`: a k6 scenario of the candidate path (feed, like or pass, likes and matches) with 50 concurrent users for 5 minutes, plus a login every 2 seconds. It runs on a throwaway stack with the production images and memory limits; see the header of `loadtest/compose.yml`. Never point it at production: it creates 300 offers and 50 accounts. The `E2E navigateur` job also runs it for one minute with 10 candidates after the browser tests: the response times of each run are in its summary and in the `k6-summary` artifact.
 
 ## Code analysis — SonarQube Cloud
 

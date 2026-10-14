@@ -309,7 +309,8 @@ jobs:
   # The browser tests (e2e/): the real front, built as in production, against
   # the API and its databases started by compose.yml. They walk the central
   # path — a candidate likes an offer, the recruiter answers, the match appears
-  # on both sides — which no other test covers from end to end.
+  # on both sides — which no other test covers from end to end. A one-minute
+  # load test follows on the same stack.
   e2e-browser:
     name: E2E navigateur
     runs-on: ubuntu-latest
@@ -322,6 +323,12 @@ jobs:
 
       - name: Start the API
         run: docker compose up -d --build backend
+        # Raised for the load test below: k6 sends everything from one address,
+        # and the production budgets would measure the limiter, not the API.
+        env:
+          THROTTLE_DEFAULT_LIMIT: 1000000
+          THROTTLE_LOGIN_LIMIT: 1000000
+          THROTTLE_SIGNUP_LIMIT: 1000000
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -357,6 +364,42 @@ jobs:
       - name: Browser tests
         working-directory: e2e
         run: npx playwright test
+
+      # A short run of loadtest/parcours.js, so that every version of the code
+      # leaves its response times behind (run summary, k6-summary artifact).
+      # The thresholds fail the job on a clear regression; a shared runner is
+      # too noisy for anything finer, and the numbers are compared between
+      # runs, not read as production figures.
+      - name: Load test
+        run: |
+          docker run --rm --network host --user "$(id -u)" \
+            -v "$PWD/loadtest:/scripts:ro" -v "$PWD:/out" grafana/k6:2.3.0 run \
+            -e API=http://localhost:3001/api -e CANDIDATES=10 -e OFFERS=60 -e MINUTES=1 \
+            --summary-export=/out/k6-summary.json /scripts/parcours.js
+
+      - name: Response times
+        if: always() && hashFiles('k6-summary.json') != ''
+        run: |
+          {
+            echo "### Temps de réponse (k6, 10 candidats, 1 minute)"
+            echo
+            echo "| Requête | Médiane | p95 | Max |"
+            echo "| --- | --- | --- | --- |"
+            jq -r '.metrics as $m
+              | ["feed", "Fil d'"'"'offres"], ["decision", "Like ou pass"], ["login", "Connexion"]
+              | $m["http_req_duration{name:\(.[0])}"] as $d
+              | "| \(.[1]) | \($d.med | floor) ms | \($d["p(95)"] | floor) ms | \($d.max | floor) ms |"' \
+              k6-summary.json
+            echo
+            jq -r '"\(.metrics.http_reqs.count) requêtes, \(.metrics.http_req_failed.value * 100) % d'"'"'échec."' k6-summary.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload load test summary
+        uses: actions/upload-artifact@v7
+        if: always() && hashFiles('k6-summary.json') != ''
+        with:
+          name: k6-summary
+          path: k6-summary.json
 
       - name: Stack logs
         if: failure()

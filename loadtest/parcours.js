@@ -7,13 +7,17 @@
 //
 //   k6 run loadtest/parcours.js                       (API on localhost:3101)
 //   k6 run -e API=http://host:port/api loadtest/parcours.js
+//
+// CANDIDATES, OFFERS and MINUTES shorten it: the CI runs 10 candidates for one
+// minute on every pull request, to follow the response times version by version.
 import http from "k6/http";
 import { check, sleep } from "k6";
 
 const API = __ENV.API || "http://localhost:3101/api";
 const PASSWORD = "Rekr-charge-parcours-2026";
-const CANDIDATES = 50;
-const OFFERS = 300;
+const CANDIDATES = Number(__ENV.CANDIDATES || 50);
+const OFFERS = Number(__ENV.OFFERS || 300);
+const SECONDS = Number(__ENV.MINUTES || 5) * 60;
 const run = Date.now().toString(36);
 
 export const options = {
@@ -24,9 +28,9 @@ export const options = {
       exec: "candidat",
       startVUs: 0,
       stages: [
-        { duration: "1m", target: CANDIDATES },
-        { duration: "3m", target: CANDIDATES },
-        { duration: "1m", target: 0 },
+        { duration: `${SECONDS / 5}s`, target: CANDIDATES },
+        { duration: `${(SECONDS * 3) / 5}s`, target: CANDIDATES },
+        { duration: `${SECONDS / 5}s`, target: 0 },
       ],
     },
     connexions: {
@@ -34,7 +38,7 @@ export const options = {
       exec: "connexion",
       rate: 1,
       timeUnit: "2s",
-      duration: "5m",
+      duration: `${SECONDS}s`,
       preAllocatedVUs: 2,
     },
   },
