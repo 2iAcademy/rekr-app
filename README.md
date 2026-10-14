@@ -121,7 +121,7 @@ JWT_SECRET="<long-random-secret>"
 
 Payloads:
 
-- `signup`: `{ "email": "user@mail.com", "password": "min8chars", "userType": "candidate" | "recruiter" }`
+- `signup`: `{ "email": "user@mail.com", "password": "min12characters", "userType": "candidate" | "recruiter" }`
 - `login`: `{ "email": "user@mail.com", "password": "min8chars" }`
 
 The response holds an `accessToken` and a `user` object (without the password).

@@ -361,11 +361,11 @@ describe('Auth (e2e)', () => {
   // Length alone used to let "aaaaaaaa" open an account. The 400 is the
   // rule's own, not the length floor's, and no account is left behind.
   it.each([
-    ['aaaaaaaa', WEAK_PASSWORD_MESSAGES.distinct],
-    ['12345678', WEAK_PASSWORD_MESSAGES.walk],
-    ['12345678!', WEAK_PASSWORD_MESSAGES.walk],
+    ['aaaaaaaaaaaa', WEAK_PASSWORD_MESSAGES.distinct],
+    ['abcdefghijkl', WEAK_PASSWORD_MESSAGES.walk],
+    ['1234567890!!', WEAK_PASSWORD_MESSAGES.walk],
     ['Motdepasse1!', WEAK_PASSWORD_MESSAGES.common],
-    ['$oleil2024', WEAK_PASSWORD_MESSAGES.common],
+    ['$oleil2024!!', WEAK_PASSWORD_MESSAGES.common],
     ['weak@test.dev', WEAK_PASSWORD_MESSAGES.email],
   ])('refuses %s and says why', async (password, reason) => {
     const res = await httpRequest(app)
@@ -382,6 +382,24 @@ describe('Auth (e2e)', () => {
     await expect(
       prisma.user.count({ where: { email: 'weak@test.dev' } }),
     ).resolves.toBe(0);
+  });
+
+  // Twelve characters for a new password; the one-character-short version of
+  // an accepted password is refused on its length alone.
+  it('refuses a new password shorter than twelve characters', async () => {
+    const res = await httpRequest(app)
+      .post('/api/auth/signup')
+      .send({
+        email: 'short@test.dev',
+        password: 'Sup3rSecret',
+        userType: 'candidate',
+        acceptTerms: true,
+      })
+      .expect(400);
+
+    expect((res.body as { message: string[] }).message).toEqual([
+      'password must be longer than or equal to 12 characters',
+    ]);
   });
 
   // A payload built to make the rule backtrack: refused by the length bound

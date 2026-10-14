@@ -15,10 +15,14 @@ import { MAX_PASSWORD_LENGTH } from './password-bounds';
  * does a long lowercase passphrase; "aaaaaaaa", "12345678" and "Motdepasse1!"
  * do not.
  *
+ * Twelve characters at least: about 56 bits even in lowercase, above the 50
+ * bits the CNIL asks for when the password is backed by an access restriction
+ * (here the login throttle).
+ *
  * Mirrored in `clientApp/src/features/auth/passwordRule.ts` so the form can
  * refuse before sending; this copy is the one that decides. Change both.
  */
-export const MIN_PASSWORD_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 12;
 
 /** "aaaaaaaa" has one, "12121212" two: neither is a password. */
 export const MIN_DISTINCT_CHARACTERS = 5;

@@ -14,7 +14,7 @@ import {
 const TECHNICAL = 'Une erreur est survenue. Réessayez dans un instant.';
 const UNREACHABLE = 'Connexion au serveur impossible. Vérifiez votre connexion et réessayez.';
 const TOO_MANY_ATTEMPTS = 'Trop de tentatives. Patientez une minute avant de réessayer.';
-const SHARED_INVALID_INPUT = 'Vérifiez votre email et votre mot de passe (8 caractères minimum).';
+const SHARED_INVALID_INPUT = 'Vérifiez votre email et votre mot de passe.';
 
 const ALL_TABLES = [profileUpdateBusiness, fileReplaceBusiness, fileRemoveBusiness];
 

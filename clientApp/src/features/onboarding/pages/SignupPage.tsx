@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/useAuth';
 import { OptionCards, type Option } from '@/components/form/OptionCards';
 import type { UserType } from '@/domain/userType';
-import { SIGNUP_SUCCESS, signupBusiness } from '@/features/auth/authFeedback';
+import { PASSWORD_MIN_LENGTH, SIGNUP_SUCCESS, signupBusiness } from '@/features/auth/authFeedback';
 import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
 import {
   PASSWORD_RULE_HINT,
@@ -150,14 +150,14 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
             id="signup-password"
             autoComplete="new-password"
             required
-            minLength={8}
+            minLength={PASSWORD_MIN_LENGTH}
             value={password}
             onChange={(event) => {
               setPassword(event.target.value);
               setError(null);
               setPasswordRefused(false);
             }}
-            placeholder="8 caractères min."
+            placeholder={`${PASSWORD_MIN_LENGTH} caractères min.`}
             aria-invalid={passwordRefused}
             aria-describedby={
               passwordRefused ? 'signup-password-hint signup-error' : 'signup-password-hint'

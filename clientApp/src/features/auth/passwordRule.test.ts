@@ -9,9 +9,9 @@ const apiError = (status: number, data: unknown) =>
 // règle doivent rendre le même verdict.
 describe('passwordWeakness', () => {
   it.each([
-    ['aaaaaaaa', 'distinct'],
+    ['aaaaaaaaaaaa', 'distinct'],
     ['12121212', 'distinct'],
-    ['12345678', 'walk'],
+    ['abcdefghijkl', 'walk'],
     ['Azertyuiop', 'walk'],
     ['Motdepasse1!', 'common'],
     ['P@ssw0rd', 'common'],
@@ -42,12 +42,12 @@ describe('passwordWeakness', () => {
 
 describe('passwordProblem', () => {
   it('parle de longueur avant le reste', () => {
-    expect(passwordProblem('aaa')).toBe('Le mot de passe doit contenir au moins 8 caractères.');
+    expect(passwordProblem('aaa')).toBe('Le mot de passe doit contenir au moins 12 caractères.');
   });
 
   it.each([
-    ['aaaaaaaa', 'Utilisez au moins 5 caractères différents.'],
-    ['12345678', 'Évitez les suites comme 123456 ou azerty.'],
+    ['aaaaaaaaaaaa', 'Utilisez au moins 5 caractères différents.'],
+    ['abcdefghijkl', 'Évitez les suites comme 123456 ou azerty.'],
     ['Motdepasse1!', 'Ce mot de passe est trop courant.'],
   ])('dit ce qui manque à %s', (password, message) => {
     expect(passwordProblem(password)).toBe(message);
