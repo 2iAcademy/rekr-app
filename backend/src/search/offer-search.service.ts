@@ -126,7 +126,7 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
         const id = hit._source?.id ?? Number(hit._id);
         return Number.isInteger(id) && id > 0 ? [id] : [];
       });
-    } catch {
+    } catch (cause) {
       this.logger.warn(
         `Elasticsearch search failed; candidate feeds will use PostgreSQL ordering.`,
       );
@@ -167,9 +167,7 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.writeOffer(offerId);
     } catch (cause) {
-      this.logger.warn(
-        `Could not sync offer ${offerId} to Elasticsearch. ${this.reasonOf(cause)}`,
-      );
+      this.logger.warn(`Could not sync offer ${offerId} to Elasticsearch.`);
       this.recoverAfter(cause);
     }
   }
@@ -200,9 +198,11 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
 
     if (!offer || offer.status !== 'open') {
       // Already absent is the state we want, not a failure.
-      await client.delete(
-        { index: OFFERS_INDEX, id: String(offerId) },
-        { ignore: [404] },
+      await externalCall('elasticsearch', 'delete_offer', () =>
+        client.delete(
+          { index: OFFERS_INDEX, id: String(offerId) },
+          { ignore: [404] },
+        ),
       );
       return;
     }
@@ -224,12 +224,14 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
         : {}),
       createdAt: offer.createdAt.toISOString(),
     };
-    await client.index({
-      index: OFFERS_INDEX,
-      id: String(offer.id),
-      document,
-      refresh: false,
-    });
+    await externalCall('elasticsearch', 'index_offer', () =>
+      client.index({
+        index: OFFERS_INDEX,
+        id: String(offer.id),
+        document,
+        refresh: false,
+      }),
+    );
   }
 
   /**
@@ -276,22 +278,22 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
       await this.ensureIndex();
       await this.reconcile();
       this.retryDelayMs = RETRY_INITIAL_DELAY_MS;
-    } catch (cause) {
-      this.scheduleRetry(cause);
+    } catch {
+      this.scheduleRetry();
     } finally {
       this.recovering = false;
     }
     if (this.recoveryRequested) this.requestRecovery();
   }
 
-  private scheduleRetry(cause: unknown): void {
+  private scheduleRetry(): void {
     if (this.closed) return;
 
     const delayMs = this.retryDelayMs;
     this.retryDelayMs = Math.min(delayMs * 2, RETRY_MAX_DELAY_MS);
     this.logger.warn(
       `Elasticsearch is unavailable; candidate feeds will use PostgreSQL ordering. ` +
-        `Retrying in ${delayMs / 1000}s. ${this.reasonOf(cause)}`,
+        `Retrying in ${delayMs / 1000}s.`,
     );
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
@@ -303,9 +305,13 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
 
   private async ensureIndex(): Promise<void> {
     const client = this.client!;
-    let exists = await client.indices.exists({ index: OFFERS_INDEX });
+    let exists = await externalCall('elasticsearch', 'index_exists', () =>
+      client.indices.exists({ index: OFFERS_INDEX }),
+    );
     if (exists && this.rebuildPending) {
-      await client.indices.delete({ index: OFFERS_INDEX });
+      await externalCall('elasticsearch', 'delete_index', () =>
+        client.indices.delete({ index: OFFERS_INDEX }),
+      );
       exists = false;
     }
     if (!exists) await this.createIndex();
@@ -381,15 +387,20 @@ export class OfferSearchService implements OnModuleInit, OnModuleDestroy {
     const ids = new Set<number>();
     let searchAfter: estypes.SortResults | undefined;
     for (;;) {
-      const response = await this.client!.search<OfferSearchDocument>({
-        index: OFFERS_INDEX,
-        size: BATCH_SIZE,
-        track_total_hits: false,
-        query: { match_all: {} },
-        sort: [{ id: { order: 'asc' } }],
-        _source: false,
-        ...(searchAfter ? { search_after: searchAfter } : {}),
-      });
+      const response = await externalCall(
+        'elasticsearch',
+        'reconcile_search',
+        () =>
+          this.client!.search<OfferSearchDocument>({
+            index: OFFERS_INDEX,
+            size: BATCH_SIZE,
+            track_total_hits: false,
+            query: { match_all: {} },
+            sort: [{ id: { order: 'asc' } }],
+            _source: false,
+            ...(searchAfter ? { search_after: searchAfter } : {}),
+          }),
+      );
       const { hits } = response.hits;
       for (const hit of hits) {
         const id = Number(hit._id);

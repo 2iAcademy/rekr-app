@@ -25,9 +25,15 @@ describe('OfferSearchService', () => {
     },
   };
   const originalEnvironment = process.env;
+  let failureLog: jest.SpyInstance;
+
+  afterEach(() => failureLog.mockRestore());
 
   beforeEach(() => {
     jest.clearAllMocks();
+    failureLog = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
     process.env = {
       ...originalEnvironment,
       ELASTICSEARCH_NODE: 'http://search.test:9200',
@@ -431,6 +437,11 @@ describe('OfferSearchService', () => {
       await service.syncOffer(1);
       await settle();
       expect(elastic.index).toHaveBeenCalledTimes(1);
+      for (const operation of ['index_offer', 'delete_offer', 'index_exists']) {
+        expect(failureLog).toHaveBeenCalledWith(
+          expect.stringContaining(`"operation":"${operation}"`),
+        );
+      }
 
       // Elasticsearch is back, still holding the closed offer only.
       elastic.index.mockResolvedValue({});
