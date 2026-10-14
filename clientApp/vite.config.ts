@@ -35,6 +35,13 @@ for (const level of ['info', 'warn', 'warnOnce', 'error'] as const) {
   };
 }
 
+const API_PROXY = {
+  '/api': {
+    target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
+    changeOrigin: true,
+  },
+};
+
 // https://vite.dev/config/
 export default defineConfig({
   customLogger: process.env.CONTAINER_LOGS === 'true' ? containerLogger : undefined,
@@ -96,20 +103,19 @@ export default defineConfig({
     // discoverable from the browser even if a map ever survives the build.
     sourcemap: 'hidden',
   },
+  // The same proxy as the dev server: the browser tests (e2e/) run against the
+  // built bundle served by `vite preview`, which then reaches the API as Caddy
+  // does in production, on the same origin.
   preview: {
     port: DEV_PORT,
     strictPort: true,
+    proxy: API_PROXY,
   },
   server: {
     port: DEV_PORT,
     strictPort: true,
     host: true,
-    proxy: {
-      '/api': {
-        target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
-        changeOrigin: true,
-      },
-    },
+    proxy: API_PROXY,
     watch: {
       usePolling: true,
       interval: 100,
