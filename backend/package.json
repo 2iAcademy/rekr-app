@@ -29,7 +29,7 @@
     "pretest:e2e": "npm run prisma:generate",
     "test:watch": "jest --watch",
     "pretest:cov": "npm run prisma:generate",
-    "test:cov": "jest --coverage",
+    "test:cov": "jest --coverage && node scripts/check-service-coverage.mjs",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json --runInBand",
     "sentry:sourcemaps": "sentry-cli sourcemaps inject --org rekr --project node-nestjs dist && sentry-cli sourcemaps upload --org rekr --project node-nestjs dist"
@@ -117,6 +117,11 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "json-summary"
+    ],
     "testEnvironment": "node"
   }
 }
