@@ -23,6 +23,7 @@ import { LikeModule } from './like/like.module';
 import { MatchModule } from './match/match.module';
 import { ChatModule } from './chat/chat.module';
 import { HealthModule } from './health/health.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { HealthModule } from './health/health.module';
     ChatModule,
     AccountModule,
     HealthModule,
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [

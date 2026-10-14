@@ -161,11 +161,18 @@ describe('Auth password reset (e2e)', () => {
 
     const known = await forgot('candidate@test.dev');
     sent.length = 0;
-    // The rate-limit counter is the one header that legitimately differs
-    // between two successive calls; rewinding it compares like for like.
+    // Reset the rate-limit counter so the stable headers compare like for like.
+    // Request IDs remain unique regardless of whether the account exists.
     resetThrottler(app);
     const unknown = await forgot('personne@test.dev');
 
+    const uuidV4 =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    expect(known.headers['x-request-id']).toMatch(uuidV4);
+    expect(unknown.headers['x-request-id']).toMatch(uuidV4);
+    expect(unknown.headers['x-request-id']).not.toBe(
+      known.headers['x-request-id'],
+    );
     expect(unknown.status).toBe(known.status);
     expect(unknown.text).toBe(known.text);
     expect(headerFingerprint(unknown)).toEqual(headerFingerprint(known));
@@ -269,6 +276,7 @@ describe('Auth password reset (e2e)', () => {
 function headerFingerprint(res: request.Response): Record<string, unknown> {
   const headers = { ...(res.headers as Record<string, unknown>) };
   delete headers.date;
+  delete headers['x-request-id'];
 
   return headers;
 }
