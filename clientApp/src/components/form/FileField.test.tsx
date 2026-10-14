@@ -44,6 +44,22 @@ describe('FileField', () => {
     expect(screen.getByText('JPG, JPEG, PNG ou WEBP — 2 Mo maximum.')).toBeInTheDocument();
   });
 
+  // RGAA 10.7, 11.9 et 12.8 : le bouton visible est le seul arrêt de tabulation,
+  // et il porte le nom et l'aide du champ.
+  it('ne laisse que le bouton visible dans l’ordre de tabulation, nommé d’après le champ', async () => {
+    const user = userEvent.setup();
+    renderField();
+
+    const pick = screen.getByRole('button', { name: 'Choisir un fichier : Photo de profil' });
+    expect(pick).toHaveAccessibleDescription(/2 Mo maximum/);
+    expect(input()).toHaveAttribute('tabindex', '-1');
+
+    await user.tab();
+    expect(pick).toHaveFocus();
+    await user.tab();
+    expect(document.body).toHaveFocus();
+  });
+
   it('nomme chaque commande d’après son champ, pour deux champs côte à côte', () => {
     render(
       <>
@@ -68,6 +84,8 @@ describe('FileField', () => {
     expect(input('CV')).toHaveAttribute('accept', '.pdf');
     expect(screen.getByRole('button', { name: 'Supprimer Photo de profil' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Supprimer CV' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remplacer Photo de profil' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remplacer CV' })).toBeInTheDocument();
   });
 
   it('annonce un emplacement vide et n’offre pas de suppression', () => {

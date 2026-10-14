@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 interface LegalLayoutProps {
   title: string;
   /** The version line, shown under the title: what a consent was given to. */
-  version: string;
+  version?: string;
   onBack?: () => void;
   children: ReactNode;
 }
@@ -15,7 +16,11 @@ interface LegalLayoutProps {
  */
 export function LegalLayout({ title, version, onBack, children }: LegalLayoutProps) {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col bg-background px-6 pt-4 pb-12">
+    <main
+      id={MAIN_CONTENT_ID}
+      tabIndex={-1}
+      className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col bg-background px-6 pt-4 pb-12 outline-none"
+    >
       <header className="relative flex h-9 items-center justify-center">
         {onBack && (
           <button
@@ -30,7 +35,7 @@ export function LegalLayout({ title, version, onBack, children }: LegalLayoutPro
       </header>
 
       <h1 className="mt-6 font-heading text-2xl font-bold text-ink">{title}</h1>
-      <p className="mt-1 text-xs text-ink-muted">{version}</p>
+      {version !== undefined && <p className="mt-1 text-xs text-ink-muted">{version}</p>}
 
       <div className="mt-6 flex flex-col gap-6 text-sm leading-relaxed text-ink [&_h2]:font-heading [&_h2]:text-base [&_h2]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ul]:flex [&_ul]:flex-col [&_ul]:gap-1">
         {children}

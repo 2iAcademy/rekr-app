@@ -4,6 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
+import { APP_NAME, pageTitle } from '@/components/layout/documentTitle';
 import { AnonymousOnly } from '@/features/auth/AnonymousOnly';
 import { USER_TYPES, type UserType } from '@/domain/userType';
 import { AuthProvider } from '@/features/auth/AuthProvider';
@@ -38,6 +39,7 @@ vi.mock('@/api/generated', () => ({
 interface RouteLike {
   path?: string;
   element?: ReactNode;
+  handle?: unknown;
   children?: RouteLike[];
 }
 
@@ -117,10 +119,13 @@ const renderAt = (path: string) => {
 
 // The chrome the shell paints, queried by role so it does not depend on the
 // labels the sidebar and the header own. None of it belongs on a login screen.
+// The site footer is not part of it: every screen carries it, the login too.
 const shellChrome = () => [
   ...screen.queryAllByRole('complementary'),
-  ...screen.queryAllByRole('navigation'),
-  ...screen.queryAllByRole('link', { name: 'Mon profil' }),
+  ...screen
+    .queryAllByRole('navigation')
+    .filter((nav) => nav.getAttribute('aria-label') !== 'Liens du site'),
+  ...screen.queryAllByRole('link', { name: /^Mon profil/ }),
 ];
 
 describe('table de routage', () => {
@@ -161,6 +166,16 @@ describe('table de routage', () => {
 
   it('déclare une seule route attrape-tout', () => {
     expect(declaredPaths(entries).filter((path) => path === '*')).toHaveLength(1);
+  });
+
+  it('donne un titre à chaque écran déclaré, et un titre différent à chacun', () => {
+    const titled = flatten(entries).filter(
+      (route) => route.path !== undefined && route.path !== '*',
+    );
+    const titles = titled.map((route) => pageTitle([route.handle]));
+
+    expect(titles.filter((title) => title === APP_NAME)).toEqual([]);
+    expect(new Set(titles).size).toBe(titles.length);
   });
 
   /**
@@ -570,5 +585,48 @@ describe('pages légales', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/inscription');
     });
+  });
+});
+
+// The skip link sits above every layout, so each kind of screen is visited: the
+// public ones, a legal text, and the shell with its navigation.
+describe('lien d’évitement', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({}),
+    } as unknown as Response);
+  });
+
+  const skipToContent = async () => {
+    const user = userEvent.setup();
+    await user.tab();
+
+    const skipLink = screen.getByRole('link', { name: 'Aller au contenu' });
+    expect(skipLink).toHaveFocus();
+    expect(skipLink).toHaveAttribute('href', '#contenu');
+
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('main')).toHaveFocus();
+  };
+
+  it.each(['/', '/inscription', '/connexion', '/mentions-legales'])(
+    'ouvre la tabulation de %s et mène au contenu principal',
+    async (path) => {
+      renderAt(path);
+      await screen.findByRole('main');
+
+      await skipToContent();
+    },
+  );
+
+  it('passe avant la navigation du shell', async () => {
+    authenticateAs('candidate');
+    renderAt('/matches');
+    await screen.findAllByRole('navigation');
+
+    await skipToContent();
   });
 });

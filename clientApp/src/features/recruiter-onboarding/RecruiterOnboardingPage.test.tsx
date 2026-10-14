@@ -223,6 +223,17 @@ describe('RecruiterOnboardingPage', () => {
     expect(screen.getByText('Étape 2 sur 5')).toBeInTheDocument();
   });
 
+  it('place le focus sur le titre de la nouvelle étape', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<RecruiterOnboardingPage userId={1} />);
+
+    expect(screen.getByRole('heading', { name: 'Mon identité' })).not.toHaveFocus();
+
+    await fillIdentity(user);
+
+    expect(screen.getByRole('heading', { name: 'Ma société' })).toHaveFocus();
+  });
+
   it('conserve la saisie en revenant à l’étape précédente', async () => {
     const user = userEvent.setup({ delay: null });
     render(<RecruiterOnboardingPage userId={1} />);

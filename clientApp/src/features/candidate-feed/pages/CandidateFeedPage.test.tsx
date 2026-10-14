@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
@@ -9,6 +9,7 @@ import {
   type LikeResultDto,
   type OfferFeedItemDto,
 } from '@/api/generated';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 import { anOffer, anotherOffer } from '../fixtures';
 import { CandidateFeedPage } from './CandidateFeedPage';
 
@@ -50,6 +51,27 @@ const dragCard = (distance: number) => {
   fireEvent.pointerMove(window, { clientX: distance, clientY: 0, pointerId: 1 });
   fireEvent.pointerUp(window, { pointerId: 1 });
 };
+
+// A drag held mid-way, so the card's inline transform can be read.
+const holdCard = async (distance: number): Promise<HTMLElement> => {
+  const card = (await screen.findByRole('article')).parentElement as HTMLElement;
+
+  fireEvent.pointerDown(card, { clientX: 0, clientY: 0, pointerId: 1 });
+  fireEvent.pointerMove(window, { clientX: distance, clientY: 0, pointerId: 1 });
+
+  return card;
+};
+
+const preferReducedMotion = () =>
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
 
 describe('CandidateFeedPage', () => {
   beforeEach(() => {
@@ -225,6 +247,31 @@ describe('CandidateFeedPage', () => {
       expect(outcome().parentElement).toHaveClass('sr-only');
     });
 
+    // Le glissé reste un geste direct : la carte suit le doigt, seule
+    // l'inclinaison, décorative, disparaît.
+    describe('pendant un glissé', () => {
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      it('incline la carte qui suit le doigt', async () => {
+        renderPage();
+
+        const card = await holdCard(60);
+
+        expect(card.style.transform).toBe('translateX(60px) rotate(2deg)');
+      });
+
+      it('ne l’incline plus quand le mouvement est réduit', async () => {
+        preferReducedMotion();
+        renderPage();
+
+        const card = await holdCard(60);
+
+        expect(card.style.transform).toBe('translateX(60px)');
+      });
+    });
+
     // Sans mouvement, la carte sortante n'a rien à montrer : seul le message
     // confirme la décision.
     it('ne montre pas la carte sortante quand le mouvement est réduit', async () => {
@@ -258,6 +305,24 @@ describe('CandidateFeedPage', () => {
 
     await user.keyboard('{ArrowLeft}');
     expect(heading('Vous avez tout vu')).toBeVisible();
+  });
+
+  // Le lien d'évitement rend `main` focusable : un clic dans le vide y pose le
+  // focus, et les flèches doivent continuer à décider.
+  it('décide encore au clavier quand le focus est sur le contenu principal', async () => {
+    const user = userEvent.setup();
+    const main = document.createElement('main');
+    main.id = MAIN_CONTENT_ID;
+    main.tabIndex = -1;
+    document.body.append(main);
+    onTestFinished(() => main.remove());
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Développeur Frontend React' });
+    main.focus();
+    await user.keyboard('{ArrowLeft}');
+
+    expect(heading('Data Analyst')).toBeVisible();
   });
 
   it('propose de réessayer quand le chargement échoue', async () => {

@@ -40,6 +40,19 @@ describe('CityField', () => {
     expect(input).toHaveAttribute('aria-expanded', 'false');
   });
 
+  // RGAA 11.13 : la ville de l'utilisateur déclare sa finalité, celle d'une offre non.
+  it('déclare la finalité address-level2 seulement quand on le lui demande', () => {
+    const { unmount } = renderField({ autoComplete: 'address-level2' });
+    expect(screen.getByRole('combobox', { name: 'Ville' })).toHaveAttribute(
+      'autocomplete',
+      'address-level2',
+    );
+    unmount();
+
+    renderField();
+    expect(screen.getByRole('combobox', { name: 'Ville' })).toHaveAttribute('autocomplete', 'off');
+  });
+
   // The reference refuses anything shorter, and a two-letter prefix would match
   // half of France anyway.
   it('n’interroge pas le référentiel avant trois caractères', async () => {

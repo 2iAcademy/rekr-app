@@ -17,6 +17,7 @@ import {
 } from '@/components/feed/deck';
 import { useCardSwipe } from '@/hooks/useCardSwipe';
 import { useDeckKeyboard } from '@/hooks/useDeckKeyboard';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import type { OfferFeedItemDto } from '@/api/generated';
 import { likedOfferCountLabel } from '../labels';
 import { useOfferFeed } from '../useOfferFeed';
@@ -197,6 +198,7 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
     [current, deck.length, onMatch],
   );
 
+  const reducedMotion = usePrefersReducedMotion();
   const swipe = useCardSwipe({
     onSwipeRight: (distance) => decide('liked', current, distance),
     onSwipeLeft: (distance) => decide('passed', current, distance),
@@ -329,11 +331,14 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
                     ? 'cursor-grabbing select-none'
                     : 'transition-transform duration-200 ease-out motion-reduce:transition-none',
                 )}
+                // The card still follows the finger under reduced motion, it is
+                // the gesture itself; only the tilt, pure decoration, goes.
                 style={{
                   transform:
                     swipe.offset === 0
                       ? undefined
-                      : `translateX(${swipe.offset}px) rotate(${swipe.offset / 30}deg)`,
+                      : `translateX(${swipe.offset}px)` +
+                        (reducedMotion ? '' : ` rotate(${swipe.offset / 30}deg)`),
                 }}
               >
                 <OfferCard offer={current} onViewOffer={() => onOpenOffer(current.id)} />

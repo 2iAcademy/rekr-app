@@ -198,7 +198,7 @@ export function SignupPage({ onBack, onSignIn, onSubmit }: SignupPageProps) {
             }}
             className="peer sr-only"
           />
-          <span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-input bg-card text-white transition-colors peer-checked:border-transparent peer-checked:bg-brand peer-focus-visible:ring-3 peer-focus-visible:ring-brand/30">
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-input bg-card text-white transition-colors peer-checked:border-transparent peer-checked:bg-brand peer-focus-visible:ring-3 peer-focus-visible:ring-brand/70">
             <Check
               className={cn(
                 'size-3.5 transition-opacity',
