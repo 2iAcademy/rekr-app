@@ -2,7 +2,8 @@
 #
 #   changes ─┬─ backend build → lint → test ──┬─ Backend CI ─┐
 #            │                                ├─ Sonar ──────┼─ images → deploy → smoke
-#            └─ frontend build → lint → test ─┴─ Frontend CI ┘
+#            ├─ frontend build → lint → test ─┴─ Frontend CI ┤
+#            └─ E2E navigateur ──────────────────────────────┘
 #
 # Pull requests and preprod stop after the CI. On main, the images are built
 # once, pushed to GHCR under the commit hash, and the deploy job then waits for
@@ -51,6 +52,7 @@ jobs:
     outputs:
       backend: ${{ github.event_name != 'pull_request' || steps.filter.outputs.backend == 'true' }}
       frontend: ${{ github.event_name != 'pull_request' || steps.filter.outputs.frontend == 'true' }}
+      e2e: ${{ github.event_name != 'pull_request' || steps.filter.outputs.e2e == 'true' }}
 
     steps:
       - name: Detect changes
@@ -65,6 +67,12 @@ jobs:
             frontend:
               - 'clientApp/**'
               - 'docker/caddy/**'
+              - '.github/workflows/ci-cd.yml'
+            e2e:
+              - 'backend/**'
+              - 'clientApp/**'
+              - 'e2e/**'
+              - 'compose.yml'
               - '.github/workflows/ci-cd.yml'
 
   backend-build:
@@ -298,6 +306,115 @@ jobs:
           esac
 
   # Reuses the coverage of the test jobs instead of running the suites again.
+  # The browser tests (e2e/): the real front, built as in production, against
+  # the API and its databases started by compose.yml. They walk the central
+  # path — a candidate likes an offer, the recruiter answers, the match appears
+  # on both sides — which no other test covers from end to end. A one-minute
+  # load test follows on the same stack.
+  e2e-browser:
+    name: E2E navigateur
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Start the API
+        run: docker compose up -d --build backend
+        # Raised for the load test below: k6 sends everything from one address,
+        # and the production budgets would measure the limiter, not the API.
+        env:
+          THROTTLE_DEFAULT_LIMIT: 1000000
+          THROTTLE_LOGIN_LIMIT: 1000000
+          THROTTLE_SIGNUP_LIMIT: 1000000
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            clientApp/package-lock.json
+            e2e/package-lock.json
+
+      - name: Build and serve the front
+        working-directory: clientApp
+        run: |
+          npm ci
+          npm run build
+          nohup npx vite preview > ../vite-preview.log 2>&1 &
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Wait for the stack
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:3001/api/health >/dev/null \
+              && curl -fsS http://localhost:8080/ >/dev/null && exit 0
+            sleep 5
+          done
+          echo "The stack did not come up in 5 minutes." && exit 1
+
+      - name: Browser tests
+        working-directory: e2e
+        run: npx playwright test
+
+      # A short run of loadtest/parcours.js, so that every version of the code
+      # leaves its response times behind (run summary, k6-summary artifact).
+      # The thresholds fail the job on a clear regression; a shared runner is
+      # too noisy for anything finer, and the numbers are compared between
+      # runs, not read as production figures.
+      - name: Load test
+        run: |
+          docker run --rm --network host --user "$(id -u)" \
+            -v "$PWD/loadtest:/scripts:ro" -v "$PWD:/out" grafana/k6:2.3.0 run \
+            -e API=http://localhost:3001/api -e CANDIDATES=10 -e OFFERS=60 -e MINUTES=1 \
+            --summary-export=/out/k6-summary.json /scripts/parcours.js
+
+      - name: Response times
+        if: always() && hashFiles('k6-summary.json') != ''
+        run: |
+          {
+            echo "### Temps de réponse (k6, 10 candidats, 1 minute)"
+            echo
+            echo "| Requête | Médiane | p95 | Max |"
+            echo "| --- | --- | --- | --- |"
+            jq -r '.metrics as $m
+              | ["feed", "Fil d'"'"'offres"], ["decision", "Like ou pass"], ["login", "Connexion"]
+              | $m["http_req_duration{name:\(.[0])}"] as $d
+              | "| \(.[1]) | \($d.med | floor) ms | \($d["p(95)"] | floor) ms | \($d.max | floor) ms |"' \
+              k6-summary.json
+            echo
+            jq -r '"\(.metrics.http_reqs.count) requêtes, \(.metrics.http_req_failed.value * 100) % d'"'"'échec."' k6-summary.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload load test summary
+        uses: actions/upload-artifact@v7
+        if: always() && hashFiles('k6-summary.json') != ''
+        with:
+          name: k6-summary
+          path: k6-summary.json
+
+      - name: Stack logs
+        if: failure()
+        run: |
+          docker compose logs --no-color backend
+          cat vite-preview.log
+
+      - name: Upload report
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          if-no-files-found: ignore
+
   sonar:
     name: Sonar
     runs-on: ubuntu-latest
@@ -350,7 +467,7 @@ jobs:
   images:
     name: Images
     runs-on: ubuntu-latest
-    needs: [backend-ci, frontend-ci, sonar]
+    needs: [backend-ci, frontend-ci, sonar, e2e-browser]
     if: github.ref == 'refs/heads/main'
     timeout-minutes: 30
     permissions:
