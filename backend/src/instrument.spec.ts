@@ -7,6 +7,7 @@ type InitOptions = {
   environment?: string;
   tracesSampleRate?: number;
   enableLogs?: boolean;
+  release?: string;
 };
 
 const init = jest.fn<void, [InitOptions]>();
@@ -34,6 +35,7 @@ describe('instrument', () => {
     process.env = { ...originalEnv };
     delete process.env.SENTRY_DSN;
     delete process.env.SENTRY_TRACES_SAMPLE_RATE;
+    delete process.env.SENTRY_RELEASE;
   });
 
   afterAll(() => {
@@ -63,6 +65,16 @@ describe('instrument', () => {
 
   it('turns Sentry Logs on', () => {
     expect(loadInstrument().enableLogs).toBe(true);
+  });
+
+  it('tags events with the deployed commit', () => {
+    process.env.SENTRY_RELEASE = '6177e9e0a1b2c3d4';
+
+    expect(loadInstrument().release).toBe('6177e9e0a1b2c3d4');
+  });
+
+  it('leaves the release unset outside a deploy', () => {
+    expect(loadInstrument().release).toBeUndefined();
   });
 
   it('sends no traces unless a sample rate is configured', () => {

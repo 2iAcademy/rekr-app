@@ -57,4 +57,5 @@ build rekr-web --target prod \
   --build-context rekr-caddy=./docker/caddy \
   --build-arg "VITE_SENTRY_DSN=${VITE_SENTRY_DSN:-}" \
   --build-arg VITE_SENTRY_ENVIRONMENT=production \
+  --build-arg "VITE_SENTRY_RELEASE=$IMAGE_TAG" \
   ./clientApp
