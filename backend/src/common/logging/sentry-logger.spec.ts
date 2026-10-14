@@ -65,11 +65,11 @@ describe('SentryLogger', () => {
     logger.error(
       'Mail not sent',
       'Error: timeout\n    at send',
-      'LoggingMailSender',
+      'PasswordResetService',
     );
 
     expect(sentryLogger.error).toHaveBeenCalledWith('Mail not sent', {
-      context: 'LoggingMailSender',
+      context: 'PasswordResetService',
       stack: 'Error: timeout\n    at send',
     });
   });
@@ -88,6 +88,15 @@ describe('SentryLogger', () => {
   it("leaves Nest's bootstrap lines out of Sentry", () => {
     logger.log('Mapped {/api/health, GET} route', 'RouterExplorer');
     logger.log('AppModule dependencies initialized', 'InstanceLoader');
+
+    expect(sentryLogger.info).not.toHaveBeenCalled();
+  });
+
+  it('never ships a logged e-mail, reset link included', () => {
+    logger.log(
+      'No SMTP host configured — e-mail not sent.\nhttp://localhost/reset?token=abc',
+      'LoggingMailSender',
+    );
 
     expect(sentryLogger.info).not.toHaveBeenCalled();
   });

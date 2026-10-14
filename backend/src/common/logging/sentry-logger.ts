@@ -4,16 +4,23 @@ import * as Sentry from '@sentry/nestjs';
 type Level = 'info' | 'warn' | 'error' | 'fatal';
 
 /**
+ * Contexts that stay on stdout only.
+ *
  * Nest's own bootstrap chatter: one line per module and per route on every
- * start. It stays on stdout, where it helps reading a failed boot, but sent to
- * Sentry it would only bury the application's logs under ~80 lines a deploy.
+ * start. It helps reading a failed boot, but sent to Sentry it would only bury
+ * the application's logs under ~80 lines a deploy.
+ *
+ * `LoggingMailSender` prints whole e-mails, password reset links included. It
+ * only runs without SMTP, so never in production, but a developer pointing a
+ * local run at Sentry would otherwise ship working reset tokens there.
  */
-const BOOTSTRAP_CONTEXTS = new Set([
+const LOCAL_ONLY_CONTEXTS = new Set([
   'InstanceLoader',
   'RoutesResolver',
   'RouterExplorer',
   'NestFactory',
   'NestApplication',
+  'LoggingMailSender',
 ]);
 
 /**
@@ -61,7 +68,7 @@ export class SentryLogger extends ConsoleLogger {
     const last = params.at(-1);
     const context =
       typeof last === 'string' ? (params.pop() as string) : this.context;
-    if (context && BOOTSTRAP_CONTEXTS.has(context)) {
+    if (context && LOCAL_ONLY_CONTEXTS.has(context)) {
       return;
     }
 
