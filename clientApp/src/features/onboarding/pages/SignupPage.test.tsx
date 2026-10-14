@@ -156,13 +156,13 @@ describe('SignupPage', () => {
     renderSignup();
 
     expect(screen.getByLabelText('Mot de passe')).toHaveAccessibleDescription(
-      /8 caractères minimum\. Évitez les mots de passe courants/,
+      /12 caractères minimum\. Évitez les mots de passe courants/,
     );
   });
 
   it.each([
-    ['aaaaaaaa', 'Utilisez au moins 5 caractères différents.'],
-    ['12345678', 'Évitez les suites comme 123456 ou azerty.'],
+    ['aaaaaaaaaaaa', 'Utilisez au moins 5 caractères différents.'],
+    ['abcdefghijkl', 'Évitez les suites comme 123456 ou azerty.'],
     ['Motdepasse1!', 'Ce mot de passe est trop courant.'],
     ['candidat@rekr.fr', 'Le mot de passe ne doit pas reprendre votre email.'],
   ])('refuse %s sans appeler le serveur et dit ce qui manque', async (weak, message) => {

@@ -23,12 +23,15 @@ interface AppHeaderProps {
  * page's centred column.
  */
 export function AppHeader({ items, user, profileTo, logoutIcon }: AppHeaderProps) {
+  const initial = user.name.charAt(0).toUpperCase();
   return (
     <header className="sticky top-0 z-30 w-full border-b border-line bg-card">
       <div className="mx-auto flex h-15 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 md:px-10">
+        {/* The name starts with what the logo shows, so voice control can target
+            it by the word on screen (RGAA 6.1). */}
         <Link
           to="/"
-          aria-label="Accueil"
+          aria-label="Rekr, accueil"
           className="flex min-h-11 shrink-0 items-center rounded-md"
         >
           <Logo size="sm" />
@@ -62,11 +65,11 @@ export function AppHeader({ items, user, profileTo, logoutIcon }: AppHeaderProps
         <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0">
           <Link
             to={profileTo}
-            aria-label="Mon profil"
+            aria-label={`Mon profil (${initial})`}
             className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full"
           >
             <span className="flex size-9 items-center justify-center rounded-full bg-brand-tint text-sm font-bold text-brand-strong">
-              {user.name.charAt(0).toUpperCase()}
+              {initial}
             </span>
           </Link>
 

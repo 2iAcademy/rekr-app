@@ -24,6 +24,7 @@ import { notifyFailure, notifySuccess } from '@/lib/feedback/notify';
 import { fileUrl } from '@/lib/fileUrl';
 import { cn } from '@/lib/utils';
 import { FactList } from '@/components/ui/fact-list';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 const UNLIKE_CONFLICT = 'Ce like ne peut plus être retiré.';
 
@@ -72,7 +73,7 @@ function TopBar({ onBack }: { onBack?: () => void }) {
         type="button"
         onClick={onBack}
         aria-label="Fermer"
-        className="flex size-11 items-center justify-center rounded-xl text-ink transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
+        className="flex size-11 items-center justify-center rounded-xl text-ink transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/70 focus-visible:outline-none"
       >
         <ArrowLeft aria-hidden="true" className="size-5" />
       </button>
@@ -142,7 +143,11 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
 
   if (isLoading) {
     return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background">
+      <main
+        id={MAIN_CONTENT_ID}
+        tabIndex={-1}
+        className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background outline-none"
+      >
         <TopBar onBack={onBack} />
         <div className="flex flex-col gap-3 px-4 pb-6">
           <p role="status" className="sr-only">
@@ -160,7 +165,11 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
 
   if (error || !offer) {
     return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background">
+      <main
+        id={MAIN_CONTENT_ID}
+        tabIndex={-1}
+        className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background outline-none"
+      >
         <TopBar onBack={onBack} />
         <div className="flex flex-1 flex-col items-center justify-center px-6 pb-16 text-center">
           <p role="alert" className="text-[0.9375rem] font-bold text-ink">
@@ -236,7 +245,11 @@ export function OfferDetailPage({ onBack, onPass, onMatch }: OfferDetailPageProp
   ];
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background">
+    <main
+      id={MAIN_CONTENT_ID}
+      tabIndex={-1}
+      className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background outline-none"
+    >
       <TopBar onBack={onBack} />
 
       <div className="flex flex-1 flex-col px-4 pb-6">

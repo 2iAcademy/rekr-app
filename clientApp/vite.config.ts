@@ -1,6 +1,6 @@
 import path from 'path';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
-import { defineConfig } from 'vite';
+import { createLogger, defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
@@ -19,8 +19,32 @@ import tailwindcss from '@tailwindcss/vite';
  */
 const DEV_PORT = Number(process.env.VITE_DEV_PORT ?? 8080);
 
+// Explicit severity prefixes let Alloy label Vite's otherwise plain text logs.
+const containerLogger = createLogger();
+for (const level of ['info', 'warn', 'warnOnce', 'error'] as const) {
+  const write = containerLogger[level].bind(containerLogger);
+  containerLogger[level] = (message, options) => {
+    const severity = level === 'warnOnce' ? 'WARN' : level.toUpperCase();
+    write(
+      message
+        .split('\n')
+        .map((line) => `[${severity}] ${line}`)
+        .join('\n'),
+      options,
+    );
+  };
+}
+
+const API_PROXY = {
+  '/api': {
+    target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
+    changeOrigin: true,
+  },
+};
+
 // https://vite.dev/config/
 export default defineConfig({
+  customLogger: process.env.CONTAINER_LOGS === 'true' ? containerLogger : undefined,
   plugins: [
     react(),
     tailwindcss(),
@@ -79,20 +103,19 @@ export default defineConfig({
     // discoverable from the browser even if a map ever survives the build.
     sourcemap: 'hidden',
   },
+  // The same proxy as the dev server: the browser tests (e2e/) run against the
+  // built bundle served by `vite preview`, which then reaches the API as Caddy
+  // does in production, on the same origin.
   preview: {
     port: DEV_PORT,
     strictPort: true,
+    proxy: API_PROXY,
   },
   server: {
     port: DEV_PORT,
     strictPort: true,
     host: true,
-    proxy: {
-      '/api': {
-        target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
-        changeOrigin: true,
-      },
-    },
+    proxy: API_PROXY,
     watch: {
       usePolling: true,
       interval: 100,

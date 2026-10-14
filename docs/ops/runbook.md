@@ -39,6 +39,8 @@ alias dc='docker compose -f compose.prod.yml'
 
 Où lire les erreurs : `dc logs` sur le serveur, et Sentry pour les exceptions du backend et du front.
 
+Désactiver un compte ou retirer une offre ne relève pas d'une panne : voir [moderation.md](moderation.md).
+
 ### Changer une valeur du `.env`
 
 Le `.env` du serveur est **réécrit à chaque déploiement**, depuis l'environnement GitHub `production` (voir

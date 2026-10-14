@@ -4,7 +4,7 @@ const TECHNICAL = 'Une erreur est survenue. Réessayez dans un instant.';
 const UNREACHABLE = 'Connexion au serveur impossible. Vérifiez votre connexion et réessayez.';
 
 const SHARED_BUSINESS: BusinessMessages = {
-  400: 'Vérifiez votre email et votre mot de passe (8 caractères minimum).',
+  400: 'Vérifiez votre email et votre mot de passe.',
   429: 'Trop de tentatives. Patientez une minute avant de réessayer.',
 };
 

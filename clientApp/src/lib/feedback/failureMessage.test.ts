@@ -5,7 +5,7 @@ import { failureMessage } from './failureMessage';
 
 const TECHNICAL = 'Une erreur est survenue. Réessayez dans un instant.';
 const UNREACHABLE = 'Connexion au serveur impossible. Vérifiez votre connexion et réessayez.';
-const INVALID_INPUT = 'Vérifiez votre email et votre mot de passe (8 caractères minimum).';
+const INVALID_INPUT = 'Vérifiez votre email et votre mot de passe.';
 const TOO_MANY_ATTEMPTS = 'Trop de tentatives. Patientez une minute avant de réessayer.';
 const BAD_CREDENTIALS =
   'Email ou mot de passe incorrect. Réessayez ou réinitialisez votre mot de passe.';

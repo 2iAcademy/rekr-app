@@ -186,7 +186,7 @@ export function RichTextField({
           does; the frame takes the focus and error rings for both. */}
       <div
         className={cn(
-          'overflow-hidden rounded-xl border border-line bg-card transition-colors',
+          'overflow-hidden rounded-xl border border-input bg-card transition-colors',
           'has-[[role=textbox]:focus-visible]:border-brand has-[[role=textbox]:focus-visible]:ring-3 has-[[role=textbox]:focus-visible]:ring-brand/20',
           'has-[[aria-invalid=true]]:border-destructive has-[[aria-invalid=true]]:ring-3 has-[[aria-invalid=true]]:ring-destructive/20',
         )}
@@ -207,7 +207,7 @@ export function RichTextField({
               // the command runs.
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => run(command)}
-              className="flex size-11 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none aria-pressed:bg-brand-tint aria-pressed:text-brand-strong"
+              className="flex size-11 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/70 focus-visible:outline-none aria-pressed:bg-brand-tint aria-pressed:text-brand-strong"
             >
               <Icon className="size-4" />
             </button>

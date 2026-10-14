@@ -121,6 +121,19 @@ describe('CandidateOnboardingPage', () => {
     expect(screen.getByText('Étape 4 sur 4')).toBeInTheDocument();
   });
 
+  it('place le focus sur le titre de chaque nouvelle étape', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<CandidateOnboardingPage userId={1} />);
+
+    expect(screen.getByRole('heading', { name: 'Mon identité' })).not.toHaveFocus();
+
+    await fillIdentity(user);
+    expect(screen.getByRole('heading', { name: 'Mon projet' })).toHaveFocus();
+
+    await user.click(screen.getAllByRole('button', { name: 'Retour' })[0]);
+    expect(screen.getByRole('heading', { name: 'Mon identité' })).toHaveFocus();
+  });
+
   it('bloque l’étape et désigne le champ manquant', async () => {
     const user = userEvent.setup({ delay: null });
     render(<CandidateOnboardingPage userId={1} />);

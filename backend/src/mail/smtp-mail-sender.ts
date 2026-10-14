@@ -1,3 +1,4 @@
+import { externalCall } from '../observability/failure-log';
 import type { MailMessage, MailSender } from './mail-sender.interface';
 
 export interface MailTransport {
@@ -11,6 +12,8 @@ export class SmtpMailSender implements MailSender {
   ) {}
 
   async send(message: MailMessage): Promise<void> {
-    await this.transport.sendMail({ from: this.from, ...message });
+    await externalCall('smtp', 'send_mail', () =>
+      this.transport.sendMail({ from: this.from, ...message }),
+    );
   }
 }

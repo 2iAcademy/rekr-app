@@ -72,7 +72,7 @@ describe('AppShell, session absente', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Chargement de votre session');
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Mon profil' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Mon profil/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('main')).not.toBeInTheDocument();
     expect(screen.queryByText('contenu')).not.toBeInTheDocument();
   });
@@ -243,7 +243,7 @@ describe('AppShell', () => {
   it('pointe l’avatar de l’en-tête sur l’écran profil, avec l’initiale du nom dérivé de l’email', () => {
     renderShell('recruiter');
 
-    const profile = screen.getByRole('link', { name: 'Mon profil' });
+    const profile = screen.getByRole('link', { name: /^Mon profil/ });
 
     expect(profile).toHaveAttribute('href', '/profil');
     expect(profile).toHaveTextContent(/^S$/);

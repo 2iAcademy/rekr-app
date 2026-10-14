@@ -95,7 +95,7 @@ export function ProfileSection({ value, title, summary, children }: ProfileSecti
           className={cn(
             'flex min-h-14 w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left',
             'text-base font-bold text-ink transition-colors hover:bg-surface',
-            'outline-none focus-visible:ring-3 focus-visible:ring-brand/30',
+            'outline-none focus-visible:ring-3 focus-visible:ring-brand/70',
             isOpen && 'rounded-b-none',
           )}
         >

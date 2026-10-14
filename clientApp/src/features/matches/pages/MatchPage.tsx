@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { fileUrl } from '@/lib/fileUrl';
 import { FactList } from '@/components/ui/fact-list';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 interface MatchPerson {
   name: string;
@@ -77,7 +78,11 @@ export function MatchPage({
     : [];
 
   return (
-    <main className="fixed inset-0 z-50 flex min-h-dvh w-full overflow-y-auto bg-card text-ink">
+    <main
+      id={MAIN_CONTENT_ID}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex min-h-dvh w-full overflow-y-auto bg-card text-ink outline-none"
+    >
       <section className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pt-16 pb-8 sm:px-8">
         <div className="flex flex-col items-center text-center">
           <div

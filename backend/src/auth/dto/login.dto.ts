@@ -11,6 +11,8 @@ export class LoginDto {
   @IsEmail()
   email!: string;
 
+  // Not MIN_PASSWORD_LENGTH: accounts created before the 12-character rule
+  // must still be able to sign in with their 8-character password.
   @ApiProperty({
     example: 'password123',
     minLength: 8,

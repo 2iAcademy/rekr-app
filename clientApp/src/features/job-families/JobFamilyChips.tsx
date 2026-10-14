@@ -111,7 +111,7 @@ export function JobFamilyChips({
                 key={family.id}
                 className={cn(
                   'flex h-11 items-center gap-2 rounded-xl border pr-4 pl-3 text-sm whitespace-nowrap',
-                  'transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand/30',
+                  'transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand/70',
                   selected
                     ? 'border-brand bg-brand-tint font-semibold text-brand-strong'
                     : 'border-line bg-card text-ink',

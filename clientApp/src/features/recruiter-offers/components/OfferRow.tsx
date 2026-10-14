@@ -60,7 +60,7 @@ export function OfferRow({ offer, statusPending = false, onStatusChange }: Offer
       <Link
         to={`/recruteur/offres/${offer.id}/candidats`}
         state={applicantsState}
-        className="-my-1 flex min-h-11 items-center gap-1.5 self-center rounded-xl py-1 pl-2 transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none md:-mr-2 md:pr-1"
+        className="-my-1 flex min-h-11 items-center gap-1.5 self-center rounded-xl py-1 pl-2 transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/70 focus-visible:outline-none md:-mr-2 md:pr-1"
       >
         <span className="flex flex-col items-end text-right">
           <span

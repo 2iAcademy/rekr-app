@@ -14,6 +14,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
+    // Bound jsdom concurrency: Docker also runs the app and database services.
+    // Using every available CPU can starve UI tests and cause timeout failures.
+    maxWorkers: 2,
     // The journey specs drive whole wizards through the real stack; under
     // v8 coverage on a 2-vCPU runner they sit close to the 5s default.
     testTimeout: 20000,
