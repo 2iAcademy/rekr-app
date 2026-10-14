@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Download, Trash2 } from 'lucide-react';
 import { accountControllerDelete, accountControllerExport } from '@/api/generated';
 import { ApiError } from '@/api/customFetch';
@@ -47,6 +47,19 @@ export function AccountDataSection() {
   const [deleting, setDeleting] = useState(false);
   const [wrongPassword, setWrongPassword] = useState(false);
 
+  // Opening or closing the confirmation swaps the button for the form and back:
+  // the focused element leaves the DOM and the focus would fall to `body`, so it
+  // is placed by hand on what replaced it (RGAA 12.8). Asked for by the action
+  // that toggles, so a first render never steals the focus.
+  const deleteButton = useRef<HTMLButtonElement>(null);
+  const passwordField = useRef<HTMLInputElement>(null);
+  const focusNext = useRef<'password' | 'button' | null>(null);
+  useEffect(() => {
+    const target = focusNext.current;
+    focusNext.current = null;
+    if (target !== null) (target === 'password' ? passwordField : deleteButton).current?.focus();
+  }, [confirming]);
+
   const download = async () => {
     setExporting(true);
     try {
@@ -61,6 +74,7 @@ export function AccountDataSection() {
   };
 
   const cancel = () => {
+    focusNext.current = 'button';
     setConfirming(false);
     setPassword('');
     setWrongPassword(false);
@@ -109,7 +123,14 @@ export function AccountDataSection() {
             <p className="text-sm text-ink-soft">
               Supprimez votre compte et toutes les données qui y sont rattachées.
             </p>
-            <Button variant="destructive" onClick={() => setConfirming(true)}>
+            <Button
+              ref={deleteButton}
+              variant="destructive"
+              onClick={() => {
+                focusNext.current = 'password';
+                setConfirming(true);
+              }}
+            >
               <Trash2 aria-hidden="true" className="size-4" />
               Supprimer mon compte
             </Button>
@@ -125,6 +146,7 @@ export function AccountDataSection() {
                 Mot de passe
               </label>
               <PasswordInput
+                ref={passwordField}
                 id="account-delete-password"
                 autoComplete="current-password"
                 required

@@ -33,6 +33,7 @@ export function IdentityStep({ state, onChange, invalidField }: StepProps) {
       />
 
       <CityField
+        autoComplete="address-level2"
         label="Ville"
         selected={
           state.city && state.postalCode ? { name: state.city, postalCode: state.postalCode } : null

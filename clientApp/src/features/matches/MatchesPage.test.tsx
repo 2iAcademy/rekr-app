@@ -188,6 +188,34 @@ describe('MatchesPage', () => {
     expect(await screen.findByText('Acme Corp')).toBeInTheDocument();
   });
 
+  // RGAA 7.1 : motif ARIA des onglets, un seul arrêt de tabulation et les flèches.
+  it('suit le motif des onglets : panneau associé, un seul arrêt, flèches et Début/Fin', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const matchesTab = screen.getByRole('tab', { name: 'Matchs' });
+    const likesTab = screen.getByRole('tab', { name: 'Mes likes' });
+    const panel = screen.getByRole('tabpanel', { name: 'Matchs' });
+    expect(matchesTab).toHaveAttribute('aria-controls', panel.id);
+    expect(likesTab).toHaveAttribute('aria-controls', panel.id);
+    expect(matchesTab).toHaveAttribute('tabindex', '0');
+    expect(likesTab).toHaveAttribute('tabindex', '-1');
+
+    matchesTab.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(likesTab).toHaveFocus();
+    expect(likesTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Mes likes' })).toBeInTheDocument();
+
+    await user.keyboard('{ArrowRight}');
+    expect(matchesTab).toHaveFocus();
+    await user.keyboard('{End}');
+    expect(likesTab).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(matchesTab).toHaveFocus();
+    expect(matchesTab).toHaveAttribute('aria-selected', 'true');
+  });
+
   /**
    * Les onglets sont asymétriques par rôle. Un recruteur ne peut liker qu'un
    * candidat qui a déjà liké son offre, et ce like crée le match : « Mes likes »
@@ -369,6 +397,22 @@ describe('MatchesPage', () => {
 
     expect(await screen.findByText('Développeuse Back-End')).toBeInTheDocument();
     expect(screen.getByText('Offre : Développeur Back-End')).toBeInTheDocument();
+  });
+
+  // RGAA 10.11 : à 320 px, une ellipse coupait le nom et l'offre, et les lignes
+  // ne se distinguaient plus. Ils passent à la ligne au lieu d'être abrégés.
+  it('n’abrège ni le nom ni l’offre d’une ligne', async () => {
+    authenticateAs('recruiter');
+    getMatches.mockResolvedValue(matches([aRecruiterMatch]));
+    renderPage();
+
+    for (const text of [
+      await screen.findByText('Développeuse Back-End'),
+      screen.getByText('Offre : Développeur Back-End'),
+    ]) {
+      expect(text).not.toHaveClass('truncate');
+      expect(text).toHaveClass('break-words');
+    }
   });
 
   /**

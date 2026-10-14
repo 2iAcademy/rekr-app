@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Heart, HeartHandshake, HeartOff, Inbox, type LucideIcon } from 'lucide-react';
 import { ApiError } from '@/api/customFetch';
@@ -428,7 +428,7 @@ function UnmatchTrigger({ subject, unmatch }: { subject: string; unmatch: Unmatc
       disabled={unmatch.state === 'pending'}
       onClick={isOpen ? unmatch.cancel : unmatch.ask}
       className={cn(
-        'mr-2 flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none disabled:cursor-default disabled:opacity-50',
+        'mr-2 flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:ring-3 focus-visible:ring-brand/70 focus-visible:outline-none disabled:cursor-default disabled:opacity-50',
         isOpen
           ? 'bg-destructive-tint text-destructive'
           : 'text-ink-faint hover:bg-destructive-tint hover:text-destructive',
@@ -509,18 +509,20 @@ function Row({
   const body = (
     <>
       <Avatar row={row} />
+      {/* Wrapped, never cut with an ellipsis: on a 320 px screen the name and
+          the offer are what tells one row from the next (RGAA 10.11). */}
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
-          <span className="truncate text-sm font-bold text-ink">{row.name}</span>
+          <span className="min-w-0 text-sm font-bold break-words text-ink">{row.name}</span>
           {row.isNew && (
             <span className="shrink-0 rounded-full bg-brand-tint px-2 py-0.5 text-xs font-semibold text-brand-strong">
               Nouveau
             </span>
           )}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-ink-muted">{row.role}</span>
+        <span className="mt-0.5 block text-xs break-words text-ink-muted">{row.role}</span>
         {row.offer !== undefined && (
-          <span className="mt-0.5 block truncate text-xs text-ink-muted">{row.offer}</span>
+          <span className="mt-0.5 block text-xs break-words text-ink-muted">{row.offer}</span>
         )}
       </span>
       <time dateTime={row.dateTime} className="tabular shrink-0 text-xs text-ink-muted">
@@ -548,7 +550,7 @@ function Row({
             state={{ from }}
             className={cn(
               shell,
-              'transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none focus-visible:ring-inset',
+              'transition-colors hover:bg-surface focus-visible:ring-3 focus-visible:ring-brand/70 focus-visible:outline-none focus-visible:ring-inset',
             )}
           >
             {body}
@@ -648,6 +650,28 @@ export function MatchesPage() {
     );
   };
 
+  // ARIA tabs pattern: one Tab stop for the whole list, the arrows move between
+  // tabs and open the one they land on (RGAA 7.1).
+  const ids = useId();
+  const tabId = (value: TabValue) => `${ids}-tab-${value}`;
+  const panelId = `${ids}-panel`;
+  const tabRefs = useRef(new Map<TabValue, HTMLButtonElement>());
+
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
+    const index = tabs.findIndex((item) => item.value === tab.value);
+    const target = {
+      ArrowRight: (index + 1) % tabs.length,
+      ArrowLeft: (index - 1 + tabs.length) % tabs.length,
+      Home: 0,
+      End: tabs.length - 1,
+    }[event.key];
+    if (target === undefined) return;
+
+    event.preventDefault();
+    open(tabs[target]);
+    tabRefs.current.get(tabs[target].value)?.focus();
+  };
+
   return (
     <div className="mx-auto max-w-3xl md:mx-0 lg:max-w-4xl xl:max-w-5xl">
       {/* The title names the open tab: a recruiter reading « Reçus » is not
@@ -667,12 +691,20 @@ export function MatchesPage() {
           return (
             <button
               key={item.value}
+              ref={(node) => {
+                if (node) tabRefs.current.set(item.value, node);
+                else tabRefs.current.delete(item.value);
+              }}
+              id={tabId(item.value)}
               type="button"
               role="tab"
               aria-selected={isActive}
+              aria-controls={panelId}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => open(item)}
+              onKeyDown={onTabKeyDown}
               className={cn(
-                'h-10 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none',
+                'h-10 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-brand/70 focus-visible:outline-none',
                 isActive ? 'bg-card text-ink shadow-card' : 'text-ink-muted hover:text-ink',
               )}
             >
@@ -682,60 +714,63 @@ export function MatchesPage() {
         })}
       </div>
 
-      <div className="mt-4">
-        {list.state === 'loading' && (
-          <>
-            <p role="status" className="sr-only">
-              Chargement…
+      {/* One panel shared by every tab: its content follows the open one. */}
+      <div role="tabpanel" id={panelId} aria-labelledby={tabId(tab.value)}>
+        <div className="mt-4">
+          {list.state === 'loading' && (
+            <>
+              <p role="status" className="sr-only">
+                Chargement…
+              </p>
+              <ListSkeleton />
+            </>
+          )}
+          {list.state === 'failed' && (
+            <p
+              role="alert"
+              className="rounded-2xl border border-line bg-card px-4 py-6 text-center text-sm text-destructive shadow-card"
+            >
+              {tab.failure}
             </p>
-            <ListSkeleton />
-          </>
-        )}
-        {list.state === 'failed' && (
-          <p
-            role="alert"
-            className="rounded-2xl border border-line bg-card px-4 py-6 text-center text-sm text-destructive shadow-card"
-          >
-            {tab.failure}
+          )}
+          {list.state === 'ready' && list.rows.length === 0 && <EmptyTab tab={tab} />}
+          {list.state === 'ready' && list.rows.length > 0 && (
+            <ul
+              aria-label={`${tab.listLabel} liste`}
+              className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card shadow-card"
+            >
+              {list.rows.map((row) => (
+                <Row key={row.key} row={row} from={from} onRemove={list.remove} />
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {list.state === 'ready' && list.more === 'failed' && (
+          <p role="alert" className="mt-4 text-center text-sm text-destructive">
+            {tab.moreFailure}{' '}
+            <button
+              type="button"
+              onClick={list.loadMore}
+              className="font-semibold text-brand-strong underline underline-offset-2 focus-visible:ring-3 focus-visible:ring-brand/70 focus-visible:outline-none"
+            >
+              Réessayer
+            </button>
           </p>
         )}
-        {list.state === 'ready' && list.rows.length === 0 && <EmptyTab tab={tab} />}
-        {list.state === 'ready' && list.rows.length > 0 && (
-          <ul
-            aria-label={`${tab.listLabel} liste`}
-            className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card shadow-card"
+        {list.state === 'ready' && list.hasMore && list.more !== 'failed' && (
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            onClick={list.loadMore}
+            disabled={list.more === 'loading'}
+            className="mt-4 h-11 w-full rounded-xl"
           >
-            {list.rows.map((row) => (
-              <Row key={row.key} row={row} from={from} onRemove={list.remove} />
-            ))}
-          </ul>
+            {list.more === 'loading' ? 'Chargement…' : 'Voir plus'}
+          </Button>
         )}
       </div>
-
-      {list.state === 'ready' && list.more === 'failed' && (
-        <p role="alert" className="mt-4 text-center text-sm text-destructive">
-          {tab.moreFailure}{' '}
-          <button
-            type="button"
-            onClick={list.loadMore}
-            className="font-semibold text-brand-strong underline underline-offset-2 focus-visible:ring-3 focus-visible:ring-brand/30 focus-visible:outline-none"
-          >
-            Réessayer
-          </button>
-        </p>
-      )}
-      {list.state === 'ready' && list.hasMore && list.more !== 'failed' && (
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          onClick={list.loadMore}
-          disabled={list.more === 'loading'}
-          className="mt-4 h-11 w-full rounded-xl"
-        >
-          {list.more === 'loading' ? 'Chargement…' : 'Voir plus'}
-        </Button>
-      )}
     </div>
   );
 }

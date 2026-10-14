@@ -149,7 +149,8 @@
   --destructive: #c8321f;
   --destructive-tint: #fdecea;
   --border: var(--line);
-  --input: #d7dae0;
+  /* Field outlines: 3:1 at least on card and page (RGAA 3.3). */
+  --input: #868b95;
   --ring: var(--brand);
   --chart-1: #c9c0f5;
   --chart-2: #9a86ea;
@@ -180,7 +181,7 @@
   --background: #111318;
   --card: #181b21;
   --popover: #181b21;
-  --input: #353a44;
+  --input: #686e7c;
   --destructive: #f07a6a;
   --destructive-tint: #3a1d19;
   --sidebar: #181b21;

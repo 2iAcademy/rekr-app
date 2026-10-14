@@ -21,6 +21,12 @@ interface CityFieldProps {
   invalid?: boolean;
   describedBy?: string;
   debounceMs?: number;
+  /**
+   * `address-level2` when the town is the user's own, so a browser or an
+   * assistive tool can fill it in (RGAA 11.13). Left `off` for the place of a
+   * job or a company, which is not about the person typing.
+   */
+  autoComplete?: 'address-level2' | 'off';
 }
 
 const format = (city: SelectedCity): string => `${city.name} (${city.postalCode})`;
@@ -33,6 +39,7 @@ export function CityField({
   invalid,
   describedBy,
   debounceMs = DEFAULT_DEBOUNCE_MS,
+  autoComplete = 'off',
 }: CityFieldProps) {
   const fieldId = useId();
   const listId = useId();
@@ -158,7 +165,7 @@ export function CityField({
       <Input
         id={fieldId}
         role="combobox"
-        autoComplete="off"
+        autoComplete={autoComplete}
         aria-required
         aria-expanded={expanded}
         aria-controls={listId}
