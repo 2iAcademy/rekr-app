@@ -1,3 +1,4 @@
+import { SwipeEventsService } from '../data/swipe-events.service';
 import {
   ConflictException,
   Injectable,
@@ -194,6 +195,7 @@ export class OfferService {
     private readonly jobFamilies: JobFamilyService,
     @Optional() private readonly search?: OfferSearchService,
     @Optional() private readonly chat?: ChatService,
+    @Optional() private readonly swipeEvents?: SwipeEventsService,
   ) {}
 
   async create(userId: number, dto: CreateOfferDto) {
@@ -460,6 +462,10 @@ export class OfferService {
         take: limit,
         select: SHOWCASE_OFFER_COLUMNS,
       });
+      this.swipeEvents?.feed(
+        user.id,
+        offers.map((offer) => offer.id),
+      );
       return offers.map(toShowcaseOffer);
     }
 
@@ -487,6 +493,10 @@ export class OfferService {
       rankedOffers.push(...fallback);
     }
 
+    this.swipeEvents?.feed(
+      user.id,
+      rankedOffers.slice(0, limit).map((offer) => offer.id),
+    );
     return rankedOffers.slice(0, limit).map(toShowcaseOffer);
   }
   /**
@@ -497,7 +507,7 @@ export class OfferService {
    * transaction, which is what makes creating a Match race-safe.
    */
   async like(candidateUserId: number, offerId: number): Promise<LikeResultDto> {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await lockAnswer(tx, candidateUserId, offerId);
       const offer = await tx.offer.findFirst({
         where: { id: offerId, status: 'open' },
@@ -534,10 +544,15 @@ export class OfferService {
       );
       return { likeCreated: like.count === 1, ...result };
     });
+    if (result.likeCreated)
+      this.swipeEvents?.decision('like', candidateUserId, offerId);
+    if (result.matchCreated)
+      this.swipeEvents?.decision('match', candidateUserId, offerId);
+    return result;
   }
   /** Records a candidate's decision not to pursue an open offer. */
   async pass(candidateUserId: number, offerId: number): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       await lockAnswer(tx, candidateUserId, offerId);
       const offer = await tx.offer.findFirst({
         where: { id: offerId, status: 'open' },
@@ -548,11 +563,13 @@ export class OfferService {
       await tx.candidateLikesOffer.deleteMany({
         where: { candidateUserId, offerId },
       });
-      await tx.candidatePassesOffer.createMany({
+      return tx.candidatePassesOffer.createMany({
         data: [{ candidateUserId, offerId }],
         skipDuplicates: true,
       });
     });
+    if (created.count === 1)
+      this.swipeEvents?.decision('pass', candidateUserId, offerId);
   }
 
   /**
@@ -685,7 +702,7 @@ export class OfferService {
     offerId: number,
     candidateUserId: number,
   ): Promise<LikeResultDto> {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await lockAnswer(tx, candidateUserId, offerId);
       const [offer, profile] = await Promise.all([
         tx.offer.findUnique({
@@ -723,6 +740,9 @@ export class OfferService {
       );
       return { likeCreated: like.count === 1, ...result };
     });
+    if (result.matchCreated)
+      this.swipeEvents?.decision('match', candidateUserId, offerId);
+    return result;
   }
   /** Records a recruiter's decision not to pursue an applicant. */
   async passApplicant(
