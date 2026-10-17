@@ -1,3 +1,4 @@
+import { useOfferImpression } from '../useOfferImpression';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { CircleAlert, RotateCcw } from 'lucide-react';
 import { offerControllerLike, offerControllerPass } from '@/api/generated';
@@ -128,6 +129,7 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
   const [leaving, setLeaving] = useState<LeavingCard[]>([]);
   const leavingKey = useRef(0);
   const deckRef = useRef<HTMLElement>(null);
+  const impressionRef = useRef<HTMLDivElement>(null);
 
   // No client-side filter left: the endpoint shapes the deck from the profile,
   // so everything that arrives belongs in it.
@@ -136,6 +138,11 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
   const liked = likedCount(decisions);
   // Answered offers leave `deck` but stay in `offers`, so the gap is how far in we are.
   const position = offers.length - deck.length + 1;
+  useOfferImpression(
+    impressionRef,
+    current?.id,
+    offers.findIndex((offer) => offer.id === current?.id) + 1,
+  );
 
   /**
    * « Vous avez tout vu » est faux sur un deck vide à l'arrivée : le candidat n'a
@@ -322,6 +329,7 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
             <div className="relative">
               {leavingCards}
               <div
+                ref={impressionRef}
                 {...swipe.handlers}
                 className={cn(
                   'relative touch-pan-y',

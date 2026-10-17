@@ -259,3 +259,9 @@ What this deployment does **not** do, knowingly, compared with Elastic's product
 - **No dedicated monitoring yet** beyond the backend's fallback warnings.
 
 Keep the PostgreSQL eligibility recheck and fallback enabled in production. Elasticsearch only chooses the order of ids; it must never become the authority for authentication, likes, passes, matches, or offer visibility.
+
+## Prototype Big Data — US #215
+
+Le prototype local Kafka → HDFS → Spark est isolé dans `compose.data.yml`.
+Voir le [guide de lancement et les limites](data/README.md) et
+Le Compose habituel (dev) et le déploiement de production ne démarrent pas ces services.
