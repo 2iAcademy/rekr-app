@@ -1,6 +1,8 @@
+import { Link } from 'react-router';
 import { Building2, Search, type LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { Button } from '@/components/ui/button';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 const matchCountFormatter = new Intl.NumberFormat('fr-FR');
 
@@ -33,7 +35,11 @@ interface SplashPageProps {
 
 export function SplashPage({ onCreateAccount, onSignIn, weeklyMatches = 0 }: SplashPageProps) {
   return (
-    <main className="flex min-h-dvh w-full flex-col bg-background">
+    <main
+      id={MAIN_CONTENT_ID}
+      tabIndex={-1}
+      className="flex min-h-dvh w-full flex-col bg-background outline-none"
+    >
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 pt-14 pb-[max(2rem,env(safe-area-inset-bottom))] md:justify-center md:py-12">
         <div className="flex flex-col items-center text-center">
           <Logo size="lg" orientation="vertical" showMark />
@@ -78,7 +84,15 @@ export function SplashPage({ onCreateAccount, onSignIn, weeklyMatches = 0 }: Spl
           </Button>
 
           <p className="mt-2 text-center text-xs leading-snug text-ink-muted">
-            En continuant, vous acceptez les CGU et la politique de confidentialité.
+            En continuant, vous acceptez les{' '}
+            <Link to="/mentions-legales" className="underline underline-offset-2">
+              CGU
+            </Link>{' '}
+            et la{' '}
+            <Link to="/confidentialite" className="underline underline-offset-2">
+              politique de confidentialité
+            </Link>
+            .
           </p>
         </div>
       </div>

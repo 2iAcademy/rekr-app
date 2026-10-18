@@ -1,5 +1,6 @@
 import { useEffect, type RefObject } from 'react';
 import type { Decision } from '@/components/feed/deck';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 interface UseDeckKeyboardOptions {
   deckRef: RefObject<HTMLElement | null>;
@@ -33,7 +34,12 @@ export function useDeckKeyboard({
       }
 
       const target = event.target;
-      const focusIsIdle = target === document.body || target === document.documentElement;
+      // The skip link makes `main` focusable, so a click on any empty spot of
+      // the page lands there: that is still a focus at rest, not a control.
+      const focusIsIdle =
+        target === document.body ||
+        target === document.documentElement ||
+        (target instanceof HTMLElement && target.id === MAIN_CONTENT_ID);
       const focusIsInDeck = target instanceof Node && deckRef.current?.contains(target) === true;
 
       if (!focusIsIdle && !focusIsInDeck) {

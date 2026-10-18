@@ -1,3 +1,4 @@
+import { useOfferImpression } from '../useOfferImpression';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { CircleAlert, RotateCcw } from 'lucide-react';
 import { offerControllerLike, offerControllerPass } from '@/api/generated';
@@ -17,6 +18,7 @@ import {
 } from '@/components/feed/deck';
 import { useCardSwipe } from '@/hooks/useCardSwipe';
 import { useDeckKeyboard } from '@/hooks/useDeckKeyboard';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import type { OfferFeedItemDto } from '@/api/generated';
 import { likedOfferCountLabel } from '../labels';
 import { useOfferFeed } from '../useOfferFeed';
@@ -127,6 +129,7 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
   const [leaving, setLeaving] = useState<LeavingCard[]>([]);
   const leavingKey = useRef(0);
   const deckRef = useRef<HTMLElement>(null);
+  const impressionRef = useRef<HTMLDivElement>(null);
 
   // No client-side filter left: the endpoint shapes the deck from the profile,
   // so everything that arrives belongs in it.
@@ -135,6 +138,11 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
   const liked = likedCount(decisions);
   // Answered offers leave `deck` but stay in `offers`, so the gap is how far in we are.
   const position = offers.length - deck.length + 1;
+  useOfferImpression(
+    impressionRef,
+    current?.id,
+    offers.findIndex((offer) => offer.id === current?.id) + 1,
+  );
 
   /**
    * « Vous avez tout vu » est faux sur un deck vide à l'arrivée : le candidat n'a
@@ -197,6 +205,7 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
     [current, deck.length, onMatch],
   );
 
+  const reducedMotion = usePrefersReducedMotion();
   const swipe = useCardSwipe({
     onSwipeRight: (distance) => decide('liked', current, distance),
     onSwipeLeft: (distance) => decide('passed', current, distance),
@@ -320,6 +329,7 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
             <div className="relative">
               {leavingCards}
               <div
+                ref={impressionRef}
                 {...swipe.handlers}
                 className={cn(
                   'relative touch-pan-y',
@@ -329,11 +339,14 @@ export function CandidateFeedPage({ onOpenOffer, onMatch }: CandidateFeedPagePro
                     ? 'cursor-grabbing select-none'
                     : 'transition-transform duration-200 ease-out motion-reduce:transition-none',
                 )}
+                // The card still follows the finger under reduced motion, it is
+                // the gesture itself; only the tilt, pure decoration, goes.
                 style={{
                   transform:
                     swipe.offset === 0
                       ? undefined
-                      : `translateX(${swipe.offset}px) rotate(${swipe.offset / 30}deg)`,
+                      : `translateX(${swipe.offset}px)` +
+                        (reducedMotion ? '' : ` rotate(${swipe.offset / 30}deg)`),
                 }}
               >
                 <OfferCard offer={current} onViewOffer={() => onOpenOffer(current.id)} />

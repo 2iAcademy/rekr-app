@@ -88,16 +88,29 @@ describe('AppHeader', () => {
   it('ramène à l’accueil depuis le logo', () => {
     renderHeader();
 
-    expect(screen.getByRole('link', { name: 'Accueil' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Rekr, accueil' })).toHaveAttribute('href', '/');
   });
 
   it('pointe le lien profil sur la destination fournie et affiche l’initiale du nom', () => {
     renderHeader();
 
-    const profileLink = screen.getByRole('link', { name: 'Mon profil' });
+    const profileLink = screen.getByRole('link', { name: /^Mon profil/ });
 
     expect(profileLink).toHaveAttribute('href', '/profil');
     expect(profileLink).toHaveTextContent('S');
+  });
+
+  // RGAA 6.1: the accessible name of a link contains the text it shows.
+  it('inclut dans le nom de chaque lien le texte qu’il affiche', () => {
+    renderHeader();
+
+    for (const link of [
+      screen.getByRole('link', { name: 'Rekr, accueil' }),
+      screen.getByRole('link', { name: /^Mon profil/ }),
+    ]) {
+      const visible = (link.textContent ?? '').replace(/\W/g, '').toLowerCase();
+      expect(link.getAttribute('aria-label')?.toLowerCase()).toContain(visible);
+    }
   });
 
   // A `NavLink` on the avatar would flag the current screen twice in the same
@@ -164,8 +177,8 @@ describe('AppHeader', () => {
     renderHeader();
 
     const clickables = [
-      screen.getByRole('link', { name: 'Accueil' }),
-      screen.getByRole('link', { name: 'Mon profil' }),
+      screen.getByRole('link', { name: 'Rekr, accueil' }),
+      screen.getByRole('link', { name: /^Mon profil/ }),
       ...within(inlineNavigation()).getAllByRole('link'),
     ];
 
@@ -174,7 +187,7 @@ describe('AppHeader', () => {
     }
 
     for (const element of [
-      screen.getByRole('link', { name: 'Mon profil' }),
+      screen.getByRole('link', { name: /^Mon profil/ }),
       ...within(inlineNavigation()).getAllByRole('link'),
     ]) {
       expect(element.className).toContain('min-w-11');

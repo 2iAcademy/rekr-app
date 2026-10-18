@@ -47,5 +47,12 @@ Sentry.init({
   dsn,
   enabled,
   environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
+  // The commit the image was built from (IMAGE_TAG, compose.prod.yml): every
+  // error and log then says which version produced it, and Sentry's Releases
+  // page compares one deploy with the previous one.
+  release: process.env.SENTRY_RELEASE?.trim() || undefined,
   tracesSampleRate: readTracesSampleRate(),
+  // Sentry Logs: the lines `SentryLogger` copies there, searchable next to the
+  // errors instead of only in the containers on the server.
+  enableLogs: true,
 });

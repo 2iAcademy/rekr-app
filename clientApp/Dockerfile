@@ -12,6 +12,9 @@ COPY --chown=node:node . .
 
 FROM base AS dev
 
+# Seeds the shared log volume with ownership for the existing node user.
+RUN mkdir -p /home/node/logs
+
 CMD ["npm","run","dev"]
 
 FROM base AS build
@@ -21,6 +24,7 @@ FROM base AS build
 # would change nothing.
 ARG VITE_SENTRY_DSN=""
 ARG VITE_SENTRY_ENVIRONMENT=""
+ARG VITE_SENTRY_RELEASE=""
 
 RUN npm run build
 

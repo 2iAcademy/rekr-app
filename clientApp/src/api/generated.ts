@@ -21,7 +21,7 @@ export interface SignupDto {
   email: string;
   /**
    * Refused when made of fewer than 5 distinct characters, when it is a keyboard or alphabet walk, a common password, or the account address.
-   * @minLength 8
+   * @minLength 12
    * @maxLength 512
    */
   password: string;
@@ -45,7 +45,7 @@ export interface ResetPasswordDto {
   token: string;
   /**
    * Refused when made of fewer than 5 distinct characters, when it is a keyboard or alphabet walk, a common password, or the account address.
-   * @minLength 8
+   * @minLength 12
    * @maxLength 512
    */
   password: string;

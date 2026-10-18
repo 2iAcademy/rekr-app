@@ -121,7 +121,7 @@ JWT_SECRET="<long-random-secret>"
 
 Payloads:
 
-- `signup`: `{ "email": "user@mail.com", "password": "min8chars", "userType": "candidate" | "recruiter" }`
+- `signup`: `{ "email": "user@mail.com", "password": "min12characters", "userType": "candidate" | "recruiter" }`
 - `login`: `{ "email": "user@mail.com", "password": "min8chars" }`
 
 The response holds an `accessToken` and a `user` object (without the password).
@@ -184,6 +184,13 @@ The `CI Backend` workflow (`Lint` job) and the `CI Frontend` workflow (`Lint` jo
 The `lint` (backend) and `lint:fix` (frontend) variants **fix** the files: they are not checks. CI only uses the `:check` commands.
 
 Line endings are normalised to LF through `.gitattributes`: ESLint tolerates CRLF (`endOfLine: "auto"`), but `prettier --check` rejects it.
+
+## Browser and load tests
+
+Two checks run against a live stack rather than inside a test runner:
+
+- `e2e/`: Playwright tests in Chromium. The `E2E navigateur` job runs them on every pull request, against the API started by `compose.yml` and the front built and served by `vite preview`. Locally, with the stack up: `cd e2e && npm ci && npx playwright install chromium && E2E_BASE_URL=http://localhost:8080 npx playwright test`. Each run creates its own accounts (`@rekr.test`).
+- `loadtest/`: a k6 scenario of the candidate path (feed, like or pass, likes and matches) with 50 concurrent users for 5 minutes, plus a login every 2 seconds. It runs on a throwaway stack with the production images and memory limits; see the header of `loadtest/compose.yml`. Never point it at production: it creates 300 offers and 50 accounts. The `E2E navigateur` job also runs it for one minute with 10 candidates after the browser tests: the response times of each run are in its summary and in the `k6-summary` artifact.
 
 ## Code analysis — SonarQube Cloud
 
@@ -252,3 +259,9 @@ What this deployment does **not** do, knowingly, compared with Elastic's product
 - **No dedicated monitoring yet** beyond the backend's fallback warnings.
 
 Keep the PostgreSQL eligibility recheck and fallback enabled in production. Elasticsearch only chooses the order of ids; it must never become the authority for authentication, likes, passes, matches, or offer visibility.
+
+## Prototype Big Data — US #215
+
+Le prototype local Kafka → HDFS → Spark est isolé dans `compose.data.yml`.
+Voir le [guide de lancement et les limites](data/README.md) et
+Le Compose habituel (dev) et le déploiement de production ne démarrent pas ces services.

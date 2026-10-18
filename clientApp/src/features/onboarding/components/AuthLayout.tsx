@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 interface AuthLayoutProps {
   title: string;
@@ -17,7 +18,11 @@ interface AuthLayoutProps {
  */
 export function AuthLayout({ title, onBack, footer, children }: AuthLayoutProps) {
   return (
-    <main className="flex min-h-dvh w-full flex-col bg-background">
+    <main
+      id={MAIN_CONTENT_ID}
+      tabIndex={-1}
+      className="flex min-h-dvh w-full flex-col bg-background outline-none"
+    >
       <header className="border-b border-line bg-card">
         <div className="relative mx-auto flex h-14 w-full max-w-md items-center justify-center px-4">
           <Button

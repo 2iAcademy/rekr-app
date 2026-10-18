@@ -76,7 +76,7 @@ export function OfferApplicantsPage({
       <div className="flex flex-col gap-3">
         <Link
           to={OFFERS_PATH}
-          className="-ml-1 inline-flex min-h-11 items-center gap-1.5 self-start rounded-lg px-1 text-sm font-semibold text-ink-muted transition-colors outline-none hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/30"
+          className="-ml-1 inline-flex min-h-11 items-center gap-1.5 self-start rounded-lg px-1 text-sm font-semibold text-ink-muted transition-colors outline-none hover:text-ink focus-visible:ring-3 focus-visible:ring-brand/70"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           Vos offres

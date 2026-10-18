@@ -1,0 +1,88 @@
+# A throwaway stack for the load test (loadtest/parcours.js): the production
+# images and memory limits (compose.prod.yml), with nothing of the developer
+# database. Only the API is published, on 3101 so it runs next to the dev stack.
+#
+#   docker compose -f loadtest/compose.yml -p rekr-load up -d --build --wait
+#   k6 run loadtest/parcours.js
+#   docker compose -f loadtest/compose.yml -p rekr-load down -v
+#
+# The rate limits are raised: k6 sends everything from one address, and with
+# the production budgets (100 requests a minute) the test would measure the
+# limiter, not the API.
+services:
+  backend:
+    build:
+      context: ../backend
+      target: runner
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://rekr:rekr@postgres:5432/rekr
+      JWT_SECRET: loadtest-secret-not-used-anywhere-else-0123456789abcdef
+      APP_URL: http://localhost:8080
+      SMTP_HOST: localhost
+      SMTP_USER: loadtest
+      SMTP_PASSWORD: loadtest
+      MAIL_FROM: loadtest@rekr.test
+      ELASTICSEARCH_ENABLED: "true"
+      ELASTICSEARCH_NODE: http://elasticsearch:9200
+      STREAM_API_KEY: loadtest
+      STREAM_API_SECRET: loadtest
+      THROTTLE_DEFAULT_LIMIT: 1000000
+      THROTTLE_LOGIN_LIMIT: 1000000
+      THROTTLE_SIGNUP_LIMIT: 1000000
+    ports:
+      - "3101:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 384m
+
+  migrate:
+    build:
+      context: ../backend
+      target: common
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: postgresql://rekr:rekr@postgres:5432/rekr
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: rekr
+      POSTGRES_PASSWORD: rekr
+      POSTGRES_DB: rekr
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rekr -d rekr"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    mem_limit: 256m
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      action.auto_create_index: "-rekr-offers-*,+*"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+    mem_limit: 1200m

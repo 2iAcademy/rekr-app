@@ -4,7 +4,11 @@ import { Button } from '@/components/ui/button';
 import { PasswordInput } from '@/components/form/PasswordInput';
 import { authControllerResetPassword } from '@/api/generated';
 import { ApiError } from '@/api/customFetch';
-import { PASSWORD_RESET_SUCCESS, passwordResetBusiness } from '@/features/auth/authFeedback';
+import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_RESET_SUCCESS,
+  passwordResetBusiness,
+} from '@/features/auth/authFeedback';
 import {
   PASSWORD_RULE_HINT,
   passwordProblem,
@@ -178,7 +182,7 @@ export function ResetPasswordPage({
                   setPassword(event.target.value);
                   clearError();
                 }}
-                placeholder="8 caractères min."
+                placeholder={`${PASSWORD_MIN_LENGTH} caractères min.`}
                 aria-invalid={error !== null}
                 aria-describedby={
                   error !== null ? 'reset-password-hint reset-error' : 'reset-password-hint'

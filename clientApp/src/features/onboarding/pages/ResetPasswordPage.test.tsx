@@ -106,7 +106,7 @@ describe('ResetPasswordPage', () => {
     expect(resetRequest).not.toHaveBeenCalled();
   });
 
-  it('refuse un mot de passe de moins de 8 caractères sans appeler le serveur', async () => {
+  it('refuse un mot de passe de moins de 12 caractères sans appeler le serveur', async () => {
     const user = userEvent.setup();
     renderReset();
 
@@ -114,7 +114,7 @@ describe('ResetPasswordPage', () => {
     await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Le mot de passe doit contenir au moins 8 caractères.',
+      'Le mot de passe doit contenir au moins 12 caractères.',
     );
     expect(resetRequest).not.toHaveBeenCalled();
   });
@@ -123,7 +123,7 @@ describe('ResetPasswordPage', () => {
     const user = userEvent.setup();
     renderReset();
 
-    await fillPasswords(user, 'aaaaaaaa');
+    await fillPasswords(user, 'aaaaaaaaaaaa');
     await user.click(screen.getByRole('button', { name: 'Réinitialiser le mot de passe' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
@@ -146,7 +146,7 @@ describe('ResetPasswordPage', () => {
     expect(toast.closest('[data-sonner-toast]')).toHaveAttribute('data-type', 'error');
     expect(screen.queryByRole('heading', { name: 'Ce lien n’est plus valide.' })).toBeNull();
     expect(screen.getByLabelText('Nouveau mot de passe')).toHaveAccessibleDescription(
-      /8 caractères minimum/,
+      /12 caractères minimum/,
     );
   });
 

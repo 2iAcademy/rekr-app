@@ -15,6 +15,7 @@ import { chatControllerIssueToken, type ChatTokenDto, type MatchChannelDto } fro
 import { applicantsPath } from '@/features/matches/paths';
 import { useMatchConversation } from '../useMatchConversation';
 import '../chat-theme.css';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 const i18n = new Streami18n({ language: 'fr' });
 
@@ -45,7 +46,11 @@ export default function ConversationPage({
   const conversation = useMatchConversation(matchId);
 
   return (
-    <main className="rekr-conversation mx-auto flex h-dvh w-full max-w-3xl flex-col bg-background">
+    <main
+      id={MAIN_CONTENT_ID}
+      tabIndex={-1}
+      className="rekr-conversation mx-auto flex h-dvh w-full max-w-3xl flex-col bg-background outline-none"
+    >
       {conversation.status === 'ready' ? (
         <ConnectedConversation
           session={conversation.session}

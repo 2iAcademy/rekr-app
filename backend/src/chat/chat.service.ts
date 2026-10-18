@@ -1,3 +1,4 @@
+import { externalCall } from '../observability/failure-log';
 import {
   ForbiddenException,
   Inject,
@@ -73,7 +74,7 @@ export class ChatService {
       throw new ForbiddenException('Messaging requires a completed profile.');
     // Display names are refreshed on every token, so a renamed profile shows
     // up at the next connection.
-    await this.reach(() => stream.upsertUsers([streamUser]));
+    await this.reach('upsert_users', () => stream.upsertUsers([streamUser]));
     return {
       apiKey: stream.key,
       userId: streamUser.id,
@@ -95,7 +96,7 @@ export class ChatService {
 
     const channelId = channelIdOf(match.id);
     const frozen = isFrozenStatus(match.offer.status);
-    await this.reach(() =>
+    await this.reach('sync_channel', () =>
       this.syncChannel(stream, channelId, {
         people,
         allowed,
@@ -125,7 +126,7 @@ export class ChatService {
     // Channels nobody opened do not exist at Stream and fail here; that is
     // expected, and `openMatchChannel` applies the status when they are.
     await this.settle(
-      `${frozen ? 'freeze' : 'thaw'} conversations of offer ${offerId}`,
+      frozen ? 'freeze_channels' : 'thaw_channels',
       matches.map(
         ({ id }) =>
           () =>
@@ -140,7 +141,7 @@ export class ChatService {
     const stream = this.stream;
     if (!stream || matchIds.length === 0) return;
     await this.settle(
-      `delete ${matchIds.length} conversation(s)`,
+      'delete_channels',
       matchIds.map(
         (id) => () =>
           stream
@@ -154,7 +155,7 @@ export class ChatService {
   async eraseUser(userId: number): Promise<void> {
     const stream = this.stream;
     if (!stream) return;
-    await this.settle(`erase user ${userId}`, [
+    await this.settle('erase_user', [
       () =>
         stream.deleteUser(String(userId), {
           hard_delete: true,
@@ -257,13 +258,14 @@ export class ChatService {
   }
 
   /** A provider outage is a 503 for the caller, not an internal error. */
-  private async reach<T>(call: () => Promise<T>): Promise<T> {
+  private async reach<T>(
+    operation: string,
+    call: () => Promise<T>,
+  ): Promise<T> {
     try {
-      return await call();
-    } catch (cause) {
-      this.logger.warn(
-        `Stream unreachable: ${cause instanceof Error ? cause.message : String(cause)}`,
-      );
+      return await externalCall('stream_chat', operation, call);
+    } catch {
+      this.logger.warn('Stream unreachable; see external_service_failed logs.');
       throw new ServiceUnavailableException('Messaging is unavailable.');
     }
   }
@@ -315,14 +317,16 @@ export class ChatService {
     const results: PromiseSettledResult<unknown>[] = [];
     for (let start = 0; start < calls.length; start += STREAM_BATCH_SIZE) {
       const batch = calls.slice(start, start + STREAM_BATCH_SIZE);
-      results.push(...(await Promise.allSettled(batch.map((call) => call()))));
+      results.push(
+        ...(await Promise.allSettled(
+          batch.map((call) => externalCall('stream_chat', what, call)),
+        )),
+      );
     }
     const failures = results.filter((result) => result.status === 'rejected');
     if (failures.length === 0) return;
-    const reason: unknown = failures[0].reason;
     this.logger.warn(
-      `Stream: ${failures.length}/${calls.length} call(s) failed to ${what}. ` +
-        (reason instanceof Error ? reason.message : String(reason)),
+      `Stream: ${failures.length}/${calls.length} call(s) failed to ${what}.`,
     );
   }
 }

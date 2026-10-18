@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { isCandidate } from '@/domain/userType';
 import { RouteGuard } from '@/features/auth/RouteGuard';
 import { backPath } from '@/lib/backPath';
+import { MAIN_CONTENT_ID } from '@/components/layout/mainContent';
 
 const ConversationPage = lazy(() => import('./pages/ConversationPage'));
 
@@ -20,7 +21,11 @@ export function ConversationRoute() {
       {(user) => (
         <Suspense
           fallback={
-            <main className="flex h-dvh items-center justify-center bg-background">
+            <main
+              id={MAIN_CONTENT_ID}
+              tabIndex={-1}
+              className="flex h-dvh items-center justify-center bg-background outline-none"
+            >
               <p className="text-sm text-ink-muted">Chargement…</p>
             </main>
           }

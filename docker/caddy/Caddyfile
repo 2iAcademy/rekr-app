@@ -11,6 +11,13 @@ www.{$DOMAIN} {
 {$DOMAIN} {
 	encode zstd gzip
 
+	# The Prometheus metrics have no guard in the API: only the internal network
+	# may read them, Prometheus scraping backend:3001 directly.
+	@metrics path /api/metrics /api/metrics/*
+	handle @metrics {
+		respond 404
+	}
+
 	# The API keeps its /api prefix (app.setGlobalPrefix in setup-app.ts), so
 	# the path is forwarded as is. Caddy appends X-Forwarded-For, which is the
 	# single hop TRUST_PROXY_HOPS=1 tells Express to trust.
