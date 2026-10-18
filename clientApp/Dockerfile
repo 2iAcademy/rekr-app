@@ -24,6 +24,7 @@ FROM base AS build
 # would change nothing.
 ARG VITE_SENTRY_DSN=""
 ARG VITE_SENTRY_ENVIRONMENT=""
+ARG VITE_SENTRY_RELEASE=""
 
 RUN npm run build
 
