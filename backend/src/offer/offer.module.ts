@@ -1,3 +1,5 @@
+import { ImpressionController } from '../data/impression.controller';
+import { SwipeEventsService } from '../data/swipe-events.service';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ChatModule } from '../chat/chat.module';
@@ -17,7 +19,7 @@ import { OfferService } from './offer.service';
     MatchModule,
     SearchModule,
   ],
-  controllers: [OfferController],
-  providers: [OfferService],
+  controllers: [OfferController, ImpressionController],
+  providers: [OfferService, SwipeEventsService],
 })
 export class OfferModule {}
