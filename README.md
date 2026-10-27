@@ -2,6 +2,10 @@
 
 Monorepo: `backend/` (NestJS + Prisma + PostgreSQL) + `clientApp/` (React + Vite).
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, branch and commit conventions, Husky hooks, tests, issues and pull requests.
+
 ## Stack
 
 | Folder        | Contents                                                                       |
