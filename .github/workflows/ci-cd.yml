@@ -1,9 +1,21 @@
-# The whole pipeline, in one run:
+# Hadolint runs before each application build; Dockerfile errors block its CI gate.
+# Pipeline:
+#   changes -> backend/frontend build, lint, test -> Backend CI / Frontend CI
+#           -> image-security (PR/preprod, relevant changes):
+#                build-images.sh PUSH=0 -> Trivy (backend, migrate, web)
+#                -> summaries/artifacts -> Backend CI / Frontend CI
+#   CI gates -> Sonar; browser E2E also runs before production images.
+#   main: CI + Sonar + E2E -> build/push images -> Trivy on all three images
+#        -> summaries/artifacts -> deploy approval -> deploy -> smoke
 #
+# A scan failure blocks the PR gates or deployment. Scans run in Actions,
+# not on the VPS. Published images can remain in GHCR after a failed scan.
+# Deployment and rollback: docs/deploiement-vps.md.
 #   changes ─┬─ backend build → lint → test ──┬─ Backend CI ─┐
 #            │                                ├─ Sonar ──────┼─ images → deploy → smoke
 #            ├─ frontend build → lint → test ─┴─ Frontend CI ┤
-#            └─ E2E navigateur ──────────────────────────────┘
+#            └─ E2E navigateur ──────────────────────────────┤
+#   Secrets (gitleaks) ──────────────────────────────────────┘
 #
 # Pull requests and preprod stop after the CI. On main, the images are built
 # once, pushed to GHCR under the commit hash, and the deploy job then waits for
@@ -64,16 +76,141 @@ jobs:
             backend:
               - 'backend/**'
               - '.github/workflows/ci-cd.yml'
+              - 'scripts/ci/**'
             frontend:
               - 'clientApp/**'
               - 'docker/caddy/**'
               - '.github/workflows/ci-cd.yml'
+              - 'scripts/ci/**'
             e2e:
               - 'backend/**'
               - 'clientApp/**'
               - 'e2e/**'
               - 'compose.yml'
               - '.github/workflows/ci-cd.yml'
+              - 'scripts/ci/**'
+
+  # Reuse production build arguments; documentation-only PRs skip this job.
+  image-security:
+    name: Image security
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.ref != 'refs/heads/main' && (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true')
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build production images locally
+        id: build
+        env:
+          PUSH: "0"
+          IMAGE_TAG: ${{ github.sha }}
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: scripts/ci/build-images.sh
+
+      - name: Scan backend image
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/rekr-backend:${{ github.sha }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: json
+          output: trivy-backend.json
+          timeout: 10m
+
+      - name: Upload backend vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-backend
+          path: trivy-backend.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Scan migrate image
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/rekr-migrate:${{ github.sha }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: json
+          output: trivy-migrate.json
+          timeout: 10m
+
+      - name: Upload migrate vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-migrate
+          path: trivy-migrate.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Scan clientApp image
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/rekr-web:${{ github.sha }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: json
+          output: trivy-clientApp.json
+          timeout: 10m
+
+      - name: Upload clientApp vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-clientApp
+          path: trivy-clientApp.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summarize vulnerabilities
+        if: always()
+        run: python3 scripts/ci/summarize-trivy.py trivy-backend.json trivy-migrate.json trivy-clientApp.json
+
+  # gitleaks over the whole history of the branch, not only the diff: a secret
+  # removed in a later commit is still in the repository and still has to be
+  # revoked. Complements GitHub secret scanning, which only knows the token
+  # formats of its partners. Known false positives live in .gitleaks.toml.
+  # The CLI image rather than gitleaks-action, which needs a paid licence on
+  # an organisation repository.
+  secrets:
+    name: Secrets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo \
+            ghcr.io/gitleaks/gitleaks:v8.28.0 git /repo \
+            --config /repo/.gitleaks.toml --redact --no-banner --verbose
 
   backend-build:
     name: Backend build
@@ -84,6 +221,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # Dockerfile errors block this build and its existing required CI gate.
+      - name: Lint Dockerfile with Hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0; Hadolint 2.15.1
+        with:
+          dockerfile: backend/Dockerfile
+          failure-threshold: error
+          no-fail: false
 
       - name: Build backend
         run: docker build --target build -t rekr-backend:ci ./backend
@@ -191,6 +336,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Dockerfile errors block this build and its existing required CI gate.
+      - name: Lint Dockerfile with Hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0; Hadolint 2.15.1
+        with:
+          dockerfile: clientApp/Dockerfile
+          failure-threshold: error
+          no-fail: false
+
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
@@ -270,7 +423,7 @@ jobs:
   backend-ci:
     name: Backend CI
     runs-on: ubuntu-latest
-    needs: [changes, backend-build, backend-lint, backend-test]
+    needs: [changes, backend-build, backend-lint, backend-test, image-security]
     if: always()
 
     steps:
@@ -278,7 +431,7 @@ jobs:
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "changes / build / lint / test : $RESULTS"
+          echo "changes / build / lint / test / image security : $RESULTS"
           case "$RESULTS" in
             *failure*|*cancelled*)
               echo "::error::Le pipeline backend a echoue, la PR ne peut pas etre mergee."
@@ -289,7 +442,8 @@ jobs:
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
-    needs: [changes, frontend-build, frontend-lint, frontend-test]
+    needs:
+      [changes, frontend-build, frontend-lint, frontend-test, image-security]
     if: always()
 
     steps:
@@ -297,7 +451,7 @@ jobs:
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "changes / build / lint / test : $RESULTS"
+          echo "changes / build / lint / test / image security : $RESULTS"
           case "$RESULTS" in
             *failure*|*cancelled*)
               echo "::error::Le pipeline frontend a echoue, la PR ne peut pas etre mergee."
@@ -467,9 +621,9 @@ jobs:
   images:
     name: Images
     runs-on: ubuntu-latest
-    needs: [backend-ci, frontend-ci, sonar, e2e-browser]
+    needs: [secrets, backend-ci, frontend-ci, sonar, e2e-browser]
     if: github.ref == 'refs/heads/main'
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -491,11 +645,89 @@ jobs:
       # The front DSN is public (it ships in the bundle), hence a repository
       # variable: this job has no environment, so no approval to wait for.
       - name: Build and push
+        id: publish
         env:
           IMAGE_TAG: ${{ github.sha }}
           VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
           SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
         run: scripts/ci/build-images.sh
+
+      # All production images must pass before Deploy can start.
+      - name: Scan backend image
+        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/rekr-backend:${{ github.sha }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: json
+          output: trivy-backend.json
+          timeout: 10m
+
+      - name: Upload backend vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-backend
+          path: trivy-backend.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Scan migrate image
+        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/rekr-migrate:${{ github.sha }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: json
+          output: trivy-migrate.json
+          timeout: 10m
+
+      - name: Upload migrate vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-migrate
+          path: trivy-migrate.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Scan clientApp image
+        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/rekr-web:${{ github.sha }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: json
+          output: trivy-clientApp.json
+          timeout: 10m
+
+      - name: Upload clientApp vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-clientApp
+          path: trivy-clientApp.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summarize vulnerabilities
+        if: always()
+        run: python3 scripts/ci/summarize-trivy.py trivy-backend.json trivy-migrate.json trivy-clientApp.json
 
   deploy:
     name: Deploy

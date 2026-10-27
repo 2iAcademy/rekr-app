@@ -20,9 +20,13 @@ www.{$DOMAIN} {
 
 	# The API keeps its /api prefix (app.setGlobalPrefix in setup-app.ts), so
 	# the path is forwarded as is. Caddy appends X-Forwarded-For, which is the
-	# single hop TRUST_PROXY_HOPS=1 tells Express to trust.
+	# single hop TRUST_PROXY_HOPS=1 tells Express to trust. It also sets
+	# X-Request-Id, overwriting the client's, so the request ID in the backend
+	# logs is never chosen by the client.
 	handle /api/* {
-		reverse_proxy backend:3001
+		reverse_proxy backend:3001 {
+			header_up X-Request-Id {http.request.uuid}
+		}
 	}
 
 	# The SPA. Any path that is not a built file falls back to index.html, so

@@ -1,5 +1,6 @@
-import { ConsoleLogger } from '@nestjs/common';
+import { ConsoleLogger, LogLevel } from '@nestjs/common';
 import * as Sentry from '@sentry/nestjs';
+import { requestContext } from '../../observability/failure-log';
 
 type Level = 'info' | 'warn' | 'error' | 'fatal';
 
@@ -23,21 +24,45 @@ const LOCAL_ONLY_CONTEXTS = new Set([
   'LoggingMailSender',
 ]);
 
+type JsonLogOptions = {
+  context: string;
+  logLevel: LogLevel;
+  writeStreamType?: 'stdout' | 'stderr';
+  errorStack?: unknown;
+};
+
 /**
- * The console logger, unchanged, that also copies each log, warn, error and
- * fatal line to Sentry Logs.
+ * The console logger in JSON mode, one object per line, that also copies each
+ * log, warn, error and fatal line to Sentry Logs.
  *
- * Without it the logs only live in the containers on the server: reading them
- * takes an SSH session and `docker compose logs`, and they cannot be searched
- * across restarts or alerted on. Sentry is already where errors and the uptime
- * monitor are; the logs land next to them, tagged with the service that wrote
- * them (`context`). Debug and verbose stay local: they are for a developer at
+ * Every line carries `service`, like `writeFailure`, so Loki and
+ * `docker compose logs | jq` can filter both the same way. Inside an HTTP
+ * request it also carries the `request_id` set by `MetricsMiddleware`, the one
+ * returned to the client in `X-Request-ID`.
+ *
+ * Without the Sentry copy the logs only live in the containers on the server:
+ * reading them takes an SSH session and `docker compose logs`, and they cannot
+ * be searched across restarts or alerted on. Sentry is already where errors and
+ * the uptime monitor are; the logs land next to them, tagged with the service
+ * that wrote them (`context`). Debug and verbose stay local: they are for a developer at
  * the console, not for the quota.
  *
  * With no DSN the SDK is disabled (`instrument.ts`) and the copy is a no-op,
  * so tests and local runs need nothing.
  */
 export class SentryLogger extends ConsoleLogger {
+  constructor() {
+    super({ json: true });
+  }
+
+  protected getJsonLogObject(message: unknown, options: JsonLogOptions) {
+    return {
+      ...super.getJsonLogObject(message, options),
+      service: 'backend',
+      ...requestContext.getStore(),
+    };
+  }
+
   log(message: unknown, ...optionalParams: unknown[]): void {
     super.log(message, ...optionalParams);
     this.forward('info', message, optionalParams);
@@ -82,6 +107,10 @@ export class SentryLogger extends ConsoleLogger {
     }
     if (stack) {
       attributes.stack = stack;
+    }
+    const requestId = requestContext.getStore()?.request_id;
+    if (requestId) {
+      attributes.request_id = requestId;
     }
 
     Sentry.logger[level](toText(message), attributes);

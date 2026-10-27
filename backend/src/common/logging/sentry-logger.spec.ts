@@ -1,3 +1,4 @@
+import { requestContext } from '../../observability/failure-log';
 import { SentryLogger } from './sentry-logger';
 
 const sentryLogger = {
@@ -30,6 +31,10 @@ describe('SentryLogger', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
+
+  function firstLine(): string {
+    return String((stdout.mock.calls as unknown[][])[0][0]);
+  }
 
   it('still prints to the console', () => {
     logger.log('Purged 3 accounts', 'AccountRetentionService');
@@ -109,5 +114,38 @@ describe('SentryLogger', () => {
     expect(
       Object.values(sentryLogger).some((fn) => fn.mock.calls.length > 0),
     ).toBe(false);
+  });
+
+  it('prints one JSON object per line', () => {
+    logger.log('Purged 3 accounts', 'AccountRetentionService');
+
+    const line = firstLine();
+    expect(JSON.parse(line)).toMatchObject({
+      level: 'log',
+      service: 'backend',
+      context: 'AccountRetentionService',
+      message: 'Purged 3 accounts',
+    });
+    expect(line.trimEnd().split('\n')).toHaveLength(1);
+  });
+
+  it('adds the request ID inside a request, to the console and to Sentry', () => {
+    requestContext.run({ request_id: 'request-a' }, () => {
+      logger.log('Offer published', 'OfferService');
+    });
+
+    expect(JSON.parse(firstLine())).toMatchObject({
+      request_id: 'request-a',
+    });
+    expect(sentryLogger.info).toHaveBeenCalledWith('Offer published', {
+      context: 'OfferService',
+      request_id: 'request-a',
+    });
+  });
+
+  it('has no request ID outside a request', () => {
+    logger.log('Purged 3 accounts', 'AccountRetentionService');
+
+    expect(JSON.parse(firstLine())).not.toHaveProperty('request_id');
   });
 });
