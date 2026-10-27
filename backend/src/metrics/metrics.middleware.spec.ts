@@ -11,12 +11,16 @@ describe('HTTP failure logging', () => {
   afterEach(() => output.mockClear());
   afterAll(() => output.mockRestore());
 
-  function respond(statusCode: number, url = '/api/offers/123?token=secret') {
+  function respond(
+    statusCode: number,
+    url = '/api/offers/123?token=secret',
+    headers: Record<string, string> = {},
+  ) {
     const recordHttpRequest = jest.fn();
     const middleware = new MetricsMiddleware({
       recordHttpRequest,
     } as unknown as MetricsService);
-    const req = { originalUrl: url, method: 'GET' } as Request;
+    const req = { originalUrl: url, method: 'GET', headers } as Request;
     const res = Object.assign(new EventEmitter(), {
       statusCode,
       setHeader: jest.fn(),
@@ -59,5 +63,25 @@ describe('HTTP failure logging', () => {
     const { recordHttpRequest } = respond(503, '/api/metrics');
     expect(output).not.toHaveBeenCalled();
     expect(recordHttpRequest).not.toHaveBeenCalled();
+  });
+
+  it('reuses a safe upstream X-Request-Id', () => {
+    const { res, contextId } = respond(200, '/api/offers', {
+      'x-request-id': 'caddy-4f2a.9',
+    });
+    expect(contextId).toBe('caddy-4f2a.9');
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', 'caddy-4f2a.9');
+  });
+
+  it.each([
+    ['a newline', 'abc\n{"level":"fatal"}'],
+    ['a value over 128 characters', 'a'.repeat(129)],
+    ['an empty value', ''],
+  ])('generates its own ID when the upstream one has %s', (_, incoming) => {
+    const { contextId } = respond(200, '/api/offers', {
+      'x-request-id': incoming,
+    });
+    expect(contextId).not.toBe(incoming);
+    expect(contextId).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
