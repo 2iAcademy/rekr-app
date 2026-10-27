@@ -5,6 +5,19 @@ import { requestContext, writeFailure } from '../observability/failure-log';
 import { performance } from 'node:perf_hooks';
 import { MetricsService } from './metrics.service';
 
+/**
+ * An upstream ID is reused only if it is short and made of safe characters: it
+ * ends up in every log line of the request, so a client must not be able to
+ * inject a newline, a JSON fragment or a megabyte of text there.
+ */
+const SAFE_REQUEST_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+
+export function resolveRequestId(incoming: unknown): string {
+  return typeof incoming === 'string' && SAFE_REQUEST_ID.test(incoming)
+    ? incoming
+    : randomUUID();
+}
+
 @Injectable()
 export class MetricsMiddleware implements NestMiddleware {
   constructor(private readonly metricsService: MetricsService) {}
@@ -19,7 +32,7 @@ export class MetricsMiddleware implements NestMiddleware {
     }
 
     const startedAt = performance.now();
-    const requestId = randomUUID();
+    const requestId = resolveRequestId(req.headers['x-request-id']);
     res.setHeader('X-Request-ID', requestId);
 
     res.once('finish', () => {
