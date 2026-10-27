@@ -2,6 +2,8 @@
 
 Une décision par fichier, numérotée, au format de [`template.md`](template.md). Une décision remplacée n'est pas supprimée : son statut passe à « Remplacée par ADR-XXXX ».
 
+La vue d'ensemble des composants et de leurs flux est dans [`docs/architecture.md`](../architecture.md).
+
 | N° | Décision | Statut |
 | --- | --- | --- |
 | [0001](0001-backend-nestjs-monolithe.md) | Backend en monolithe NestJS | Acceptée |
