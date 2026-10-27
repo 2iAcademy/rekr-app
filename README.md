@@ -2,6 +2,9 @@
 
 Monorepo: `backend/` (NestJS + Prisma + PostgreSQL) + `clientApp/` (React + Vite).
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, branch and commit conventions, Husky hooks, tests, issues and pull requests.
 The components, their flows and the diagrams are described in [docs/architecture.md](docs/architecture.md).
 Architecture decisions are recorded in [docs/adr/](docs/adr/README.md).
 
