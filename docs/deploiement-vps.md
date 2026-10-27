@@ -49,13 +49,16 @@ seule exécution :
 
 1. **CI** (à chaque PR, sur `preprod` et sur `main`) : build, lint et tests du
    backend et du front, puis analyse Sonar. « Backend CI » et « Frontend CI »
-   sont les contrôles obligatoires des PR.
+   sont les contrôles obligatoires des PR et intègrent le résultat du scan Trivy
+   lorsque les changements nécessitent de construire les images.
 2. **Images** (sur `main` uniquement, une fois la CI verte) : construit trois
    images et les pousse sur GHCR, taguées avec le hash du commit
    (`scripts/ci/build-images.sh`) :
    - `rekr-backend` : l'API ;
    - `rekr-migrate` : les migrations Prisma ;
    - `rekr-web` : Caddy, avec le front et le `Caddyfile` dedans.
+     Les trois images publiées sont ensuite scannées par Trivy avant de permettre
+     le passage à `Deploy`.
 3. **Deploy** : attend l'approbation de Julien ou de Diego (environnement
    GitHub `production`). C'est la seule étape manuelle, et elle n'est proposée
    que si tout ce qui précède a réussi. Ensuite :
@@ -66,6 +69,69 @@ seule exécution :
    - l'envoie en SSH au compte `deploy`, dont la clé ne peut lancer que
      `/usr/local/bin/rekr-deploy`.
 4. **Smoke test** : vérifie que `https://rekr.tech/api/health` répond 200.
+
+### Scan des images avec Trivy
+
+Sur les PR et `preprod`, le job `Image security` utilise les sorties de `changes` :
+une PR qui ne modifie que la documentation ne reconstruit pas les images.
+Les changements backend, frontend, Caddy, workflow ou scripts CI déclenchent le scan.
+Le job appelle `scripts/ci/build-images.sh` avec `PUSH=0` : les mêmes cibles et
+arguments que la production construisent localement `rekr-backend`, `rekr-migrate`
+et `rekr-web`, sans publication ni identifiants GHCR. Les trois images sont
+analysées, y compris les dépendances de développement présentes dans l'image de migration.
+Le résultat participe aux contrôles obligatoires `Backend CI` et `Frontend CI`.
+
+Sur `main`, le job `Images` construit et publie les trois images, puis Trivy
+analyse leurs tags de commit avant que `Deploy` puisse démarrer. Une vulnérabilité
+**CRITICAL avec une correction disponible** fait échouer le job (`ignore-unfixed`
+et code de sortie 1). Une erreur technique du scanner bloque également la suite.
+Les autres scans sont tout de même tentés après un premier échec. Une image peut
+rester publiée dans GHCR après un échec, mais cette exécution ne la déploie pas ;
+la version déjà en service continue de tourner. Trivy s'exécute dans GitHub Actions,
+pas sur le VPS.
+
+Dans **Actions → exécution CI/CD**, le résumé du job et ses logs indiquent les CVE,
+paquets, versions installées et versions corrigées. Les rapports JSON filtrés sur
+les CRITICAL corrigeables sont disponibles dans **Artifacts** sous `trivy-backend`,
+`trivy-migrate` et `trivy-clientApp`, pendant 30 jours, même si le scan échoue.
+Si aucun rapport n'a pu être généré, le résumé le signale : cela ne signifie pas
+que l'image est sans vulnérabilité. Corriger les dépendances ou l'image de base
+concernées, puis relancer la CI ; ne pas contourner le contrôle pour déployer.
+
+#### Pourquoi ces modifications du workflow ?
+
+| Modification                                                                   | Justification et effet                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `needs: changes` et condition sur `image-security`                             | Évite les builds pour une PR uniquement documentaire. Hors PR, les sorties de `changes` activent les contrôles : `preprod` est scanné à chaque exécution. Sur `main`, le scan se fait dans `Images`.                                                             |
+| `scripts/ci/**` dans les filtres backend, frontend et E2E                      | Une modification des scripts de construction ou de résumé déclenche les validations, même sans changement du code applicatif.                                                                                                                                    |
+| Appel partagé à `build-images.sh` avec `PUSH=0`                                | Construit les trois images une seule fois dans ce job, avec les définitions et arguments de production. Remplace les commandes dupliquées dans une matrice par un build commun et trois scans séquentiels. Les builds de compilation existants restent en place. |
+| Scan de `rekr-migrate`                                                         | Cette image s'exécute aussi en production et contient le résultat du `npm ci` complet, dont des dépendances absentes de l'image API finale.                                                                                                                      |
+| `scanners: vuln` et `vuln-type: os,library`                                    | Analyse les vulnérabilités des paquets système et des bibliothèques détectables dans les images finales. Complète les analyses du code et des dépendances, sans garantir l'absence de toute faille.                                                              |
+| `severity: CRITICAL`, `ignore-unfixed: true`, `exit-code: 1`                   | Applique le critère du ticket : une CRITICAL corrigeable bloque. Les rapports sont filtrés selon cette règle, pas un inventaire de toutes les gravités.                                                                                                          |
+| Dépendance des contrôles `Backend CI` et `Frontend CI` envers `image-security` | Rend un échec du scan bloquant via les contrôles déjà utilisés par les PR. Un scan ignoré sur une PR documentaire ne les fait pas échouer.                                                                                                                       |
+| Scans dans `Images` après publication sur `main`                               | Vérifie les images publiées de ce commit avant de permettre le déploiement. Conserve la construction/publication existante et la dépendance de `Deploy` envers `Images`.                                                                                         |
+| Condition `!cancelled()` et réussite du build pour chaque scan                 | Tente les scans suivants même si le premier échoue, mais pas après un build raté ou une annulation. L'échec initial reste bloquant.                                                                                                                              |
+| Uploads et résumé avec `always()`                                              | Tente de conserver les diagnostics même après un échec. Un rapport absent est signalé ; les logs du build ou du scanner permettent d'en chercher la cause.                                                                                                       |
+| Artefacts JSON conservés 30 jours                                              | Rend les rapports téléchargeables sans configurer SARIF ni accorder `security-events: write`. Le ticket accepte un artefact comme alternative à l'onglet Security.                                                                                               |
+| Action Trivy fixée au SHA de la version 0.36.0                                 | Stabilise la révision de l'action utilisée. Cette référence doit être mise à jour explicitement ; elle ne fige pas la base de vulnérabilités téléchargée.                                                                                                        |
+| 60 minutes par job d'images et 10 minutes par scan                             | Prévoit du temps pour les builds et trois scans tout en bornant une exécution bloquée. Ce sont des limites maximales, pas des attentes imposées.                                                                                                                 |
+| Schéma en tête du workflow                                                     | Rend visibles les contrôles de sécurité et leur position avant le déploiement.                                                                                                                                                                                   |
+
+#### Rôle du script Python de résumé
+
+`scripts/ci/summarize-trivy.py` lit les trois rapports JSON et produit le même
+format de tableau dans les logs et dans `GITHUB_STEP_SUMMARY`, sur les PR comme
+sur `main`. Ce fichier partagé évite de répéter la mise en forme dans les deux
+jobs. La bibliothèque standard Python suffit pour lire le JSON, échapper les
+valeurs du tableau et distinguer un rapport vide d'un rapport absent ; aucune
+dépendance Python supplémentaire n'est installée. Un JSON malformé fait échouer
+l'étape de résumé.
+
+Python est un choix de maintenance, pas une exigence de Trivy : `jq` aurait
+également pu produire un résumé. Le script ne détecte aucune CVE, ne décide pas
+de la gravité et ne remplace pas le code de sortie du scanner. Il présente les
+résultats déjà filtrés par Trivy, dans le runner GitHub Actions. Aucun script
+ni service supplémentaire n'est installé sur le VPS.
 
 Sur le serveur, `rekr-deploy` :
 
