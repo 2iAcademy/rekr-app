@@ -26,6 +26,8 @@ describe('external failure logging', () => {
     });
     expect(output).toHaveBeenCalledTimes(1);
     const line = String(output.mock.calls[0][0]);
+    const { timestamp } = JSON.parse(line) as { timestamp: unknown };
+    expect(typeof timestamp).toBe('number');
     expect(JSON.parse(line)).toMatchObject({
       event: 'external_service_failed',
       dependency: 'smtp',

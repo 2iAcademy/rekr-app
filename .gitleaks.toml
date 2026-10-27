@@ -1,0 +1,55 @@
+# gitleaks configuration, read by the Secrets job of .github/workflows/ci-cd.yml.
+#
+# The default rules apply; the allowlists below only silence the false
+# positives found by the full history scan of #315. Each one is attached to the
+# rule that raised it and pinned to its file and to its exact value, so a real
+# secret added to the same file is still reported. A new false positive gets
+# its own entry here, with the reason.
+#
+# They are rule allowlists on purpose: a global [[allowlists]] entry with paths
+# skips the whole file before any rule runs, whatever its condition says.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Passwords of the throwaway accounts created by the browser tests and the load test, on a local or CI stack"
+condition = "AND"
+paths = ['''(^|/)e2e/tests/match\.spec\.ts$''', '''(^|/)loadtest/parcours\.js$''']
+regexes = ['''^Rekr-(e2e|charge)-parcours-2026$''']
+
+[[rules.allowlists]]
+description = "Grafana panel query ids (refId keys), not credentials"
+condition = "AND"
+paths = ['''(^|/)docker/grafana/provisioning/dashboards/json/.+\.json$''']
+regexes = ['''^Q-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-\d+$''']
+
+[[rules.allowlists]]
+description = "Sample signup payload in the README"
+condition = "AND"
+paths = ['''(^|/)README\.md$''']
+regexes = ['''^min12characters$''']
+
+[[rules.allowlists]]
+description = "Badge URL of the NestJS starter README, with its placeholder token"
+condition = "AND"
+paths = ['''(^|/)backend/README\.md$''']
+regexes = ['''^abc123def456$''']
+
+[[rules.allowlists]]
+description = "Fixed value used by the unit test of the JWT secret strength check"
+condition = "AND"
+paths = ['''(^|/)backend/src/auth/jwt-secret\.spec\.ts$''']
+regexes = ['''^k3J9xQ2mV7pL4sT8wZ1bN6cR5yH0aF3d$''']
+
+[[rules]]
+id = "curl-auth-user"
+
+[[rules.allowlists]]
+description = "Elasticsearch healthcheck: the password is read from the environment, never written in the file"
+condition = "AND"
+paths = ['''(^|/)compose(\..+)?\.yml$''']
+regexes = ['''^elastic:\$\$\{ELASTIC_PASSWORD\}$''']
