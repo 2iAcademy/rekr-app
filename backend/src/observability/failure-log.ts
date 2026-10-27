@@ -9,7 +9,7 @@ export function writeFailure(
 ): void {
   console.error(
     JSON.stringify({
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
       level: 'error',
       service: 'backend',
       event,

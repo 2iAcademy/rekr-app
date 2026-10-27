@@ -10,6 +10,19 @@
 # A scan failure blocks the PR gates or deployment. Scans run in Actions,
 # not on the VPS. Published images can remain in GHCR after a failed scan.
 # Deployment and rollback: docs/deploiement-vps.md.
+#   changes ─┬─ backend build → lint → test ──┬─ Backend CI ─┐
+#            │                                ├─ Sonar ──────┼─ images → deploy → smoke
+#            ├─ frontend build → lint → test ─┴─ Frontend CI ┤
+#            └─ E2E navigateur ──────────────────────────────┤
+#   Secrets (gitleaks) ──────────────────────────────────────┘
+#
+# Pull requests and preprod stop after the CI. On main, the images are built
+# once, pushed to GHCR under the commit hash, and the deploy job then waits for
+# an approval (Julien or Diego, GitHub environment `production`): it is the
+# only manual step, and it is only offered once everything before it passed.
+#
+# The server never builds anything: it pulls the images of that commit. Setup
+# and rollback: docs/deploiement-vps.md.
 name: CI/CD
 
 on:
@@ -174,6 +187,29 @@ jobs:
       - name: Summarize vulnerabilities
         if: always()
         run: python3 scripts/ci/summarize-trivy.py trivy-backend.json trivy-migrate.json trivy-clientApp.json
+
+  # gitleaks over the whole history of the branch, not only the diff: a secret
+  # removed in a later commit is still in the repository and still has to be
+  # revoked. Complements GitHub secret scanning, which only knows the token
+  # formats of its partners. Known false positives live in .gitleaks.toml.
+  # The CLI image rather than gitleaks-action, which needs a paid licence on
+  # an organisation repository.
+  secrets:
+    name: Secrets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo \
+            ghcr.io/gitleaks/gitleaks:v8.28.0 git /repo \
+            --config /repo/.gitleaks.toml --redact --no-banner --verbose
 
   backend-build:
     name: Backend build
@@ -568,7 +604,7 @@ jobs:
   images:
     name: Images
     runs-on: ubuntu-latest
-    needs: [backend-ci, frontend-ci, sonar, e2e-browser]
+    needs: [secrets, backend-ci, frontend-ci, sonar, e2e-browser]
     if: github.ref == 'refs/heads/main'
     timeout-minutes: 60
     permissions:
