@@ -1,0 +1,77 @@
+<svg viewBox="0 0 880 600" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <rect x="0" y="0" width="880" height="600" fill="#ffffff"/>
+  <defs>
+    <marker id="inc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+  <rect x="205" y="55" width="475" height="515" rx="14" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="442" y="80" text-anchor="middle" font-size="15" font-weight="bold" fill="#64748b">Rekr</text>
+  <g stroke="#94a3b8" stroke-width="1.2">
+    <line x1="103" y1="244" x2="362" y2="120"/>
+    <line x1="103" y1="244" x2="240" y2="188"/>
+    <line x1="103" y1="244" x2="240" y2="250"/>
+    <line x1="103" y1="244" x2="240" y2="312"/>
+    <line x1="103" y1="244" x2="240" y2="374"/>
+    <line x1="802" y1="244" x2="522" y2="120"/>
+    <line x1="802" y1="244" x2="645" y2="188"/>
+    <line x1="802" y1="244" x2="645" y2="250"/>
+    <line x1="802" y1="244" x2="645" y2="312"/>
+    <line x1="802" y1="244" x2="645" y2="374"/>
+    <line x1="103" y1="488" x2="362" y2="520"/>
+  </g>
+  <g stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5 4">
+    <line x1="340" y1="394" x2="405" y2="430" marker-end="url(#inc)"/>
+    <line x1="545" y1="394" x2="479" y2="430" marker-end="url(#inc)"/>
+  </g>
+  <text x="442" y="412" text-anchor="middle" font-size="9.5" fill="#94a3b8" font-style="italic">&#171;include&#187;</text>
+  <g fill="#eff6ff" stroke="#2563eb" stroke-width="1.5">
+    <ellipse cx="442" cy="120" rx="82" ry="23"/>
+    <ellipse cx="320" cy="188" rx="82" ry="23"/>
+    <ellipse cx="320" cy="250" rx="82" ry="23"/>
+    <ellipse cx="320" cy="312" rx="82" ry="23"/>
+    <ellipse cx="320" cy="374" rx="82" ry="23"/>
+    <ellipse cx="565" cy="188" rx="82" ry="23"/>
+    <ellipse cx="565" cy="250" rx="82" ry="23"/>
+    <ellipse cx="565" cy="312" rx="82" ry="23"/>
+    <ellipse cx="565" cy="374" rx="82" ry="23"/>
+    <ellipse cx="442" cy="448" rx="92" ry="26"/>
+    <ellipse cx="442" cy="520" rx="82" ry="23"/>
+  </g>
+  <g text-anchor="middle" font-size="12" fill="#1f2933">
+    <text x="442" y="124">Créer un compte</text>
+    <text x="320" y="192">Compléter son profil</text>
+    <text x="320" y="254">Renseigner ses tags</text>
+    <text x="320" y="316">Parcourir les offres</text>
+    <text x="320" y="378">Aimer une offre</text>
+    <text x="565" y="192">Gérer l'entreprise</text>
+    <text x="565" y="254">Publier une offre</text>
+    <text x="565" y="316">Taguer une offre</text>
+    <text x="565" y="378">Aimer un candidat</text>
+    <text x="442" y="445">Mise en relation</text>
+    <text x="442" y="520">Administration</text>
+  </g>
+  <text x="442" y="459" text-anchor="middle" font-size="9.5" fill="#52606d">match réciproque</text>
+  <g stroke="#1f2933" stroke-width="2" fill="none">
+    <circle cx="85" cy="212" r="12"/>
+    <line x1="85" y1="224" x2="85" y2="258"/>
+    <line x1="64" y1="236" x2="106" y2="236"/>
+    <line x1="85" y1="258" x2="70" y2="282"/>
+    <line x1="85" y1="258" x2="100" y2="282"/>
+    <circle cx="820" cy="212" r="12"/>
+    <line x1="820" y1="224" x2="820" y2="258"/>
+    <line x1="799" y1="236" x2="841" y2="236"/>
+    <line x1="820" y1="258" x2="805" y2="282"/>
+    <line x1="820" y1="258" x2="835" y2="282"/>
+    <circle cx="85" cy="452" r="12"/>
+    <line x1="85" y1="464" x2="85" y2="498"/>
+    <line x1="64" y1="476" x2="106" y2="476"/>
+    <line x1="85" y1="498" x2="70" y2="522"/>
+    <line x1="85" y1="498" x2="100" y2="522"/>
+  </g>
+  <g text-anchor="middle" font-size="13" font-weight="bold" fill="#1f2933">
+    <text x="85" y="302">Candidat</text>
+    <text x="820" y="302">Recruteur</text>
+    <text x="85" y="542">Administrateur</text>
+  </g>
+</svg>
