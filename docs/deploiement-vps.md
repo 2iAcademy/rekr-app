@@ -148,6 +148,66 @@ déploiement volée ne peut donc relancer que du code relu et mergé.
 Les scripts `scripts/ci/*.sh` et `scripts/deploy/rekr-deploy` ne dépendent pas
 de GitHub : seul le fichier du workflow serait à réécrire pour une autre CI.
 
+## Vérification des Dockerfiles avec Hadolint
+
+Dans `.github/workflows/ci-cd.yml`, les jobs `Backend build` et `Frontend build`
+exécutent Hadolint après le checkout et avant la compilation. Ils analysent
+respectivement `backend/Dockerfile` et `clientApp/Dockerfile`. La référence de
+l'action est fixée au commit de la version 3.5.0, qui utilise Hadolint 2.15.1.
+Les chemins fournis à l'action sont relatifs à la racine du dépôt, y compris
+pour le job frontend dont les commandes `run` utilisent `clientApp/`.
+
+`failure-threshold: error` fait échouer le job dès qu'une règle de niveau erreur
+est violée ; `no-fail: false` conserve ce code de sortie. Les dépendances déjà
+présentes propagent cet échec vers `Backend CI` ou `Frontend CI`, puis bloquent
+la publication et le déploiement sur `main`. Aucun nouveau service ne tourne sur
+le VPS. Les filtres existants déclenchent ces jobs pour les changements des
+applications ou du workflow ; une PR uniquement documentaire les ignore.
+
+Les diagnostics sont consultables dans **Actions → exécution → Backend build /
+Frontend build → Lint Dockerfile with Hadolint**. Un avertissement ne bloque pas
+avec ce seuil, mais doit être corrigé ou explicitement justifié lors de la revue.
+Il ne faut pas désactiver globalement les règles pour obtenir une CI verte.
+
+### Diagnostics et exceptions actuels
+
+- **DL3022, frontend :** `COPY --from=rekr-caddy` utilise un contexte BuildKit
+  externe transmis par `compose.prod.yml` et `scripts/ci/build-images.sh`.
+  Hadolint l'interprète comme un alias de stage manquant. Un commentaire explique
+  ce cas et `# hadolint ignore=DL3022`, placé juste avant cette instruction,
+  ignore uniquement ce diagnostic pour cette instruction. Le contexte reste
+  nécessaire pour construire l'image.
+- **DL3066, niveau information :** les deux Dockerfiles utilisent `USER node`
+  dans leurs stages Node concernés. Cet utilisateur est fourni par les images
+  officielles Node et les permissions utilisent déjà `node:node`. Le nom est
+  conservé pour rester cohérent avec cette configuration. Le diagnostic reste
+  visible ; aucune règle n'est désactivée pour le masquer.
+
+Les constructions multi-stage et le `USER node` du stage backend `runner`
+restent inchangés. Hadolint n'est pas une preuve exhaustive d'exécution non-root :
+le stage frontend final repart de l'image Caddy et n'hérite pas du `USER node`
+des stages précédents. Modifier son utilisateur demanderait une vérification
+séparée des permissions, volumes et ports ; ce ticket ajoute le contrôle statique,
+pas un changement du comportement de production.
+
+### Reproduire le contrôle localement
+
+Avec Hadolint 2.15.1 installé, depuis la racine :
+
+```bash
+hadolint --failure-threshold error backend/Dockerfile clientApp/Dockerfile
+```
+
+Pour afficher également les diagnostics volontairement ignorés pendant une revue :
+
+```bash
+hadolint --disable-ignore-pragma --failure-threshold error backend/Dockerfile clientApp/Dockerfile
+```
+
+Les erreurs Hadolint bloquent, même avec des tests applicatifs verts. Ce contrôle
+lit les Dockerfiles et leurs instructions shell ; il ne construit pas les images
+et ne remplace ni les tests, ni un scan de vulnérabilités des images.
+
 ## Préparer le compte `deploy` et le dépôt
 
 Une seule fois, depuis un compte administrateur.

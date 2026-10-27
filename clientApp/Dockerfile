@@ -34,5 +34,8 @@ RUN npm run build
 # `rekr-caddy` (compose.prod.yml, scripts/ci/build-images.sh).
 FROM caddy:2.11-alpine AS prod
 
+# rekr-caddy is an external BuildKit named context supplied by compose.prod.yml
+# and scripts/ci/build-images.sh, not a stage declared in this Dockerfile.
+# hadolint ignore=DL3022
 COPY --from=rekr-caddy Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/dist /srv

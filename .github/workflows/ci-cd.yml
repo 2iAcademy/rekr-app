@@ -1,3 +1,4 @@
+# Hadolint runs before each application build; Dockerfile errors block its CI gate.
 # Pipeline:
 #   changes -> backend/frontend build, lint, test -> Backend CI / Frontend CI
 #           -> image-security (PR/preprod, relevant changes):
@@ -221,6 +222,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Dockerfile errors block this build and its existing required CI gate.
+      - name: Lint Dockerfile with Hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0; Hadolint 2.15.1
+        with:
+          dockerfile: backend/Dockerfile
+          failure-threshold: error
+          no-fail: false
+
       - name: Build backend
         run: docker build --target build -t rekr-backend:ci ./backend
 
@@ -326,6 +335,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # Dockerfile errors block this build and its existing required CI gate.
+      - name: Lint Dockerfile with Hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0; Hadolint 2.15.1
+        with:
+          dockerfile: clientApp/Dockerfile
+          failure-threshold: error
+          no-fail: false
 
       - name: Setup Node
         uses: actions/setup-node@v5
