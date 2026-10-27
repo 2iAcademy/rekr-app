@@ -2,6 +2,8 @@
 
 Monorepo: `backend/` (NestJS + Prisma + PostgreSQL) + `clientApp/` (React + Vite).
 
+Architecture decisions are recorded in [docs/adr/](docs/adr/README.md).
+
 ## Stack
 
 | Folder        | Contents                                                                       |
