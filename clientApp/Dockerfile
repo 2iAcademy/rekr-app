@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 
 WORKDIR /app
 RUN chown node:node /app
@@ -33,6 +33,11 @@ RUN npm run build
 # build context, in docker/caddy: it comes in as the named context
 # `rekr-caddy` (compose.prod.yml, scripts/ci/build-images.sh).
 FROM caddy:2.11-alpine AS prod
+
+# The Caddy image is not rebuilt as soon as Alpine ships a security fix, so
+# the image-security gate fails on CVEs already fixed upstream: pull the
+# patched Alpine packages at build time.
+RUN apk upgrade --no-cache
 
 # rekr-caddy is an external BuildKit named context supplied by compose.prod.yml
 # and scripts/ci/build-images.sh, not a stage declared in this Dockerfile.

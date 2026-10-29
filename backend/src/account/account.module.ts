@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { ChatModule } from '../chat/chat.module';
 import { StorageModule } from '../storage/storage.module';
@@ -7,7 +8,7 @@ import { AccountRetentionService } from './account-retention.service';
 import { AccountService } from './account.service';
 
 @Module({
-  imports: [AuthModule, ChatModule, StorageModule],
+  imports: [AuditModule, AuthModule, ChatModule, StorageModule],
   controllers: [AccountController],
   providers: [AccountService, AccountRetentionService],
 })

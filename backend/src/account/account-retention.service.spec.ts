@@ -1,9 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { AccountService } from './account.service';
 import { AccountRetentionService } from './account-retention.service';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const HOUR_MS = 60 * 60 * 1000;
+const auditPurge = jest.fn().mockResolvedValue(0);
 
 describe('AccountRetentionService scheduling', () => {
   let service: AccountRetentionService;
@@ -17,6 +19,7 @@ describe('AccountRetentionService scheduling', () => {
       {} as PrismaService,
       {} as AccountService,
       config,
+      { purgeExpired: auditPurge } as unknown as AuditService,
     );
     purge = jest.spyOn(service, 'purgeInactive').mockResolvedValue(0);
   };
@@ -47,6 +50,16 @@ describe('AccountRetentionService scheduling', () => {
     jest.advanceTimersByTime(12 * HOUR_MS);
 
     expect(purge).toHaveBeenCalledTimes(3);
+  });
+
+  it('purges the security journal on the same schedule', () => {
+    build(undefined);
+    auditPurge.mockClear();
+
+    service.onApplicationBootstrap();
+    jest.advanceTimersByTime(24 * HOUR_MS);
+
+    expect(auditPurge).toHaveBeenCalledTimes(2);
   });
 
   it('never runs when the interval is 0', () => {

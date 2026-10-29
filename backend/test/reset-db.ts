@@ -18,4 +18,5 @@ export async function resetDb(prisma: PrismaService): Promise<void> {
   await prisma.refreshToken.deleteMany();
   await prisma.passwordResetToken.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.auditEvent.deleteMany();
 }

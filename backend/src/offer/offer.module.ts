@@ -1,6 +1,7 @@
 import { ImpressionController } from '../data/impression.controller';
 import { SwipeEventsService } from '../data/swipe-events.service';
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { ChatModule } from '../chat/chat.module';
 import { CityModule } from '../city/city.module';
@@ -12,6 +13,7 @@ import { OfferService } from './offer.service';
 
 @Module({
   imports: [
+    AuditModule,
     AuthModule,
     ChatModule,
     CityModule,

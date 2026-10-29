@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'node:crypto';
+import { AuditService } from '../audit/audit.service';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RefreshTokenService } from './refresh-token.service';
@@ -25,6 +26,7 @@ interface TestContext {
     revokeById: jest.Mock;
     revokeFamily: jest.Mock;
   };
+  audit: { record: jest.Mock };
 }
 
 async function createTestContext(): Promise<TestContext> {
@@ -32,6 +34,7 @@ async function createTestContext(): Promise<TestContext> {
     user: { findUnique: jest.fn(), create: jest.fn() },
     $executeRaw: jest.fn(),
   };
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const refreshTokens = {
     issue: jest.fn().mockResolvedValue({
       token: 'raw-refresh',
@@ -55,10 +58,11 @@ async function createTestContext(): Promise<TestContext> {
       { provide: PrismaService, useValue: prisma },
       { provide: JwtService, useValue: { sign: jest.fn(() => 'token') } },
       { provide: RefreshTokenService, useValue: refreshTokens },
+      { provide: AuditService, useValue: audit },
     ],
   }).compile();
 
-  return { service: moduleRef.get(AuthService), prisma, refreshTokens };
+  return { service: moduleRef.get(AuthService), prisma, refreshTokens, audit };
 }
 
 describe('AuthService.login — enumeration hardening', () => {
@@ -513,6 +517,112 @@ describe('AuthService — profile completion in the session', () => {
 
     await expect(service.me(CANDIDATE.id)).resolves.toMatchObject({
       hasProfile: true,
+    });
+  });
+});
+
+describe('AuthService — security journal', () => {
+  let service: AuthService;
+  let prisma: TestContext['prisma'];
+  let refreshTokens: TestContext['refreshTokens'];
+  let audit: TestContext['audit'];
+
+  const account = {
+    id: 42,
+    email: 'known@test.dev',
+    passwordHash: 'stored',
+    isActive: true,
+    role: 'user',
+    userType: 'candidate',
+  };
+
+  beforeEach(async () => {
+    compareMock.mockReset().mockResolvedValue(false);
+    ({ service, prisma, refreshTokens, audit } = await createTestContext());
+  });
+
+  it('records a failed login on an unknown address without naming anyone', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.login(
+        { email: 'ghost@test.dev', password: 'whatever' },
+        { ip: '203.0.113.9' },
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(audit.record).toHaveBeenCalledWith({
+      action: 'login_failed',
+      ip: '203.0.113.9',
+      detail: { reason: 'unknown_account' },
+    });
+    expect(JSON.stringify(audit.record.mock.calls)).not.toContain('ghost');
+  });
+
+  it('records a wrong password against the account it targeted, with no actor', async () => {
+    prisma.user.findUnique.mockResolvedValue(account);
+
+    await expect(
+      service.login({ email: account.email, password: 'wrong' }, {}),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(audit.record).toHaveBeenCalledWith({
+      action: 'login_failed',
+      target: { type: 'user', id: 42 },
+      detail: { reason: 'wrong_password' },
+    });
+  });
+
+  it('records a login refused on a deactivated account', async () => {
+    compareMock.mockResolvedValueOnce(true);
+    prisma.user.findUnique.mockResolvedValue({ ...account, isActive: false });
+
+    await expect(
+      service.login({ email: account.email, password: 'right' }, {}),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'login_failed',
+        detail: { reason: 'inactive_account' },
+      }),
+    );
+  });
+
+  it('records a successful login once', async () => {
+    compareMock.mockResolvedValueOnce(true);
+    prisma.user.findUnique.mockResolvedValue(account);
+
+    await service.login(
+      { email: account.email, password: 'right' },
+      { ip: '10.0.0.1' },
+    );
+
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(audit.record).toHaveBeenCalledWith({
+      action: 'login_succeeded',
+      actorId: 42,
+      ip: '10.0.0.1',
+    });
+  });
+
+  it('records the reuse of a refresh token against its owner', async () => {
+    refreshTokens.findByToken.mockResolvedValue({
+      id: 7,
+      userId: 42,
+      familyId: '11111111-1111-4111-8111-111111111111',
+      revokedAt: new Date(Date.now() - 60_000),
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+
+    await expect(
+      service.refresh('replayed', { ip: '198.51.100.4' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(audit.record).toHaveBeenCalledWith({
+      action: 'session_reuse_detected',
+      target: { type: 'user', id: 42 },
+      ip: '198.51.100.4',
     });
   });
 });

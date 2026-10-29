@@ -12,16 +12,17 @@ Architecture decisions are recorded in [docs/adr/](docs/adr/README.md).
 
 | Folder        | Contents                                                                       |
 | ------------- | ------------------------------------------------------------------------------ |
-| `backend/`    | NestJS 11 API (TypeScript) · **Prisma 7** ORM · PostgreSQL 18 · Kafka producer |
+| `backend/`    | NestJS 11 API (TypeScript) · **Prisma 7** ORM · PostgreSQL 18 · Elasticsearch (feed ranking) |
 | `clientApp/`  | React + Vite frontend                                                          |
-| `compose.yml` | Local stack: PostgreSQL, backend, frontend                                     |
+| `compose.yml` | Local stack: PostgreSQL, Elasticsearch, backend, frontend, monitoring (Prometheus, Grafana, Loki, Alloy) |
+| `docker/docker-compose.yml` | Separate prototype stack for the Kafka logs pipeline (see below) |
 
 ## Getting started
 
 ### Prerequisites
 
 - Docker + Docker Compose
-- Node.js 20+ (to run Prisma commands from the host)
+- Node.js 24 (to run Prisma commands from the host; the images use Node 24 for the backend and Node 22 for the frontend)
 
 ### 1. Start the stack
 
@@ -32,7 +33,7 @@ docker compose up -d
 No `.env` is needed: `compose.yml` provides development defaults (database, throwaway `JWT_SECRET`), and the
 backend applies the Prisma migrations every time its container starts.
 
-This starts `postgres` (5432), `elasticsearch` (9200), `backend` (3001) and `frontend` (8080). The API answers on
+This starts `postgres` (5432), `elasticsearch` (9200), `backend` (3001) and `frontend` (8080), plus the local monitoring stack (Prometheus, Grafana, Loki, Alloy, see [docs/grafana-prometheus.md](docs/grafana-prometheus.md)). The API answers on
 `http://localhost:3001/api`, Swagger on `http://localhost:3001/api/docs`.
 
 ### 2. Customise (optional)
@@ -235,7 +236,7 @@ The local Compose stack includes Elasticsearch at `http://localhost:9200`. It is
 
 The backend indexes open offers and uses Elasticsearch only to rank candidate-feed offer ids. PostgreSQL rechecks that every returned offer is still open and has not already been liked or passed, then reads the card data. If Elasticsearch is disabled or unavailable, the feed safely falls back to the existing newest-first PostgreSQL ordering. When Elasticsearch does not answer, the backend retries in the background (5 s, doubling up to 5 min), then creates the index if it is missing and re-aligns it on PostgreSQL, logging the drift it fixed (`Elasticsearch drift: …`). No restart is needed after an outage.
 
-The ranking weights are intentionally explicit and all live in `backend/src/search/ranking/ranking-rules.ts`: skills 5, seniority 4, contract type 3, salary 3, location 1, freshness 1. Remote work carries no weight — it excludes only. **[docs/ranking-du-feed-candidat.md](docs/ranking-du-feed-candidat.md) explains what filters, what ranks, and why**, with a worked trace. Set `ELASTICSEARCH_ENABLED=false` to force the fallback, override `ELASTICSEARCH_NODE` for another secured cluster, or set `ELASTICSEARCH_REINDEX_ON_STARTUP=true` for a deliberate rebuild from PostgreSQL.
+The ranking weights are intentionally explicit and all live in `backend/src/search/ranking/ranking-rules.ts`: skills 5, seniority 4, contract type 3, salary 3, primary job family 2, location 1, freshness 1 (19 at most, 17 for a candidate with a single job family). Remote work carries no weight: it excludes only. **[docs/ranking-du-feed-candidat.md](docs/ranking-du-feed-candidat.md) explains what filters, what ranks, and why**, with a worked trace. Set `ELASTICSEARCH_ENABLED=false` to force the fallback, override `ELASTICSEARCH_NODE` for another secured cluster, or set `ELASTICSEARCH_REINDEX_ON_STARTUP=true` for a deliberate rebuild from PostgreSQL.
 
 ### How candidate-feed ranking works
 

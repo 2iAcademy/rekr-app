@@ -80,8 +80,9 @@ Une requête SQL ne passe pas par l'API, donc pas par ce qui accompagne d'habitu
 - **Conversations** : l'API gèle les conversations d'une offre fermée. Fermée en SQL, chaque conversation est
   gelée chez Stream à sa prochaine ouverture. Un compte désactivé garde son jeton Stream jusqu'à son expiration,
   une heure au plus.
-- **Traçabilité** : rien n'enregistre qui a fait quoi. Le dépôt est public : n'y écrire ni adresse e-mail ni
-  nom. Garder la date, l'identifiant et le motif hors du dépôt.
+- **Traçabilité** : le journal de sécurité (table `audit_event`) n'enregistre que ce qui passe par l'API. Une
+  modération faite en SQL n'y laisse aucune trace. Le dépôt est public : n'y écrire ni adresse e-mail ni nom.
+  Garder la date, l'identifiant et le motif hors du dépôt.
 
 Le back-office de la V2 remplacera ces requêtes par des routes de l'API réservées au rôle `admin`, qui passeront
 par les mêmes services que l'application.
