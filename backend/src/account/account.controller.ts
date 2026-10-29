@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   HttpCode,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -14,7 +15,7 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -47,9 +48,10 @@ export class AccountController {
   async delete(
     @CurrentUser() user: AuthUser,
     @Body() dto: DeleteAccountDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    await this.service.delete(user.id, dto.password);
+    await this.service.delete(user.id, dto.password, req.ip);
     clearRefreshCookie(res);
   }
 

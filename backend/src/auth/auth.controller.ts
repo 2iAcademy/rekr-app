@@ -107,8 +107,11 @@ export class AuthController {
   @Post('password/forgot')
   @HttpCode(204)
   @ThrottleScope('passwordForgot')
-  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    await this.passwordReset.requestReset(forgotPasswordDto.email);
+  async forgotPassword(
+    @Body() forgotPasswordDto: ForgotPasswordDto,
+    @Req() req: Request,
+  ) {
+    await this.passwordReset.requestReset(forgotPasswordDto.email, req.ip);
   }
 
   /** No session is opened on success: the account has just had every session
@@ -117,10 +120,14 @@ export class AuthController {
   @Post('password/reset')
   @HttpCode(204)
   @ThrottleScope('passwordReset')
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+  async resetPassword(
+    @Body() resetPasswordDto: ResetPasswordDto,
+    @Req() req: Request,
+  ) {
     await this.passwordReset.reset(
       resetPasswordDto.token,
       resetPasswordDto.password,
+      req.ip,
     );
   }
 

@@ -135,6 +135,8 @@ describe('PasswordResetService', () => {
     }),
   };
 
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
+
   const mail = {
     send: jest.fn((message: MailMessage) => {
       sent.push(message);
@@ -173,6 +175,7 @@ describe('PasswordResetService', () => {
       { get: (key: string) => env[key] } as unknown as ConfigService,
       refreshTokens as never,
       mail,
+      audit as never,
     );
   });
 
@@ -469,6 +472,49 @@ describe('PasswordResetService', () => {
       await service.reset(second, 'Nouveau-Mot2Passe!');
 
       expect(resetRows.every((row) => row.usedAt !== null)).toBe(true);
+    });
+  });
+
+  describe('security journal', () => {
+    it('records a request against the account, with the caller address', async () => {
+      await service.requestReset('candidate@test.dev', '203.0.113.9');
+      await flush();
+
+      expect(audit.record).toHaveBeenCalledWith({
+        action: 'password_reset_requested',
+        target: { type: 'user', id: 1 },
+        ip: '203.0.113.9',
+      });
+    });
+
+    it('records nothing for an address no account uses', async () => {
+      await service.requestReset('ghost@test.dev', '203.0.113.9');
+      await flush();
+
+      expect(audit.record).not.toHaveBeenCalled();
+    });
+
+    it('records a completed reset once the transaction has committed', async () => {
+      await service.requestReset('candidate@test.dev');
+      await flush();
+      const token = sentToken();
+      audit.record.mockClear();
+
+      await service.reset(token, 'Nouveau-Mot2Passe!', '198.51.100.4');
+
+      expect(audit.record).toHaveBeenCalledWith({
+        action: 'password_reset_completed',
+        actorId: 1,
+        ip: '198.51.100.4',
+      });
+    });
+
+    it('records nothing when the link is refused', async () => {
+      await expect(
+        service.reset('never-issued', 'Nouveau-Mot2Passe!'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(audit.record).not.toHaveBeenCalled();
     });
   });
 });
