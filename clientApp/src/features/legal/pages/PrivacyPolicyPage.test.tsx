@@ -10,6 +10,16 @@ describe('PrivacyPolicyPage', () => {
     expect(screen.getByText(/24 mois sans connexion/)).toBeInTheDocument();
   });
 
+  it('annonce le journal de sécurité, son adresse tronquée et sa durée', () => {
+    render(<PrivacyPolicyPage />);
+
+    expect(screen.getByText(/Journal de sécurité/)).toHaveTextContent(/adresse IP tronquée/);
+    expect(screen.getByText(/conservés 12 mois/)).toHaveTextContent(
+      /même si le compte est supprimé/,
+    );
+    expect(screen.getByText(/journal de sécurité compris/)).toBeInTheDocument();
+  });
+
   it('dit ce que devient chaque donnée quand le compte est supprimé', () => {
     render(<PrivacyPolicyPage />);
     const section = within(
@@ -41,6 +51,6 @@ describe('PrivacyPolicyPage', () => {
   it('affiche la version du texte, celle que l’inscription enregistre', () => {
     render(<PrivacyPolicyPage />);
 
-    expect(screen.getByText(/Version du 11 octobre 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Version du 29 octobre 2026/)).toBeInTheDocument();
   });
 });

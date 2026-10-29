@@ -6,6 +6,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { Prisma, TagCategory } from '../../generated/prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { CityService, type Coordinates } from '../city/city.service';
 import { lockAnswer } from '../common/answers/answer-lock';
 import { resolveTagIds } from '../common/tags/tag-sync';
@@ -196,6 +197,7 @@ export class OfferService {
     @Optional() private readonly search?: OfferSearchService,
     @Optional() private readonly chat?: ChatService,
     @Optional() private readonly swipeEvents?: SwipeEventsService,
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
   async create(userId: number, dto: CreateOfferDto) {
@@ -229,7 +231,12 @@ export class OfferService {
     return offer;
   }
 
-  async update(userId: number, offerId: number, dto: UpdateOfferDto) {
+  async update(
+    userId: number,
+    offerId: number,
+    dto: UpdateOfferDto,
+    ip?: string,
+  ) {
     const { skills, benefits, ...offerData } = dto;
     let coordinates: Coordinates | null = null;
 
@@ -266,8 +273,16 @@ export class OfferService {
       },
     );
     await this.search?.syncOffer(updated.id);
-    if (updated.status !== previousStatus)
+    if (updated.status !== previousStatus) {
       await this.chat?.syncOfferStatus(updated.id, updated.status);
+      await this.audit?.record({
+        action: 'offer_status_changed',
+        actorId: userId,
+        target: { type: 'offer', id: updated.id },
+        ip,
+        detail: { from: previousStatus, to: updated.status },
+      });
+    }
     return updated;
   }
 

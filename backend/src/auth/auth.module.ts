@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { AuditModule } from '../audit/audit.module';
 import { MailModule } from '../mail/mail.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthController } from './auth.controller';
@@ -13,6 +14,7 @@ import { RefreshTokenService } from './refresh-token.service';
 
 @Module({
   imports: [
+    AuditModule,
     ConfigModule,
     MailModule,
     PrismaModule,

@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '../../generated/prisma/client';
 import { PRIVACY_POLICY_VERSION } from '../account/privacy-policy';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { hashPassword, verifyPassword } from './password-hash';
@@ -48,6 +49,7 @@ export class AuthService {
     private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly audit: AuditService,
   ) {}
 
   async signup(
@@ -89,11 +91,14 @@ export class AuthService {
       include: WITH_PROFILES,
     });
 
+    // Every branch writes one event, so the journal adds the same work to the
+    // unknown-address path as to the others and opens no timing gap of its own.
     if (!user) {
       await verifyPassword(
         loginDto.password,
         AuthService.ABSENT_USER_PASSWORD_HASH,
       );
+      await this.recordFailedLogin(null, 'unknown_account', context);
       throw new UnauthorizedException('Invalid email or password.');
     }
 
@@ -103,14 +108,21 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
+      await this.recordFailedLogin(user.id, 'wrong_password', context);
       throw new UnauthorizedException('Invalid email or password.');
     }
 
     if (!user.isActive) {
+      await this.recordFailedLogin(user.id, 'inactive_account', context);
       throw new ForbiddenException('This account is inactive.');
     }
 
     await this.markActive(user.id);
+    await this.audit.record({
+      action: 'login_succeeded',
+      actorId: user.id,
+      ip: context.ip,
+    });
 
     return this.buildSession(user, context);
   }
@@ -139,7 +151,7 @@ export class AuthService {
       : null;
 
     if (stored.revokedAt && !replayed) {
-      return this.rejectAsReuse(stored.familyId);
+      return this.rejectAsReuse(stored, context);
     }
 
     if (stored.expiresAt.getTime() <= Date.now()) {
@@ -166,7 +178,7 @@ export class AuthService {
       replayed ?? (await this.refreshTokens.rotate(stored, rawToken, context));
 
     if (!refreshToken) {
-      return this.rejectAsReuse(stored.familyId);
+      return this.rejectAsReuse(stored, context);
     }
 
     await this.markActive(user.id);
@@ -180,8 +192,16 @@ export class AuthService {
 
   /** Cut the entire session, not just the link presented — whoever leaked this
    * token may hold its successor too. */
-  private async rejectAsReuse(familyId: string): Promise<never> {
-    await this.refreshTokens.revokeFamily(familyId);
+  private async rejectAsReuse(
+    stored: { userId: number; familyId: string },
+    context: SessionContext,
+  ): Promise<never> {
+    await this.refreshTokens.revokeFamily(stored.familyId);
+    await this.audit.record({
+      action: 'session_reuse_detected',
+      target: { type: 'user', id: stored.userId },
+      ip: context.ip,
+    });
 
     throw new UnauthorizedException('Invalid refresh token.');
   }
@@ -214,6 +234,19 @@ export class AuthService {
     }
 
     return this.toPublicUser(user);
+  }
+
+  private recordFailedLogin(
+    userId: number | null,
+    reason: 'unknown_account' | 'wrong_password' | 'inactive_account',
+    context: SessionContext,
+  ): Promise<void> {
+    return this.audit.record({
+      action: 'login_failed',
+      target: userId === null ? undefined : { type: 'user', id: userId },
+      ip: context.ip,
+      detail: { reason },
+    });
   }
 
   /**

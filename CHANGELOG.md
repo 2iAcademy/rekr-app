@@ -7,6 +7,10 @@ The retrospective entries below are based on the published GitHub release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Security journal: logins, session reuse, password resets, account deletions (and refused attempts) and offer status changes are recorded with a truncated IP address and purged after twelve months; each user gets their own entries in the data export, and the privacy policy describes it (version of 29 October 2026).
+
 ## [1.3.0] - 2026-10-28
 
 Source: [v1.3.0 release notes](https://github.com/2iAcademy/rekr-app/releases/tag/v1.3.0).

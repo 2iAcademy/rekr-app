@@ -4,6 +4,7 @@ import {
   Optional,
   UnauthorizedException,
 } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
 import { verifyPassword } from '../auth/password-hash';
 import { ChatService } from '../chat/chat.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -38,6 +39,7 @@ export class AccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FileSlotService,
+    private readonly audit: AuditService,
     @Optional() private readonly chat?: ChatService,
   ) {}
 
@@ -53,7 +55,7 @@ export class AccountService {
    * picture that no longer exists — the same ordering `FileSlotService.replace`
    * follows, for the same reason.
    */
-  async delete(userId: number, password: string): Promise<void> {
+  async delete(userId: number, password: string, ip?: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { passwordHash: true },
@@ -63,10 +65,22 @@ export class AccountService {
     }
 
     if (!(await verifyPassword(password, user.passwordHash))) {
+      await this.audit.record({
+        action: 'account_deletion_refused',
+        target: { type: 'user', id: userId },
+        ip,
+        detail: { reason: 'wrong_password' },
+      });
       throw new ForbiddenException('Incorrect password.');
     }
 
     await this.erase(userId);
+    await this.audit.record({
+      action: 'account_deleted',
+      actorId: userId,
+      target: { type: 'user', id: userId },
+      ip,
+    });
   }
 
   /**
@@ -175,6 +189,7 @@ export class AccountService {
       ...(account.userType === 'recruiter'
         ? await this.recruiterData(userId)
         : await this.candidateData(userId)),
+      securityEvents: await this.securityEvents(userId),
     };
   }
 
@@ -287,6 +302,24 @@ export class AccountService {
       passesSent: passes,
       matches,
     };
+  }
+
+  /** The journal entries the caller made, or that aimed at their account. */
+  private securityEvents(userId: number) {
+    return this.prisma.auditEvent.findMany({
+      where: {
+        OR: [{ actorId: userId }, { targetType: 'user', targetId: userId }],
+      },
+      select: {
+        action: true,
+        targetType: true,
+        targetId: true,
+        ip: true,
+        detail: true,
+        occurredAt: true,
+      },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+    });
   }
 }
 

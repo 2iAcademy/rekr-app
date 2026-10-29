@@ -1,5 +1,6 @@
 import { LegalLayout, LegalSection } from '@/features/legal/components/LegalLayout';
 import {
+  AUDIT_EVENT_RETENTION_MONTHS,
   INACTIVE_ACCOUNT_RETENTION_MONTHS,
   PRIVACY_POLICY_VERSION_LABEL,
 } from '@/features/legal/policy';
@@ -40,6 +41,12 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
           <li>Profil recruteur : nom, prénom, fonction, et la fiche de votre entreprise.</li>
           <li>Activité : likes, passages et matchs, dates de connexion.</li>
           <li>Messagerie : les messages échangés après un match.</li>
+          <li>
+            Journal de sécurité : connexions réussies ou refusées, sessions coupées après la
+            réutilisation d’un jeton, demandes et changements de mot de passe, suppression du compte
+            ou tentative refusée, changements de statut des offres, avec leur date et, pour une
+            action faite depuis l’application, une adresse IP tronquée (seul le réseau est gardé).
+          </li>
         </ul>
       </LegalSection>
 
@@ -50,6 +57,12 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
           d’échanger par messagerie avec votre match. Le traitement repose sur votre consentement,
           recueilli à l’inscription, et sur l’exécution du service que vous demandez en créant un
           compte.
+        </p>
+        <p>
+          Le journal de sécurité sert à détecter et à établir une tentative d’accès frauduleux à un
+          compte, et à retracer les actions sensibles sur les comptes et les offres : qui a supprimé
+          un compte, qui a publié, mis en pause ou fermé une offre. Il repose sur notre intérêt
+          légitime à protéger le service et vos données.
         </p>
       </LegalSection>
 
@@ -81,6 +94,11 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
           {INACTIVE_ACCOUNT_RETENTION_MONTHS} mois sans connexion est supprimé, avec les mêmes
           effets qu’une suppression demandée par vous.
         </p>
+        <p>
+          Les événements du journal de sécurité sont conservés {AUDIT_EVENT_RETENTION_MONTHS} mois,
+          puis effacés. Ils sont gardés pendant ce délai même si le compte est supprimé : la trace
+          d’une suppression fait partie de ce qu’ils doivent prouver.
+        </p>
       </LegalSection>
 
       <LegalSection title="Suppression du compte">
@@ -101,8 +119,9 @@ export function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
         <p>
           Vous disposez d’un droit d’accès, de rectification, d’effacement, de portabilité et
           d’opposition. Depuis l’écran Mon compte, vous pouvez à tout moment modifier votre profil,
-          télécharger une copie de vos données au format JSON, et supprimer votre compte. Cette
-          copie ne contient pas encore vos messages : pour les obtenir, écrivez à dpo@rekr.example.
+          télécharger une copie de vos données au format JSON, journal de sécurité compris, et
+          supprimer votre compte. Cette copie ne contient pas encore vos messages : pour les
+          obtenir, écrivez à dpo@rekr.example.
         </p>
         <p>
           Si vous estimez que vos droits ne sont pas respectés, vous pouvez adresser une réclamation

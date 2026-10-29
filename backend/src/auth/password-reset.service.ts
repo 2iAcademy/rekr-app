@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MAIL_SENDER, type MailSender } from '../mail/mail-sender.interface';
 import { buildPasswordResetEmail } from './password-reset-email';
@@ -39,6 +40,7 @@ export class PasswordResetService {
     private readonly config: ConfigService,
     private readonly refreshTokens: RefreshTokenService,
     @Inject(MAIL_SENDER) private readonly mail: MailSender,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -65,7 +67,7 @@ export class PasswordResetService {
    * endpoint would be work spent on the second-best enumeration path while
    * the first stays open; the day signup stops answering, this comes back.
    */
-  async requestReset(email: string): Promise<void> {
+  async requestReset(email: string, ip?: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user?.isActive) {
       return;
@@ -87,9 +89,16 @@ export class PasswordResetService {
     });
 
     void this.deliver(user.email, token, ttlMinutes);
+    // Detached like the delivery, and for the same reason: an awaited write
+    // here would widen the gap the comment above measures.
+    void this.audit.record({
+      action: 'password_reset_requested',
+      target: { type: 'user', id: user.id },
+      ip,
+    });
   }
 
-  async reset(token: string, password: string): Promise<void> {
+  async reset(token: string, password: string, ip?: string): Promise<void> {
     const row = await this.prisma.passwordResetToken.findUnique({
       where: { tokenHash: hashToken(token) },
       // The account may have been deactivated after the link went out.
@@ -149,6 +158,12 @@ export class PasswordResetService {
       // purpose.
       await this.refreshTokens.revokeAllForUser(row.userId, tx);
       await this.invalidatePending(tx, row.userId);
+    });
+
+    await this.audit.record({
+      action: 'password_reset_completed',
+      actorId: row.userId,
+      ip,
     });
   }
 

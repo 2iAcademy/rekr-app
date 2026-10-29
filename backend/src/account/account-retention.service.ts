@@ -5,6 +5,7 @@ import {
   OnApplicationShutdown,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AccountService } from './account.service';
 import { INACTIVE_ACCOUNT_RETENTION_MONTHS } from './privacy-policy';
@@ -38,6 +39,7 @@ export class AccountRetentionService
     private readonly prisma: PrismaService,
     private readonly accounts: AccountService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -46,7 +48,11 @@ export class AccountRetentionService
       return;
     }
 
-    const run = () => void this.purgeInactive(new Date()).catch(this.report);
+    const run = () => {
+      const now = new Date();
+      void this.purgeInactive(now).catch(this.report);
+      void this.audit.purgeExpired(now).catch(this.report);
+    };
     run();
     this.timer = setInterval(run, hours * HOUR_MS);
     // A pending purge must never be what keeps the process alive.
@@ -82,6 +88,10 @@ export class AccountRetentionService
     for (const { id } of stale) {
       try {
         await this.accounts.erase(id);
+        await this.audit.record({
+          action: 'account_purged',
+          target: { type: 'user', id },
+        });
         erased += 1;
       } catch (error) {
         this.report(error);
