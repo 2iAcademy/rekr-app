@@ -34,6 +34,11 @@ RUN npm run build
 # `rekr-caddy` (compose.prod.yml, scripts/ci/build-images.sh).
 FROM caddy:2.11-alpine AS prod
 
+# The Caddy image is not rebuilt as soon as Alpine ships a security fix, so
+# the image-security gate fails on CVEs already fixed upstream: pull the
+# patched Alpine packages at build time.
+RUN apk upgrade --no-cache
+
 # rekr-caddy is an external BuildKit named context supplied by compose.prod.yml
 # and scripts/ci/build-images.sh, not a stage declared in this Dockerfile.
 # hadolint ignore=DL3022
